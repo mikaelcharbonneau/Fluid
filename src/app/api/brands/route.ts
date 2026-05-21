@@ -1,0 +1,16 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { listBrandsForUser } from "@/lib/db/brands";
+
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const brands = await listBrandsForUser(supabase, user.id);
+  return NextResponse.json({ brands });
+}

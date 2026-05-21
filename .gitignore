@@ -1,6 +1,16 @@
 node_modules/
 dist/
+.next/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
 .playwright-cli/
+playwright-report/
+test-results/
+coverage/
+
+# Sentry
+.sentryclirc
 
 .DS_Store
 *.local
