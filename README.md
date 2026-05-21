@@ -92,6 +92,14 @@ See `.env.example` for the full list. Key groups:
   happy path requires a test database and a test auth provider — see notes in
   `playwright.config.ts`.
 
+## Continuous integration
+
+A ready-to-use GitHub Actions pipeline (typecheck, lint, unit tests, build, and
+Playwright E2E) lives at `docs/ci-workflow.yml`. Move it to
+`.github/workflows/ci.yml` to enable it — it is parked under `docs/` only
+because the automation that created this branch lacked `workflows` write
+permission.
+
 ## Deployment (Vercel)
 
 1. Import the repo into Vercel.
