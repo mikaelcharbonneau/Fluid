@@ -41,10 +41,11 @@ never trusting client-supplied IDs. `Brand.userId` stores the Supabase
 
 Required environment variables are validated at the point of use via
 `requireEnv` (`src/lib/env.ts`), so a missing Supabase URL/key fails with a
-clear message instead of a cryptic library error. The `/api/health` endpoint is
-a readiness probe: it runs a lightweight `SELECT 1` and returns `503` when the
-database is unreachable, so orchestrators can route traffic away from an
-unhealthy instance.
+clear message instead of a cryptic library error. Health is exposed as two
+probes: `/api/health` (liveness — dependency-free, always `200` when the server
+can respond) and `/api/health/ready` (readiness — runs a lightweight `SELECT 1`
+and returns `503` when the database is unreachable, so orchestrators can route
+traffic away from an instance that is up but not ready).
 
 ## Prerequisites
 
@@ -109,11 +110,10 @@ OAuth client IDs/secrets live in the Supabase dashboard, not in `.env`.
 
 ## Continuous integration
 
-A ready-to-use GitHub Actions pipeline (typecheck, lint, unit tests, build, and
-Playwright E2E) lives at `docs/ci-workflow.yml`. Move it to
-`.github/workflows/ci.yml` to enable it — it is parked under `docs/` only
-because the automation that created this branch lacked `workflows` write
-permission.
+A GitHub Actions pipeline runs on every push to `main` and on all pull
+requests, defined in `.github/workflows/ci.yml`. It has two jobs: `verify`
+(typecheck, lint, unit tests, build) and `e2e` (Playwright). Both run against
+placeholder Supabase credentials, so no secrets are required for CI.
 
 ## Deployment (Vercel)
 
