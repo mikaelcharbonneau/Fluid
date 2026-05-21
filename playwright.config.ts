@@ -20,8 +20,10 @@ export default defineConfig({
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
     env: {
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? "test-secret-for-e2e-only",
-      NEXTAUTH_URL: baseURL,
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-anon-key",
     },
   },
 });

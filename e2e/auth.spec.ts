@@ -24,6 +24,5 @@ test("brand-strategy endpoint rejects unauthenticated requests", async ({ reques
     data: { about: "x", audience: "y" },
     maxRedirects: 0,
   });
-  expect(response.status()).not.toBe(200);
-  expect([302, 307, 401]).toContain(response.status());
+  expect(response.status()).toBe(401);
 });

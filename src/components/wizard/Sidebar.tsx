@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
 import {
   ArrowRightIcon,
   ChevronDownIcon,
@@ -25,9 +27,31 @@ const navItems = [
 ];
 
 export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
-  const { data: session } = useSession();
-  const name = session?.user?.name ?? "Your account";
-  const email = session?.user?.email ?? "";
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("Your account");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
+      const displayName =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        user.email ??
+        "Your account";
+      setName(displayName);
+      setEmail(user.email ?? "");
+    });
+  }, []);
+
+  const signOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/signin");
+  };
+
   const initial = (name || "?").trim().charAt(0).toUpperCase();
 
   return (
@@ -65,12 +89,7 @@ export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
         </button>
       </section>
 
-      <button
-        className="profile-card"
-        type="button"
-        aria-label="Sign out"
-        onClick={() => signOut({ callbackUrl: "/signin" })}
-      >
+      <button className="profile-card" type="button" aria-label="Sign out" onClick={signOut}>
         <span className="avatar">{initial}</span>
         <span className="profile-copy">
           <strong>{name}</strong>

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { getBrandById } from "@/lib/db/brands";
 import { Sidebar } from "@/components/wizard/Sidebar";
 import { GradientRibbon } from "@/components/icons";
@@ -11,13 +10,16 @@ import { toBrandView } from "../serialize";
 export const dynamic = "force-dynamic";
 
 export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     redirect("/signin");
   }
 
   const { id } = await params;
-  const brand = await getBrandById(session.user.id, id);
+  const brand = await getBrandById(user.id, id);
   if (!brand) {
     notFound();
   }

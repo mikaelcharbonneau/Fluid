@@ -10,8 +10,8 @@ generated with the OpenAI Agents SDK and saved to their account.
 - **Next.js 16** (App Router) + **React 19** + **TypeScript** (strict)
 - **OpenAI Agents SDK** (`@openai/agents`) for strategy generation, with a
   deterministic demo fallback when no API key is set
-- **NextAuth v4** (GitHub + Google OAuth, JWT sessions) for authentication
-- **Prisma + PostgreSQL** (Neon / Vercel Postgres) for persistence
+- **Supabase** for **Postgres + Auth** (GitHub/Google OAuth via `@supabase/ssr`)
+- **Prisma** for the application data layer and migrations (against Supabase Postgres)
 - **Upstash Redis** for per-user rate limiting on the cost-bearing endpoint
 - **Sentry** for error tracking, **Vitest** for unit tests, **Playwright** for E2E
 - **Zod** for input/output validation
@@ -20,7 +20,7 @@ generated with the OpenAI Agents SDK and saved to their account.
 
 ```
 Wizard UI (src/components/wizard) ──POST──▶ /api/brand-strategy
-                                              │  auth check (getServerSession)
+                                              │  auth check (Supabase getUser)
                                               │  per-user rate limit (Upstash)
                                               │  validate input (Zod)
                                               ▼
@@ -32,14 +32,19 @@ Wizard UI (src/components/wizard) ──POST──▶ /api/brand-strategy
 Saved brands (/brands, /brands/[id]) ◀────────┘  ownership enforced per query
 ```
 
-Routes are gated by `src/middleware.ts`; the brand endpoint and data-access
-layer re-check ownership server-side, never trusting client-supplied IDs.
+Auth is handled by Supabase via `@supabase/ssr`: `src/middleware.ts` refreshes
+the session and redirects unauthenticated users away from protected routes, and
+every API route / server page re-checks `supabase.auth.getUser()`. The
+data-access layer (`src/lib/db/brands.ts`) scopes every query to the user's id,
+never trusting client-supplied IDs. `Brand.userId` stores the Supabase
+`auth.users` UUID.
 
 ## Prerequisites
 
 - Node `22` (see `.nvmrc`)
-- A PostgreSQL database (Neon or Vercel Postgres recommended)
-- GitHub and/or Google OAuth apps
+- A **Supabase** project (provides Postgres + Auth)
+- GitHub and/or Google OAuth apps, registered under Supabase
+  **Authentication > Providers**
 - (Optional) Upstash Redis, OpenAI API key, Sentry project
 
 ## Local setup
@@ -60,14 +65,15 @@ result, so you can develop the full flow without incurring API cost. Without
 
 See `.env.example` for the full list. Key groups:
 
-| Variable                                      | Purpose                                                |
-| --------------------------------------------- | ------------------------------------------------------ |
-| `OPENAI_API_KEY`                              | Live strategy generation (demo fallback if unset)      |
-| `DATABASE_URL` / `DIRECT_URL`                 | Pooled (runtime) and direct (migrations) Postgres URLs |
-| `NEXTAUTH_URL` / `NEXTAUTH_SECRET`            | NextAuth config (`openssl rand -base64 32`)            |
-| `GITHUB_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET` | OAuth providers                                        |
-| `UPSTASH_REDIS_REST_URL/TOKEN`                | Per-user rate limiting                                 |
-| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`          | Error tracking + source map upload                     |
+| Variable                                                     | Purpose                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------ |
+| `OPENAI_API_KEY`                                             | Live strategy generation (demo fallback if unset)      |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project URL + anon key (auth)                 |
+| `DATABASE_URL` / `DIRECT_URL`                                | Pooled (runtime) and direct (migrations) Postgres URLs |
+| `UPSTASH_REDIS_REST_URL/TOKEN`                               | Per-user rate limiting                                 |
+| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                         | Error tracking + source map upload                     |
+
+OAuth client IDs/secrets live in the Supabase dashboard, not in `.env`.
 
 ## Scripts
 
@@ -89,8 +95,8 @@ See `.env.example` for the full list. Key groups:
   brand data-access ownership. The OpenAI runner is never called in tests.
 - **E2E** (`e2e/`): health check, sign-in page, the unauthenticated redirect, and
   rejection of unauthenticated calls to `/api/brand-strategy`. The authenticated
-  happy path requires a test database and a test auth provider — see notes in
-  `playwright.config.ts`.
+  happy path requires a Supabase test project (and a seeded session) — see notes
+  in `playwright.config.ts`.
 
 ## Continuous integration
 
@@ -102,13 +108,15 @@ permission.
 
 ## Deployment (Vercel)
 
-1. Import the repo into Vercel.
-2. Provision Postgres (Neon integration) and set **both** `DATABASE_URL` (pooled)
-   and `DIRECT_URL` (direct) — migrations fail over a pooled connection.
-3. Set all environment variables from `.env.example` in the Vercel project.
-4. Create GitHub/Google OAuth apps with callback
-   `https://<your-domain>/api/auth/callback/<provider>`.
-5. Run `npm run db:deploy` against the production database (e.g. as a release
+1. Create a Supabase project; from **Project Settings**: copy the API URL + anon
+   key, and the database connection strings (pooled `DATABASE_URL` on port 6543,
+   direct `DIRECT_URL` on port 5432 — migrations fail over the pooled connection).
+2. In Supabase **Authentication > Providers**, enable GitHub/Google with their
+   client IDs/secrets, and add the site URL + redirect URL
+   `https://<your-domain>/auth/callback` to the allowed redirect list.
+3. Import the repo into Vercel and set all environment variables from
+   `.env.example` in the project.
+4. Run `npm run db:deploy` against the production database (e.g. as a release
    step) to apply migrations.
 
 `prisma generate` runs automatically on install via the `postinstall` script.

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { listBrandsForUser } from "@/lib/db/brands";
 import { Sidebar } from "@/components/wizard/Sidebar";
 import { GradientRibbon } from "@/components/icons";
@@ -11,12 +10,15 @@ import { toBrandView } from "./serialize";
 export const dynamic = "force-dynamic";
 
 export default async function BrandsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    redirect("/signin?callbackUrl=/brands");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/signin?redirectTo=/brands");
   }
 
-  const brands = await listBrandsForUser(session.user.id);
+  const brands = await listBrandsForUser(user.id);
 
   return (
     <main className="app-frame" aria-label="Saved brands">

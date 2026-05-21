@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { brandBasicsSchema, createBrandStrategy } from "@/lib/agents/brand-workflow";
 import { createBrand } from "@/lib/db/brands";
 import { checkRateLimit } from "@/lib/ratelimit";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
-  const userId = session.user.id;
+  const userId = user.id;
 
   const { success, reset } = await checkRateLimit(userId);
   if (!success) {
