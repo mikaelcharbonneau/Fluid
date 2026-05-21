@@ -31,7 +31,9 @@ const brandWorkflowRunner = new Runner({
   workflowName: "Fluid brand strategy",
 });
 
-export async function createBrandStrategy(input: z.infer<typeof brandBasicsSchema>) {
+export async function createBrandStrategy(
+  input: z.infer<typeof brandBasicsSchema>,
+): Promise<z.infer<typeof brandStrategyOutputSchema>> {
   const parsedInput = brandBasicsSchema.parse(input);
 
   if (!process.env.OPENAI_API_KEY) {
@@ -43,12 +45,21 @@ export async function createBrandStrategy(input: z.infer<typeof brandBasicsSchem
     `Create a brand strategy foundation for this company:\n${JSON.stringify(parsedInput, null, 2)}`,
   );
 
+  if (!result.finalOutput) {
+    throw new Error("Brand strategy generation returned no output.");
+  }
+
   return result.finalOutput;
 }
 
+function clamp(value: string, max = 120) {
+  const trimmed = value.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
+}
+
 function createDemoBrandStrategy(input: z.infer<typeof brandBasicsSchema>) {
-  const audience = input.audience || "ambitious teams";
-  const focus = input.about || "a company creating clarity for its customers";
+  const audience = clamp(input.audience) || "ambitious teams";
+  const focus = clamp(input.about) || "a company creating clarity for its customers";
 
   return {
     positioning: `A focused, high-trust brand for ${audience}, built around clarity, momentum, and confident decision-making.`,
@@ -57,7 +68,16 @@ function createDemoBrandStrategy(input: z.infer<typeof brandBasicsSchema>) {
     namingTerritories: ["Clarity and flow", "Momentum", "Signal", "Simple systems"],
     visualDirection: `A modern identity with soft motion, generous whitespace, and fluid gradient accents that make ${focus} feel precise but approachable.`,
     recommendedStyle: "modern" as const,
-    suggestedNames: ["ClarityFlow", "Lumiq", "Intentra", "Novaform", "Mindscape", "Peakora", "Virelo", "Elevan"],
+    suggestedNames: [
+      "ClarityFlow",
+      "Lumiq",
+      "Intentra",
+      "Novaform",
+      "Mindscape",
+      "Peakora",
+      "Virelo",
+      "Elevan",
+    ],
     tagline: "Empowering teams with clarity and flow.",
   };
 }

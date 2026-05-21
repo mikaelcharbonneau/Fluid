@@ -9,7 +9,9 @@
   --line-strong: #ddd0cf;
   --line-cool: #dde3ec;
   --brand-gradient: linear-gradient(135deg, #32d4b5 0%, #7ccfff 34%, #f295d7 66%, #ff9935 100%);
-  --shadow-panel: 0 28px 80px rgba(77, 52, 49, 0.06), 0 9px 26px rgba(42, 31, 31, 0.035), 0 1px 1px rgba(30, 20, 20, 0.04);
+  --shadow-panel:
+    0 28px 80px rgba(77, 52, 49, 0.06), 0 9px 26px rgba(42, 31, 31, 0.035),
+    0 1px 1px rgba(30, 20, 20, 0.04);
   --shadow-soft: 0 20px 48px rgba(77, 52, 49, 0.06), 0 2px 8px rgba(42, 31, 31, 0.035);
   --shadow-card: 0 14px 30px rgba(77, 52, 49, 0.055), 0 1px 1px rgba(42, 31, 31, 0.035);
   --radius-shell: 14px;
@@ -30,7 +32,14 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
@@ -112,7 +121,11 @@ button {
   font-size: 13px;
   font-weight: 650;
   line-height: 1;
-  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .nav-item:hover {
@@ -123,7 +136,9 @@ button {
 
 .nav-item.active {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.36));
-  box-shadow: inset 0 0 0 1px rgba(238, 226, 224, 0.66), 0 8px 18px rgba(77, 52, 49, 0.035);
+  box-shadow:
+    inset 0 0 0 1px rgba(238, 226, 224, 0.66),
+    0 8px 18px rgba(77, 52, 49, 0.035);
 }
 
 .nav-item.active::before {
@@ -174,12 +189,17 @@ button {
   border-radius: 12px;
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(12px);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .upgrade-card:hover {
   border-color: #dfd0ce;
-  box-shadow: 0 18px 38px rgba(77, 52, 49, 0.075), 0 2px 7px rgba(42, 31, 31, 0.04);
+  box-shadow:
+    0 18px 38px rgba(77, 52, 49, 0.075),
+    0 2px 7px rgba(42, 31, 31, 0.04);
   transform: translateY(-1px);
 }
 
@@ -225,7 +245,9 @@ button {
   background: var(--surface);
   border: 1px solid #dfe3ea;
   border-radius: 8px;
-  box-shadow: 0 7px 16px rgba(77, 52, 49, 0.045), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 7px 16px rgba(77, 52, 49, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -246,12 +268,17 @@ button {
   border: 1px solid var(--line);
   border-radius: 15px;
   box-shadow: var(--shadow-card);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .profile-card:hover {
   border-color: #dfd0ce;
-  box-shadow: 0 18px 36px rgba(77, 52, 49, 0.07), 0 2px 8px rgba(42, 31, 31, 0.04);
+  box-shadow:
+    0 18px 36px rgba(77, 52, 49, 0.07),
+    0 2px 8px rgba(42, 31, 31, 0.04);
   transform: translateY(-1px);
 }
 
@@ -345,13 +372,20 @@ button {
   background: rgba(252, 250, 250, 0.78);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 10px 22px rgba(77, 52, 49, 0.045), inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  box-shadow:
+    0 10px 22px rgba(77, 52, 49, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .close-button:hover {
   border-color: #dbc9c7;
-  box-shadow: 0 14px 30px rgba(77, 52, 49, 0.065), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 14px 30px rgba(77, 52, 49, 0.065),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
   transform: translateY(-1px);
 }
 
@@ -444,19 +478,26 @@ button {
   border: 1px solid rgba(226, 214, 212, 0.86);
   border-radius: 9px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .step-card:hover {
   border-color: #dbcac8;
-  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.04), 0 1px 0 rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 12px 24px rgba(77, 52, 49, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.75);
   transform: translateY(-1px);
 }
 
 .step-card.active {
   border-color: #d9c8c7;
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.94) 0%, rgba(252, 250, 250, 0.98) 100%);
-  box-shadow: 0 16px 34px rgba(77, 52, 49, 0.06), 0 1px 0 rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 16px 34px rgba(77, 52, 49, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .step-card.active::before {
@@ -490,7 +531,9 @@ button {
   height: 43px;
   flex: 0 0 auto;
   color: #0a0d13;
-  background: linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, rgba(218, 225, 235, 0.95), rgba(232, 217, 215, 0.95)) border-box;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, rgba(218, 225, 235, 0.95), rgba(232, 217, 215, 0.95)) border-box;
   border: 1px solid transparent;
   border-radius: 50%;
   font-size: 17px;
@@ -499,8 +542,12 @@ button {
 }
 
 .step-card.active .step-number {
-  background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--brand-gradient) border-box;
-  box-shadow: 0 0 0 4px rgba(255, 250, 250, 0.88), 0 10px 24px rgba(92, 204, 199, 0.14);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--brand-gradient) border-box;
+  box-shadow:
+    0 0 0 4px rgba(255, 250, 250, 0.88),
+    0 10px 24px rgba(92, 204, 199, 0.14);
 }
 
 .step-card.completed .step-number {
@@ -602,20 +649,30 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.9) 0%, rgba(252, 250, 250, 0.98) 100%);
   border: 1px solid rgba(218, 207, 206, 0.92);
   border-radius: 10px;
-  box-shadow: 0 10px 24px rgba(77, 52, 49, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  box-shadow:
+    0 10px 24px rgba(77, 52, 49, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
 }
 
 .style-card:hover {
   border-color: #d2c1c0;
-  box-shadow: 0 16px 32px rgba(77, 52, 49, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 16px 32px rgba(77, 52, 49, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transform: translateY(-1px);
 }
 
 .style-card.selected {
   border-color: #d0bfbd;
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.98) 0%, rgba(252, 250, 250, 1) 100%);
-  box-shadow: 0 18px 34px rgba(77, 52, 49, 0.065), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 18px 34px rgba(77, 52, 49, 0.065),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 .style-radio {
@@ -656,7 +713,9 @@ button {
   overflow: hidden;
   border-radius: 9px;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(243, 240, 240, 0.72));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 9px 20px rgba(77, 52, 49, 0.035);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 9px 20px rgba(77, 52, 49, 0.035);
 }
 
 .style-art span {
@@ -839,12 +898,17 @@ button {
   border-radius: 7px;
   outline: none;
   padding: 13px 14px;
-  box-shadow: inset 0 1px 2px rgba(77, 52, 49, 0.035), inset 0 -1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 2px rgba(77, 52, 49, 0.035),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.55;
   letter-spacing: -0.02px;
-  transition: border-color 170ms ease, box-shadow 170ms ease, background 170ms ease;
+  transition:
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    background 170ms ease;
 }
 
 .field-block textarea::placeholder {
@@ -854,12 +918,17 @@ button {
 
 .field-block textarea:hover {
   border-color: #d4c4c3;
-  box-shadow: inset 0 1px 2px rgba(77, 52, 49, 0.045), inset 0 -1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow:
+    inset 0 1px 2px rgba(77, 52, 49, 0.045),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .field-block textarea:focus {
   border-color: #bfc9d8;
-  box-shadow: 0 0 0 3px rgba(102, 207, 207, 0.14), 0 0 0 1px rgba(255, 145, 157, 0.06), inset 0 1px 2px rgba(77, 52, 49, 0.035);
+  box-shadow:
+    0 0 0 3px rgba(102, 207, 207, 0.14),
+    0 0 0 1px rgba(255, 145, 157, 0.06),
+    inset 0 1px 2px rgba(77, 52, 49, 0.035);
 }
 
 .about-field em {
@@ -922,7 +991,9 @@ button {
   background: linear-gradient(180deg, #fffdfd 0%, #fbf7f6 100%);
   border: 1px solid var(--line-strong);
   border-radius: 7px;
-  box-shadow: inset 0 1px 2px rgba(77, 52, 49, 0.032), inset 0 -1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 2px rgba(77, 52, 49, 0.032),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.72);
   font-size: 12px;
   font-weight: 650;
   line-height: 1;
@@ -987,7 +1058,10 @@ button {
   font-weight: 650;
   line-height: 1;
   box-shadow: 0 7px 16px rgba(77, 52, 49, 0.035);
-  transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+  transition:
+    transform 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease;
 }
 
 .chip:hover {
@@ -1017,11 +1091,17 @@ button {
   background: linear-gradient(180deg, #05080d 0%, #010205 100%);
   border: 0;
   border-radius: 7px;
-  box-shadow: 0 14px 28px rgba(5, 7, 11, 0.18), 0 2px 7px rgba(5, 7, 11, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 14px 28px rgba(5, 7, 11, 0.18),
+    0 2px 7px rgba(5, 7, 11, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
 }
 
 .back-button {
@@ -1039,22 +1119,32 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.96), rgba(252, 250, 250, 0.98));
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  box-shadow: 0 9px 20px rgba(77, 52, 49, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 9px 20px rgba(77, 52, 49, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
   font-size: 12.5px;
   font-weight: 720;
   line-height: 1;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .back-button:hover {
   border-color: #d2c1c0;
-  box-shadow: 0 14px 28px rgba(77, 52, 49, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 14px 28px rgba(77, 52, 49, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
   transform: translateY(-1px);
 }
 
 .continue-button:hover {
   background: linear-gradient(180deg, #0d1118 0%, #010205 100%);
-  box-shadow: 0 18px 34px rgba(5, 7, 11, 0.2), 0 3px 10px rgba(5, 7, 11, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 18px 34px rgba(5, 7, 11, 0.2),
+    0 3px 10px rgba(5, 7, 11, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
 }
 
@@ -1073,7 +1163,9 @@ button {
   background: linear-gradient(120deg, rgba(255, 253, 253, 0.9), rgba(252, 250, 250, 0.72));
   border: 1px solid rgba(223, 211, 210, 0.9);
   border-radius: 9px;
-  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 12px 24px rgba(77, 52, 49, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .ai-status {
@@ -1157,14 +1249,22 @@ button {
   border: 1px solid rgba(230, 216, 214, 0.76);
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(255, 253, 253, 0.72), rgba(252, 250, 250, 0.44));
-  box-shadow: 0 16px 32px rgba(77, 52, 49, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 16px 32px rgba(77, 52, 49, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .brand-preview::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, rgba(54, 211, 180, 0.08), transparent 28%, rgba(255, 138, 171, 0.1) 62%, rgba(255, 151, 31, 0.1));
+  background: linear-gradient(
+    110deg,
+    rgba(54, 211, 180, 0.08),
+    transparent 28%,
+    rgba(255, 138, 171, 0.1) 62%,
+    rgba(255, 151, 31, 0.1)
+  );
   opacity: 0.8;
 }
 
@@ -1301,19 +1401,28 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.9) 0%, rgba(252, 250, 250, 0.98) 100%);
   border: 1px solid rgba(218, 207, 206, 0.92);
   border-radius: 8px;
-  box-shadow: 0 10px 22px rgba(77, 52, 49, 0.032), inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  box-shadow:
+    0 10px 22px rgba(77, 52, 49, 0.032),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .choice-card:hover {
   border-color: #d4c2c0;
-  box-shadow: 0 14px 28px rgba(77, 52, 49, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 14px 28px rgba(77, 52, 49, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transform: translateY(-1px);
 }
 
 .choice-card.selected {
   border-color: rgba(4, 7, 10, 0.72);
-  box-shadow: 0 16px 32px rgba(77, 52, 49, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 16px 32px rgba(77, 52, 49, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .choice-card.selected .style-radio {
@@ -1384,7 +1493,9 @@ button {
   border: 1px solid rgba(220, 210, 208, 0.92);
   border-radius: 9px;
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.84), rgba(252, 250, 250, 0.96));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 12px 24px rgba(77, 52, 49, 0.028);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 12px 24px rgba(77, 52, 49, 0.028);
 }
 
 .name-row {
@@ -1451,7 +1562,9 @@ button {
   background: linear-gradient(180deg, #05080d 0%, #010205 100%);
   border: 0;
   border-radius: 6px;
-  box-shadow: 0 8px 15px rgba(5, 7, 11, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 15px rgba(5, 7, 11, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   font-size: 10.5px;
   font-weight: 770;
 }
@@ -1558,7 +1671,9 @@ button {
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   outline: none;
-  box-shadow: inset 0 1px 2px rgba(77, 52, 49, 0.032), inset 0 -1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 2px rgba(77, 52, 49, 0.032),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.72);
   font-size: 12px;
   font-weight: 610;
 }
@@ -1609,13 +1724,20 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.82), rgba(252, 250, 250, 0.96));
   border: 1px solid rgba(220, 210, 208, 0.92);
   border-radius: 9px;
-  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  box-shadow:
+    0 12px 24px rgba(77, 52, 49, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .logo-concept:hover {
   border-color: #d2c1c0;
-  box-shadow: 0 16px 30px rgba(77, 52, 49, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 16px 30px rgba(77, 52, 49, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
   transform: translateY(-1px);
 }
 
@@ -1740,7 +1862,12 @@ button {
 .logo-concept-art.loop span:nth-child(3) {
   width: 58px;
   height: 58px;
-  background: linear-gradient(140deg, transparent 0 44%, rgba(255, 255, 255, 0.55) 44% 58%, transparent 58%);
+  background: linear-gradient(
+    140deg,
+    transparent 0 44%,
+    rgba(255, 255, 255, 0.55) 44% 58%,
+    transparent 58%
+  );
 }
 
 .logo-concept-art.loop span:nth-child(4) {
@@ -1788,11 +1915,16 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.96), rgba(252, 250, 250, 0.98));
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  box-shadow: 0 9px 20px rgba(77, 52, 49, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 9px 20px rgba(77, 52, 49, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
   font-size: 12px;
   font-weight: 710;
   line-height: 1;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .generate-button {
@@ -1804,7 +1936,9 @@ button {
 .action-row button:hover,
 .edit-button:hover {
   border-color: #d2c1c0;
-  box-shadow: 0 14px 26px rgba(77, 52, 49, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 14px 26px rgba(77, 52, 49, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
   transform: translateY(-1px);
 }
 
@@ -1834,7 +1968,9 @@ button {
   border: 1px solid rgba(220, 210, 208, 0.92);
   border-radius: 9px;
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.74), rgba(252, 250, 250, 0.94));
-  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 24px rgba(77, 52, 49, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .brand-summary > .logo-concept-art {
@@ -1900,7 +2036,9 @@ button {
   background: linear-gradient(180deg, rgba(255, 253, 253, 0.76), rgba(252, 250, 250, 0.94));
   border: 1px solid rgba(220, 210, 208, 0.92);
   border-radius: 9px;
-  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 24px rgba(77, 52, 49, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .kit-card .logo-concept-art,
@@ -2811,4 +2949,261 @@ button {
     flex: 1 1 0;
     min-width: 0;
   }
+}
+
+/* --- Sign in --- */
+.signin-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--page);
+}
+
+.signin-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 36px 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-shell);
+  box-shadow: var(--shadow-panel);
+  text-align: center;
+}
+
+.signin-logo {
+  height: 28px;
+  width: auto;
+  margin-bottom: 20px;
+}
+
+.signin-card h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.signin-card p {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.signin-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.signin-buttons button {
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 14px;
+  transition:
+    border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.signin-buttons button:hover {
+  border-color: var(--ink);
+}
+
+.signin-buttons button:active {
+  transform: translateY(1px);
+}
+
+.signin-error {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  background: #fdecec;
+  color: #b42318;
+  font-size: 13px;
+}
+
+/* --- Brand actions (shared) --- */
+.brand-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.brand-action:hover {
+  border-color: var(--ink);
+}
+
+.brand-action-primary {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+
+.brand-action-primary:hover {
+  opacity: 0.9;
+}
+
+.brand-action-danger {
+  color: #b42318;
+  border-color: #f0c5c0;
+}
+
+.brand-action-danger:hover {
+  border-color: #b42318;
+}
+
+.brand-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.brands-create {
+  margin-top: 16px;
+}
+
+/* --- Brands list --- */
+.brands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.brand-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.brand-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand-card-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.brand-card-style {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.brand-card-tagline {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.brand-card-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.brand-card-error {
+  margin: 0;
+  font-size: 13px;
+  color: #b42318;
+}
+
+.brand-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.brands-empty {
+  margin-top: 48px;
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-shell);
+}
+
+.brands-empty h2 {
+  margin: 0 0 8px;
+}
+
+.brands-empty p {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+/* --- Brand detail --- */
+.brand-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.brand-detail-block {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.brand-detail-block h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.brand-detail-block p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.brand-detail-meta {
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  text-transform: capitalize;
+}
+
+.brand-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-chip-row li {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  font-size: 13px;
 }

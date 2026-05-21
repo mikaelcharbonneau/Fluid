@@ -1,19 +1,53 @@
 import { NextResponse } from "next/server";
-import { createBrandStrategy } from "@/lib/agents/brand-workflow";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { brandBasicsSchema, createBrandStrategy } from "@/lib/agents/brand-workflow";
+import { createBrand } from "@/lib/db/brands";
+import { checkRateLimit } from "@/lib/ratelimit";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  const userId = session.user.id;
+
+  const { success, reset } = await checkRateLimit(userId);
+  if (!success) {
+    const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000));
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
+
+  let body: unknown;
   try {
-    const payload = await request.json();
-    const strategy = await createBrandStrategy(payload);
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
 
-    return NextResponse.json({
+  const parsed = brandBasicsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid input.", issues: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const strategy = await createBrandStrategy(parsed.data);
+    const brand = await createBrand(userId, {
+      basics: parsed.data,
       strategy,
-      mode: process.env.OPENAI_API_KEY ? "agent" : "demo",
-      setupRequired: !process.env.OPENAI_API_KEY,
+      name: strategy.suggestedNames[0] ?? "Untitled brand",
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create brand strategy.";
 
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ strategy, brandId: brand.id });
+  } catch (error) {
+    logger.error({ err: error, userId }, "Failed to create brand strategy");
+    return NextResponse.json({ error: "Unable to create brand strategy." }, { status: 500 });
   }
 }
