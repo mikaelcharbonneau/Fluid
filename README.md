@@ -110,10 +110,13 @@ OAuth client IDs/secrets live in the Supabase dashboard, not in `.env`.
 
 ## Continuous integration
 
-A GitHub Actions pipeline runs on every push to `main` and on all pull
-requests, defined in `.github/workflows/ci.yml`. It has two jobs: `verify`
-(typecheck, lint, unit tests, build) and `e2e` (Playwright). Both run against
-placeholder Supabase credentials, so no secrets are required for CI.
+A ready-to-use GitHub Actions pipeline lives at `docs/ci-workflow.yml`. It has
+two jobs: `verify` (typecheck, lint, unit tests, build) and `e2e` (Playwright),
+both running against placeholder Supabase credentials, so no secrets are
+required. Move it to `.github/workflows/ci.yml` and commit it with a token/app
+that has the `workflows` permission to enable it — it is parked under `docs/`
+because the automation that maintains this branch cannot write under
+`.github/workflows/`.
 
 ## Deployment (Vercel)
 
