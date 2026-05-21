@@ -39,6 +39,13 @@ data-access layer (`src/lib/db/brands.ts`) scopes every query to the user's id,
 never trusting client-supplied IDs. `Brand.userId` stores the Supabase
 `auth.users` UUID.
 
+Required environment variables are validated at the point of use via
+`requireEnv` (`src/lib/env.ts`), so a missing Supabase URL/key fails with a
+clear message instead of a cryptic library error. The `/api/health` endpoint is
+a readiness probe: it runs a lightweight `SELECT 1` and returns `503` when the
+database is unreachable, so orchestrators can route traffic away from an
+unhealthy instance.
+
 ## Prerequisites
 
 - Node `22` (see `.nvmrc`)
@@ -91,8 +98,10 @@ OAuth client IDs/secrets live in the Supabase dashboard, not in `.env`.
 
 ## Testing
 
-- **Unit** (`src/**/*.test.ts`): schema validation, the demo strategy shape, and
-  brand data-access ownership. The OpenAI runner is never called in tests.
+- **Unit** (`src/**/*.test.ts`): schema validation, the demo strategy shape,
+  brand data-access ownership, and the `/api/brand-strategy` route handler (auth
+  gating, rate limiting, input validation, and error handling). The OpenAI
+  runner is never called in tests.
 - **E2E** (`e2e/`): health check, sign-in page, the unauthenticated redirect, and
   rejection of unauthenticated calls to `/api/brand-strategy`. The authenticated
   happy path requires a Supabase test project (and a seeded session) — see notes
