@@ -18,7 +18,7 @@ export default async function BrandsPage() {
     redirect("/signin?redirectTo=/brands");
   }
 
-  const brands = await listBrandsForUser(user.id);
+  const brands = await listBrandsForUser(supabase, user.id);
 
   return (
     <main className="app-frame" aria-label="Saved brands">

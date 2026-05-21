@@ -9,15 +9,10 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@openai/agents": "^0.11.4",
-    "@prisma/client": "^6.19.3",
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
@@ -42,7 +37,6 @@
     "eslint-config-next": "^16.2.6",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.3",
-    "prisma": "^6.19.3",
     "vitest": "^4.1.7"
   }
 }

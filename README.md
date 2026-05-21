@@ -11,7 +11,8 @@ generated with the OpenAI Agents SDK and saved to their account.
 - **OpenAI Agents SDK** (`@openai/agents`) for strategy generation, with a
   deterministic demo fallback when no API key is set
 - **Supabase** for **Postgres + Auth** (GitHub/Google OAuth via `@supabase/ssr`)
-- **Prisma** for the application data layer and migrations (against Supabase Postgres)
+- **Supabase client** (`@supabase/supabase-js`) for the application data layer,
+  with Row Level Security enforcing per-user ownership in the database
 - **Upstash Redis** for per-user rate limiting on the cost-bearing endpoint
 - **Sentry** for error tracking, **Vitest** for unit tests, **Playwright** for E2E
 - **Zod** for input/output validation
@@ -27,7 +28,7 @@ Wizard UI (src/components/wizard) ──POST──▶ /api/brand-strategy
                                    createBrandStrategy (OpenAI agent / demo)
                                               │
                                               ▼
-                                   persist via Prisma (src/lib/db/brands.ts)
+                              persist via Supabase client (src/lib/db/brands.ts)
                                               │
 Saved brands (/brands, /brands/[id]) ◀────────┘  ownership enforced per query
 ```
@@ -35,17 +36,19 @@ Saved brands (/brands, /brands/[id]) ◀────────┘  ownership e
 Auth is handled by Supabase via `@supabase/ssr`: `src/middleware.ts` refreshes
 the session and redirects unauthenticated users away from protected routes, and
 every API route / server page re-checks `supabase.auth.getUser()`. The
-data-access layer (`src/lib/db/brands.ts`) scopes every query to the user's id,
-never trusting client-supplied IDs. `Brand.userId` stores the Supabase
-`auth.users` UUID.
+data-access layer (`src/lib/db/brands.ts`) runs through the request-scoped
+Supabase client and scopes every query to the user's id, never trusting
+client-supplied IDs; Row Level Security policies on `Brand` enforce the same
+ownership rule in the database as defense in depth. `Brand.userId` stores the
+Supabase `auth.users` UUID.
 
 Required environment variables are validated at the point of use via
 `requireEnv` (`src/lib/env.ts`), so a missing Supabase URL/key fails with a
 clear message instead of a cryptic library error. Health is exposed as two
 probes: `/api/health` (liveness — dependency-free, always `200` when the server
-can respond) and `/api/health/ready` (readiness — runs a lightweight `SELECT 1`
-and returns `503` when the database is unreachable, so orchestrators can route
-traffic away from an instance that is up but not ready).
+can respond) and `/api/health/ready` (readiness — runs a lightweight read
+through the Supabase API and returns `503` when the database is unreachable, so
+orchestrators can route traffic away from an instance that is up but not ready).
 
 ## Prerequisites
 
@@ -59,11 +62,15 @@ traffic away from an instance that is up but not ready).
 
 ```bash
 nvm use
-npm install                 # runs prisma generate via postinstall
+npm install
 cp .env.example .env        # then fill in the values
-npm run db:migrate          # create the schema
 npm run dev                 # http://localhost:3000
 ```
+
+The `Brand` table and its RLS policies are already applied to the provisioned
+Supabase project (see [Provisioned backend](#provisioned-backend)). To stand up
+a fresh database instead, apply the SQL in `supabase/migrations/` (e.g. via the
+Supabase CLI: `supabase db push`).
 
 Without an `OPENAI_API_KEY` the strategy generator returns a deterministic demo
 result, so you can develop the full flow without incurring API cost. Without
@@ -76,8 +83,7 @@ See `.env.example` for the full list. Key groups:
 | Variable                                                     | Purpose                                                |
 | ------------------------------------------------------------ | ------------------------------------------------------ |
 | `OPENAI_API_KEY`                                             | Live strategy generation (demo fallback if unset)      |
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project URL + anon key (auth)                 |
-| `DATABASE_URL` / `DIRECT_URL`                                | Pooled (runtime) and direct (migrations) Postgres URLs |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project URL + anon key (auth + data layer)    |
 | `UPSTASH_REDIS_REST_URL/TOKEN`                               | Per-user rate limiting                                 |
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                         | Error tracking + source map upload                     |
 
@@ -94,8 +100,6 @@ OAuth client IDs/secrets live in the Supabase dashboard, not in `.env`.
 | `npm run format`              | Prettier write                |
 | `npm run test`                | Vitest unit tests             |
 | `npm run test:e2e`            | Playwright E2E tests          |
-| `npm run db:migrate`          | Prisma dev migration          |
-| `npm run db:deploy`           | Apply migrations (production) |
 
 ## Testing
 
@@ -124,13 +128,11 @@ A Supabase project has been provisioned for this app and the schema applied:
 
 - **Project:** `fluid-backend` (org `mikaelcharbonneau's Org`), region `us-east-1`,
   ref `uvztmqsjxthfabbsykik`, project URL `https://uvztmqsjxthfabbsykik.supabase.co`.
-- **Schema:** the `Brand` table (see `prisma/migrations/`) is applied. Prisma's
-  migration history is baselined to match, so `npm run db:deploy` is a no-op
-  against this database and applies cleanly to any fresh one.
-- **Row Level Security:** enabled on `Brand` with no policies. The table is only
-  ever accessed server-side through Prisma (service role / direct Postgres
-  connection, which bypasses RLS); RLS denies all access via the public
-  anon/PostgREST API as defense-in-depth.
+- **Schema:** the `Brand` table (see `supabase/migrations/`) is applied.
+- **Row Level Security:** enabled on `Brand` with per-user owner policies for
+  select/insert/delete (`auth.uid() = "userId"`). The app accesses the table
+  through the Supabase client using the signed-in user's session, so these
+  policies enforce ownership at the database level.
 
 To point an environment at this project, set these (the anon key is public and
 safe to expose to the browser):
@@ -138,10 +140,6 @@ safe to expose to the browser):
 ```bash
 NEXT_PUBLIC_SUPABASE_URL="https://uvztmqsjxthfabbsykik.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon key from Project Settings > API>"
-# Database password is not retrievable via API — copy/reset it in
-# Project Settings > Database, then use the dashboard's exact pooler host:
-DATABASE_URL="postgresql://postgres.uvztmqsjxthfabbsykik:[PASSWORD]@<pooler-host>:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.uvztmqsjxthfabbsykik:[PASSWORD]@<pooler-host>:5432/postgres"
 ```
 
 Auth still needs manual configuration in the Supabase dashboard (these are not
@@ -156,16 +154,13 @@ exposed via the management API):
 
 ## Deployment (Vercel)
 
-1. Create a Supabase project; from **Project Settings**: copy the API URL + anon
-   key, and the database connection strings (pooled `DATABASE_URL` on port 6543,
-   direct `DIRECT_URL` on port 5432 — migrations fail over the pooled connection).
+1. Create a Supabase project; from **Project Settings > API** copy the project
+   URL + anon key. Apply the schema by running the SQL in `supabase/migrations/`
+   (e.g. with the Supabase CLI: `supabase db push`).
 2. In Supabase **Authentication > Providers**, enable GitHub/Google with their
    client IDs/secrets, and add the site URL + redirect URL
    `https://<your-domain>/auth/callback` to the allowed redirect list.
 3. Import the repo into Vercel and set all environment variables from
    `.env.example` in the project.
-4. Run `npm run db:deploy` against the production database (e.g. as a release
-   step) to apply migrations.
 
-`prisma generate` runs automatically on install via the `postinstall` script.
 Security headers and (when configured) Sentry are wired through `next.config.ts`.

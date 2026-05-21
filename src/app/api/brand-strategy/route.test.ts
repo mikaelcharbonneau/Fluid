@@ -74,7 +74,11 @@ describe("POST /api/brand-strategy", () => {
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.brandId).toBe("brand-1");
-    expect(createBrand).toHaveBeenCalledWith("user-1", expect.objectContaining({ name: "Acme" }));
+    expect(createBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+      expect.objectContaining({ name: "Acme" }),
+    );
   });
 
   it("returns 500 without leaking internals when generation fails", async () => {

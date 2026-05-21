@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
   try {
     const strategy = await createBrandStrategy(parsed.data);
-    const brand = await createBrand(userId, {
+    const brand = await createBrand(supabase, userId, {
       basics: parsed.data,
       strategy,
       name: strategy.suggestedNames[0] ?? "Untitled brand",

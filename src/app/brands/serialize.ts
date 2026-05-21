@@ -1,9 +1,8 @@
-import type { Brand } from "@prisma/client";
-import type { BrandStrategy } from "@/types/brand";
+import type { BrandRow } from "@/lib/db/brands";
 import type { BrandView } from "@/components/brands/types";
 
-// Maps a Prisma Brand row to a plain, client-serializable shape.
-export function toBrandView(brand: Brand): BrandView {
+// Maps a Brand row to a plain, client-serializable shape.
+export function toBrandView(brand: BrandRow): BrandView {
   return {
     id: brand.id,
     name: brand.name,
@@ -15,7 +14,14 @@ export function toBrandView(brand: Brand): BrandView {
     selectedName: brand.selectedName,
     selectedStyle: brand.selectedStyle,
     selectedLogo: brand.selectedLogo,
-    strategy: brand.strategy as unknown as BrandStrategy,
-    createdAt: brand.createdAt.toISOString(),
+    strategy: brand.strategy,
+    createdAt: toIso(brand.createdAt),
   };
+}
+
+// PostgREST returns `timestamp without time zone` values as naive ISO strings
+// with no offset; they are stored in UTC, so append `Z` before normalizing.
+function toIso(value: string): string {
+  const hasTz = value.endsWith("Z") || /[+-]\d\d:?\d\d$/.test(value);
+  return new Date(hasTz ? value : `${value}Z`).toISOString();
 }

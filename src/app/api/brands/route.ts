@@ -11,6 +11,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const brands = await listBrandsForUser(user.id);
+  const brands = await listBrandsForUser(supabase, user.id);
   return NextResponse.json({ brands });
 }

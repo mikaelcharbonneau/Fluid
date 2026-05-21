@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const brand = await getBrandById(user.id, id);
+  const brand = await getBrandById(supabase, user.id, id);
   if (!brand) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
@@ -30,7 +30,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const deleted = await deleteBrand(user.id, id);
+  const deleted = await deleteBrand(supabase, user.id, id);
   if (!deleted) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }

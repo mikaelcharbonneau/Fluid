@@ -19,7 +19,7 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const brand = await getBrandById(user.id, id);
+  const brand = await getBrandById(supabase, user.id, id);
   if (!brand) {
     notFound();
   }
