@@ -1,6 +1,6 @@
+"use client";
+
 import React, { useState } from "react";
-import { createRoot } from "react-dom/client";
-import "./styles.css";
 
 const navItems = [
   { label: "Home", icon: HomeIcon },
@@ -77,7 +77,7 @@ const styleOptions = [
   },
 ];
 
-const nameSuggestions = [
+const defaultNameSuggestions = [
   "ClarityFlow",
   "Lumiq",
   "Intentra",
@@ -141,13 +141,68 @@ function App() {
   const [hasLogo, setHasLogo] = useState("no");
   const [logoPreference, setLogoPreference] = useState("");
   const [selectedLogo, setSelectedLogo] = useState("spark");
+  const [brandStrategy, setBrandStrategy] = useState(null);
+  const [strategyStatus, setStrategyStatus] = useState("idle");
+  const [strategyError, setStrategyError] = useState("");
+  const [isDemoStrategy, setIsDemoStrategy] = useState(false);
 
   const goBack = () => setActiveStep((step) => Math.max(1, step - 1));
   const goNext = () => setActiveStep((step) => Math.min(5, step + 1));
+  const generatedNames = brandStrategy?.suggestedNames?.length
+    ? brandStrategy.suggestedNames
+    : defaultNameSuggestions;
 
   const saveName = (name) => {
     setSelectedName(name);
     setSavedNames((items) => (items.includes(name) ? items : [...items, name]));
+  };
+
+  const createStrategyAndContinue = async () => {
+    if (!about.trim() || !audience.trim()) {
+      setStrategyError("Add a short brand description and audience so Fluid can shape the strategy.");
+      return;
+    }
+
+    setStrategyStatus("loading");
+    setStrategyError("");
+
+    try {
+      const response = await fetch("/api/brand-strategy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          about,
+          audience,
+          difference,
+          competitors,
+          styleDirection: selectedStyle,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Fluid could not create a strategy yet.");
+      }
+
+      setBrandStrategy(payload.strategy);
+      setIsDemoStrategy(Boolean(payload.setupRequired));
+
+      if (payload.strategy?.recommendedStyle) {
+        setSelectedStyle(payload.strategy.recommendedStyle);
+      }
+
+      if (payload.strategy?.suggestedNames?.length) {
+        setSelectedName(payload.strategy.suggestedNames[0]);
+      }
+
+      setStrategyStatus("success");
+      setActiveStep(2);
+    } catch (error) {
+      setStrategyStatus("error");
+      setStrategyError(error instanceof Error ? error.message : "Fluid could not create a strategy yet.");
+    }
   };
 
   return (
@@ -197,13 +252,18 @@ function App() {
                 setDifference={setDifference}
                 competitors={competitors}
                 setCompetitors={setCompetitors}
-                onNext={goNext}
+                onNext={createStrategyAndContinue}
+                strategyStatus={strategyStatus}
+                strategyError={strategyError}
+                isDemoStrategy={isDemoStrategy}
               />
             )}
             {activeStep === 2 && (
               <BrandStyleStep
                 selectedStyle={selectedStyle}
                 setSelectedStyle={setSelectedStyle}
+                brandStrategy={brandStrategy}
+                isDemoStrategy={isDemoStrategy}
                 onBack={goBack}
                 onNext={goNext}
               />
@@ -214,6 +274,8 @@ function App() {
                 setHasBrandName={setHasBrandName}
                 selectedName={selectedName}
                 savedNames={savedNames}
+                generatedNames={generatedNames}
+                brandStrategy={brandStrategy}
                 saveName={saveName}
                 onBack={goBack}
                 onNext={goNext}
@@ -227,6 +289,7 @@ function App() {
                 setLogoPreference={setLogoPreference}
                 selectedLogo={selectedLogo}
                 setSelectedLogo={setSelectedLogo}
+                brandStrategy={brandStrategy}
                 onBack={goBack}
                 onNext={goNext}
               />
@@ -236,6 +299,7 @@ function App() {
                 selectedStyle={selectedStyle}
                 selectedName={selectedName}
                 selectedLogo={selectedLogo}
+                brandStrategy={brandStrategy}
                 onBack={goBack}
               />
             )}
@@ -256,13 +320,24 @@ function BrandBasicsStep({
   competitors,
   setCompetitors,
   onNext,
+  strategyStatus,
+  strategyError,
+  isDemoStrategy,
 }) {
+  const isLoading = strategyStatus === "loading";
+
   return (
     <div className="form-content basics-content">
       <header className="form-title">
         <h2>01. Brand Basics</h2>
         <p>Tell us more about your vision</p>
       </header>
+
+      <AgentInsight
+        label="AI agent"
+        title="Strategy generation starts here"
+        body="Continue will analyze your mission, audience, and competitors before recommending a style direction, name territories, and brand kit foundation."
+      />
 
       <div className="field-grid">
         <label className="field-block about-field">
@@ -329,6 +404,20 @@ function BrandBasicsStep({
         </div>
       </section>
 
+      {(strategyError || strategyStatus === "success" || isLoading) && (
+        <div className={strategyError ? "ai-status error" : "ai-status"}>
+          <SparkleIcon />
+          <span>
+            {isLoading && "Fluid is shaping your first brand strategy..."}
+            {strategyStatus === "success" &&
+              (isDemoStrategy
+                ? "Demo strategy created. Add an OpenAI API key to use live agents."
+                : "Brand strategy created by Fluid's AI agent.")}
+            {strategyError}
+          </span>
+        </div>
+      )}
+
       <div className="brand-preview" aria-hidden="true">
         <div className="preview-mark">
           <span />
@@ -347,15 +436,15 @@ function BrandBasicsStep({
         </div>
       </div>
 
-      <button type="button" className="continue-button" onClick={onNext}>
-        Continue
+      <button type="button" className="continue-button" onClick={onNext} disabled={isLoading}>
+        {isLoading ? "Creating" : "Create strategy"}
         <ArrowRightIcon />
       </button>
     </div>
   );
 }
 
-function BrandStyleStep({ selectedStyle, setSelectedStyle, onBack, onNext }) {
+function BrandStyleStep({ selectedStyle, setSelectedStyle, brandStrategy, isDemoStrategy, onBack, onNext }) {
   return (
     <div className="form-content style-content">
       <header className="form-title">
@@ -365,6 +454,13 @@ function BrandStyleStep({ selectedStyle, setSelectedStyle, onBack, onNext }) {
 
       <section className="style-picker">
         <h3>Which style direction feels right for your brand?</h3>
+        {brandStrategy && (
+          <AgentInsight
+            label={isDemoStrategy ? "Demo strategy" : "AI recommendation"}
+            title={styleOptions.find((item) => item.id === brandStrategy.recommendedStyle)?.title ?? "Modern"}
+            body={brandStrategy.visualDirection}
+          />
+        )}
         <div className="style-grid">
           {styleOptions.map((option) => (
             <button
@@ -395,6 +491,8 @@ function BrandNameStep({
   setHasBrandName,
   selectedName,
   savedNames,
+  generatedNames,
+  brandStrategy,
   saveName,
   onBack,
   onNext,
@@ -428,10 +526,14 @@ function BrandNameStep({
         <div className="name-column">
           <div className="section-copy">
             <h3>AI-suggested names</h3>
-            <p>Choose a name that resonates with your brand.</p>
+            <p>
+              {brandStrategy
+                ? brandStrategy.namingTerritories?.slice(0, 2).join(" + ")
+                : "Choose a name that resonates with your brand."}
+            </p>
           </div>
           <div className="name-list">
-            {nameSuggestions.map((name) => (
+            {generatedNames.map((name) => (
               <div className={selectedName === name ? "name-row selected" : "name-row"} key={name}>
                 <button
                   className={savedNames.includes(name) ? "heart-button saved" : "heart-button"}
@@ -486,6 +588,7 @@ function BrandLogoStep({
   setLogoPreference,
   selectedLogo,
   setSelectedLogo,
+  brandStrategy,
   onBack,
   onNext,
 }) {
@@ -535,6 +638,14 @@ function BrandLogoStep({
         </label>
       </section>
 
+      {brandStrategy && (
+        <AgentInsight
+          label="Logo direction"
+          title="Use the strategy as the visual brief"
+          body={brandStrategy.visualDirection}
+        />
+      )}
+
       <section className="concept-section">
         <h3>AI-generated concepts</h3>
         <div className="concept-grid">
@@ -566,8 +677,9 @@ function BrandLogoStep({
   );
 }
 
-function BrandKitStep({ selectedStyle, selectedName, selectedLogo, onBack }) {
+function BrandKitStep({ selectedStyle, selectedName, selectedLogo, brandStrategy, onBack }) {
   const styleLabel = styleOptions.find((item) => item.id === selectedStyle)?.title ?? "Modern";
+  const personality = brandStrategy?.personality?.slice(0, 2) ?? ["Clean", "Forward-looking"];
 
   return (
     <div className="form-content kit-content">
@@ -582,8 +694,8 @@ function BrandKitStep({ selectedStyle, selectedName, selectedLogo, onBack }) {
           <LogoConceptArt kind={selectedLogo} />
           <div className="summary-copy">
             <h4>{selectedName}</h4>
-            <p>{styleLabel} <span>•</span> Clean <span>•</span> Forward-looking</p>
-            <p>Empowering teams with clarity and flow.</p>
+            <p>{styleLabel} <span>•</span> {personality.join(" • ")}</p>
+            <p>{brandStrategy?.tagline ?? "Empowering teams with clarity and flow."}</p>
           </div>
           <button type="button" className="edit-button">
             <EditIcon />
@@ -607,7 +719,7 @@ function BrandKitStep({ selectedStyle, selectedName, selectedLogo, onBack }) {
 
       <section className="next-section">
         <h3>What's next?</h3>
-        <p>Your brand kit is ready! You can now:</p>
+        <p>{brandStrategy?.positioning ?? "Your brand kit is ready! You can now:"}</p>
         <div className="action-row">
           <button type="button">
             <EyeIcon />
@@ -654,6 +766,19 @@ function FooterNav({ onBack, onNext }) {
         <ArrowRightIcon />
       </button>
     </footer>
+  );
+}
+
+function AgentInsight({ label, title, body }) {
+  return (
+    <aside className="agent-insight">
+      <span className="agent-insight-kicker">
+        <SparkleIcon />
+        {label}
+      </span>
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </aside>
   );
 }
 
@@ -1001,8 +1126,4 @@ function GearIcon() {
   );
 }
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+export default App;

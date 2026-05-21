@@ -1058,6 +1058,90 @@ button {
   transform: translateY(-1px);
 }
 
+.continue-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+  transform: none;
+}
+
+.ai-status,
+.agent-insight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #293250;
+  background: linear-gradient(120deg, rgba(255, 253, 253, 0.9), rgba(252, 250, 250, 0.72));
+  border: 1px solid rgba(223, 211, 210, 0.9);
+  border-radius: 9px;
+  box-shadow: 0 12px 24px rgba(77, 52, 49, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.ai-status {
+  width: min(430px, calc(100% - 150px));
+  min-height: 38px;
+  margin-top: 15px;
+  padding: 10px 13px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.ai-status.error {
+  color: #6f2536;
+  border-color: rgba(239, 168, 181, 0.92);
+  background: linear-gradient(120deg, rgba(255, 248, 249, 0.96), rgba(252, 239, 241, 0.78));
+}
+
+.ai-status .sparkle-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.agent-insight {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin: 0 0 18px;
+  padding: 13px 15px;
+}
+
+.agent-insight-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #5e6a88;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.agent-insight-kicker .sparkle-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-insight strong {
+  color: #0a0d13;
+  font-size: 13.5px;
+  font-weight: 820;
+  line-height: 1.15;
+}
+
+.agent-insight p {
+  margin: 0;
+  color: #5a6583;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.48;
+}
+
+.basics-content .agent-insight {
+  max-width: 720px;
+  margin-top: 22px;
+  margin-bottom: -14px;
+}
+
 .brand-preview {
   position: absolute;
   left: 40px;
@@ -2286,29 +2370,183 @@ button {
 
 @media (max-width: 1180px) {
   .app-frame {
-    display: block;
     min-height: 100vh;
     padding: 10px;
+    gap: 10px;
   }
 
   .sidebar {
-    display: none;
+    flex: 0 0 84px;
+    min-height: calc(100vh - 20px);
+    padding: 22px 10px;
   }
 
   .workspace-shell {
-    width: 100%;
     min-height: calc(100vh - 20px);
     height: auto;
   }
 
+  .logo {
+    width: 54px;
+    height: 32px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+
+  .logo img {
+    width: 128px;
+    max-width: none;
+    object-position: left center;
+  }
+
+  .primary-nav {
+    gap: 13px;
+    margin-top: 54px;
+  }
+
+  .nav-item {
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto;
+    padding: 0;
+    gap: 0;
+  }
+
+  .nav-item span {
+    display: none;
+  }
+
+  .nav-item.active::before {
+    left: -3px;
+    height: 20px;
+  }
+
+  .sidebar-wave,
+  .upgrade-card {
+    display: none;
+  }
+
+  .profile-card {
+    display: none;
+  }
+
   .builder-grid {
-    left: 28px;
-    right: 28px;
+    left: 24px;
+    right: 24px;
+    gap: 14px;
   }
 
   .screen-heading {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .steps-panel {
+    flex-basis: 214px;
+  }
+
+  .form-content {
     padding-left: 28px;
     padding-right: 28px;
+  }
+
+  .style-grid {
+    gap: 16px;
+  }
+
+  .style-card {
+    grid-template-columns: 18px 46px minmax(0, 1fr);
+    min-height: 96px;
+    height: auto;
+    gap: 13px;
+    padding: 14px;
+  }
+
+  .style-art {
+    width: 46px;
+    height: 46px;
+  }
+
+  .style-copy span {
+    max-width: none;
+  }
+
+  .logo-concept strong {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+}
+
+@media (max-width: 1080px) and (min-width: 901px) {
+  .screen-heading h1 {
+    font-size: 37px;
+  }
+
+  .screen-heading p {
+    max-width: 560px;
+    font-size: 14px;
+  }
+
+  .builder-grid {
+    top: 228px;
+    gap: 12px;
+  }
+
+  .steps-panel {
+    flex: 0 0 76px;
+    padding: 12px 8px;
+    gap: 9px;
+  }
+
+  .step-card {
+    justify-content: center;
+    min-height: 76px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+
+  .step-card h3,
+  .step-card p {
+    display: none;
+  }
+
+  .step-card::before,
+  .step-card.active::before,
+  .step-card.completed::before {
+    left: -5px;
+  }
+
+  .step-number {
+    width: 38px;
+    height: 38px;
+  }
+
+  .form-content {
+    padding: 30px 26px 78px;
+  }
+
+  .footer-actions {
+    left: 26px;
+    right: 26px;
+  }
+
+  .concept-grid {
+    gap: 12px;
+  }
+
+  .logo-concept {
+    min-height: 156px;
+    padding: 14px 10px;
+  }
+
+  .logo-concept strong {
+    font-size: 14px;
+  }
+
+  .kit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
