@@ -118,6 +118,42 @@ that has the `workflows` permission to enable it — it is parked under `docs/`
 because the automation that maintains this branch cannot write under
 `.github/workflows/`.
 
+## Provisioned backend
+
+A Supabase project has been provisioned for this app and the schema applied:
+
+- **Project:** `fluid-backend` (org `mikaelcharbonneau's Org`), region `us-east-1`,
+  ref `uvztmqsjxthfabbsykik`, project URL `https://uvztmqsjxthfabbsykik.supabase.co`.
+- **Schema:** the `Brand` table (see `prisma/migrations/`) is applied. Prisma's
+  migration history is baselined to match, so `npm run db:deploy` is a no-op
+  against this database and applies cleanly to any fresh one.
+- **Row Level Security:** enabled on `Brand` with no policies. The table is only
+  ever accessed server-side through Prisma (service role / direct Postgres
+  connection, which bypasses RLS); RLS denies all access via the public
+  anon/PostgREST API as defense-in-depth.
+
+To point an environment at this project, set these (the anon key is public and
+safe to expose to the browser):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL="https://uvztmqsjxthfabbsykik.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon key from Project Settings > API>"
+# Database password is not retrievable via API — copy/reset it in
+# Project Settings > Database, then use the dashboard's exact pooler host:
+DATABASE_URL="postgresql://postgres.uvztmqsjxthfabbsykik:[PASSWORD]@<pooler-host>:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.uvztmqsjxthfabbsykik:[PASSWORD]@<pooler-host>:5432/postgres"
+```
+
+Auth still needs manual configuration in the Supabase dashboard (these are not
+exposed via the management API):
+
+1. **Authentication > URL Configuration:** set the Site URL and add the redirect
+   URLs `http://localhost:3000/auth/callback` and
+   `https://<your-domain>/auth/callback`.
+2. **Authentication > Providers:** enable GitHub and Google, pasting the client
+   IDs/secrets from OAuth apps registered on GitHub and Google (their provider
+   callback URL is `https://uvztmqsjxthfabbsykik.supabase.co/auth/callback`).
+
 ## Deployment (Vercel)
 
 1. Create a Supabase project; from **Project Settings**: copy the API URL + anon
