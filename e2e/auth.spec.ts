@@ -9,9 +9,9 @@ test("health endpoint is public and reports ok", async ({ request }) => {
 
 test("sign-in page renders provider buttons", async ({ page }) => {
   await page.goto("/signin");
-  await expect(page.getByRole("heading", { name: "Sign in to Fluid" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /continue with github/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Log in to your account" })).toBeVisible();
   await expect(page.getByRole("button", { name: /continue with google/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /continue with apple/i })).toBeVisible();
 });
 
 test("unauthenticated visit to the wizard redirects to sign-in", async ({ page }) => {
