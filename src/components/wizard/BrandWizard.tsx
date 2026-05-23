@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloseIcon, GradientRibbon } from "@/components/icons";
-import { defaultNameSuggestions, stepMeta } from "@/lib/wizard-constants";
+import { stepMeta } from "@/lib/wizard-constants";
 import { Sidebar } from "./Sidebar";
 import { StepCard } from "./shared";
 import { BrandBasicsStep } from "./BrandBasicsStep";
@@ -19,28 +19,37 @@ export function BrandWizard() {
   const [about, setAbout] = useState("");
   const [audience, setAudience] = useState("");
   const [difference, setDifference] = useState("");
-  const [competitors, setCompetitors] = useState<string[]>(["Notion", "Canva", "Figma"]);
-  const [selectedStyle, setSelectedStyle] = useState("modern");
+  const [competitors, setCompetitors] = useState<string[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState("");
   const [hasBrandName, setHasBrandName] = useState("no");
-  const [selectedName, setSelectedName] = useState("ClarityFlow");
+  const [selectedName, setSelectedName] = useState("");
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [hasLogo, setHasLogo] = useState("no");
   const [logoPreference, setLogoPreference] = useState("");
-  const [selectedLogo, setSelectedLogo] = useState("spark");
+  const [selectedLogo, setSelectedLogo] = useState("");
   const [brandStrategy, setBrandStrategy] = useState<BrandStrategy | null>(null);
   const [strategyStatus, setStrategyStatus] = useState<StrategyStatus>("idle");
   const [strategyError, setStrategyError] = useState("");
   const [brandId, setBrandId] = useState<string | null>(null);
+  const hasCompletedMandatoryBasics = Boolean(about.trim());
+  const canAccessStep2 = Boolean(brandStrategy && hasCompletedMandatoryBasics);
+  const canAccessStep3 = Boolean(canAccessStep2 && selectedStyle);
+  const canAccessStep4 = Boolean(canAccessStep3 && selectedName);
+  const canAccessStep5 = Boolean(canAccessStep4 && selectedLogo);
+  const stepAccess = [true, canAccessStep2, canAccessStep3, canAccessStep4, canAccessStep5];
 
   const goBack = () => setActiveStep((step) => Math.max(1, step - 1));
   const goNext = () => setActiveStep((step) => Math.min(5, step + 1));
-  const generatedNames = brandStrategy?.suggestedNames?.length
-    ? brandStrategy.suggestedNames
-    : defaultNameSuggestions;
+  const generatedNames = brandStrategy?.suggestedNames ?? [];
+
+  const selectName = (name: string) => {
+    setSelectedName((currentName) => (currentName === name ? "" : name));
+  };
 
   const saveName = (name: string) => {
-    setSelectedName(name);
-    setSavedNames((items) => (items.includes(name) ? items : [...items, name]));
+    setSavedNames((items) =>
+      items.includes(name) ? items.filter((item) => item !== name) : [...items, name],
+    );
   };
 
   const completeSetup = () => {
@@ -48,10 +57,8 @@ export function BrandWizard() {
   };
 
   const createStrategyAndContinue = async () => {
-    if (!about.trim() || !audience.trim()) {
-      setStrategyError(
-        "Add a short brand description and audience so Fluid can shape the strategy.",
-      );
+    if (!about.trim()) {
+      setStrategyError("Add a short brand description so Fluid can shape the strategy.");
       return;
     }
 
@@ -79,12 +86,9 @@ export function BrandWizard() {
       setBrandStrategy(payload.strategy);
       setBrandId(payload.brandId ?? null);
 
-      if (payload.strategy?.recommendedStyle) {
-        setSelectedStyle(payload.strategy.recommendedStyle);
-      }
-      if (payload.strategy?.suggestedNames?.length) {
-        setSelectedName(payload.strategy.suggestedNames[0]);
-      }
+      setSelectedStyle("");
+      setSelectedName("");
+      setSelectedLogo("");
 
       setStrategyStatus("success");
       setActiveStep(2);
@@ -98,7 +102,7 @@ export function BrandWizard() {
 
   return (
     <main className="app-frame" aria-label="Fluid create brand interface">
-      <Sidebar activeHref="/" />
+      <Sidebar activeHref="/brands" />
       <section className="workspace-shell">
         <GradientRibbon variant="top" />
         <GradientRibbon variant="bottom" />
@@ -121,15 +125,23 @@ export function BrandWizard() {
 
         <div className="builder-grid">
           <aside className="steps-panel" aria-label="Brand creation steps">
-            {stepMeta.map((step, index) => (
-              <StepCard
-                key={step.number}
-                step={step}
-                active={activeStep === index + 1}
-                completed={activeStep > index + 1}
-                onClick={() => setActiveStep(index + 1)}
-              />
-            ))}
+            {stepMeta.map((step, index) => {
+              const stepNumber = index + 1;
+              const locked = !stepAccess[index];
+
+              return (
+                <StepCard
+                  key={step.number}
+                  step={step}
+                  active={activeStep === stepNumber}
+                  completed={activeStep > stepNumber}
+                  locked={locked}
+                  onClick={() => {
+                    if (!locked) setActiveStep(stepNumber);
+                  }}
+                />
+              );
+            })}
           </aside>
 
           <section className="form-panel" aria-label={stepMeta[activeStep - 1].title}>
@@ -155,6 +167,7 @@ export function BrandWizard() {
                 brandStrategy={brandStrategy}
                 onBack={goBack}
                 onNext={goNext}
+                nextDisabled={!selectedStyle}
               />
             )}
             {activeStep === 3 && (
@@ -166,8 +179,10 @@ export function BrandWizard() {
                 generatedNames={generatedNames}
                 brandStrategy={brandStrategy}
                 saveName={saveName}
+                selectName={selectName}
                 onBack={goBack}
                 onNext={goNext}
+                nextDisabled={!selectedName}
               />
             )}
             {activeStep === 4 && (
@@ -178,9 +193,11 @@ export function BrandWizard() {
                 setLogoPreference={setLogoPreference}
                 selectedLogo={selectedLogo}
                 setSelectedLogo={setSelectedLogo}
+                selectedName={selectedName}
                 brandStrategy={brandStrategy}
                 onBack={goBack}
                 onNext={goNext}
+                nextDisabled={!selectedLogo}
               />
             )}
             {activeStep === 5 && (

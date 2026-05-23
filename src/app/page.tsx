@@ -1,5 +1,5 @@
-import { BrandWizard } from "@/components/wizard/BrandWizard";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <BrandWizard />;
+  redirect("/brands");
 }

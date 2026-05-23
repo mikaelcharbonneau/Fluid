@@ -2,9 +2,9 @@ import { Agent, Runner } from "@openai/agents";
 import { z } from "zod";
 
 export const brandBasicsSchema = z.object({
-  about: z.string().min(1),
-  audience: z.string().min(1),
-  difference: z.string().optional(),
+  about: z.string().trim().min(1),
+  audience: z.string().trim().optional().default(""),
+  difference: z.string().trim().optional().default(""),
   competitors: z.array(z.string()).default([]),
   styleDirection: z.string().optional(),
 });

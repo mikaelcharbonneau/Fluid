@@ -77,6 +77,7 @@ describe("brand data access ownership", () => {
         about: "a",
         audience: "b",
         id: expect.any(String),
+        selectedName: null,
         updatedAt: expect.any(String),
       }),
     );

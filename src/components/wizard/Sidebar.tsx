@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -18,7 +18,7 @@ import {
 } from "@/components/icons";
 
 const navItems = [
-  { label: "Home", icon: HomeIcon, href: "/" },
+  { label: "Home", icon: HomeIcon, href: null, disabled: true },
   { label: "Brands", icon: GridIcon, href: "/brands" },
   { label: "Assets", icon: StackIcon, href: "/brands" },
   { label: "Templates", icon: TemplateIcon, href: "/brands" },
@@ -30,6 +30,8 @@ export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("Your account");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -46,6 +48,19 @@ export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
     });
   }, []);
 
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [profileMenuOpen]);
+
   const signOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -56,12 +71,21 @@ export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
 
   return (
     <aside className="sidebar" aria-label="Fluid navigation">
-      <Link className="logo" href="/" aria-label="Fluid home">
+      <Link className="logo" href="/brands" aria-label="Fluid brands">
         <img src="/fluid-primary-wordmark.png" alt="Fluid." />
       </Link>
       <nav className="primary-nav" aria-label="Primary">
         {navItems.map((item) => {
           const Icon = item.icon;
+          if (item.disabled || !item.href) {
+            return (
+              <button className="nav-item disabled" type="button" disabled key={item.label}>
+                <Icon />
+                <span>{item.label}</span>
+              </button>
+            );
+          }
+
           return (
             <Link
               className={item.href === activeHref ? "nav-item active" : "nav-item"}
@@ -89,14 +113,41 @@ export function Sidebar({ activeHref = "/" }: { activeHref?: string }) {
         </button>
       </section>
 
-      <button className="profile-card" type="button" aria-label="Sign out" onClick={signOut}>
-        <span className="avatar">{initial}</span>
-        <span className="profile-copy">
-          <strong>{name}</strong>
-          <em>{email}</em>
-        </span>
-        <ChevronDownIcon />
-      </button>
+      <div className="profile-menu-wrap" ref={profileMenuRef}>
+        {profileMenuOpen && (
+          <div className="profile-menu" id="profile-menu" role="menu">
+            <div className="profile-menu-head">
+              <strong>{name}</strong>
+              <span>{email}</span>
+            </div>
+            <button type="button" role="menuitem" disabled>
+              Profile settings
+            </button>
+            <button type="button" role="menuitem" disabled>
+              Billing
+            </button>
+            <button type="button" role="menuitem" className="danger" onClick={signOut}>
+              Log out
+            </button>
+          </div>
+        )}
+
+        <button
+          className="profile-card"
+          type="button"
+          aria-label="Open profile menu"
+          aria-expanded={profileMenuOpen}
+          aria-controls="profile-menu"
+          onClick={() => setProfileMenuOpen((open) => !open)}
+        >
+          <span className="avatar">{initial}</span>
+          <span className="profile-copy">
+            <strong>{name}</strong>
+            <em>{email}</em>
+          </span>
+          <ChevronDownIcon />
+        </button>
+      </div>
     </aside>
   );
 }

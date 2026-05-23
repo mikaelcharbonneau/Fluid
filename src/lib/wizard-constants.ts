@@ -69,22 +69,11 @@ export const styleOptions: StyleOption[] = [
   { id: "luxurious", title: "Luxurious", body: "Premium, sophisticated, and high-end in feel." },
 ];
 
-export const defaultNameSuggestions: string[] = [
-  "ClarityFlow",
-  "Lumiq",
-  "Intentra",
-  "Novaform",
-  "Mindscape",
-  "Peakora",
-  "Virelo",
-  "Elevan",
-];
-
 export const logoConcepts: LogoConcept[] = [
-  { id: "spark", label: "ClarityFlow" },
-  { id: "cube", label: "ClarityFlow" },
-  { id: "loop", label: "ClarityFlow" },
-  { id: "monogram", label: "ClarityFlow" },
+  { id: "spark", label: "Concept 01" },
+  { id: "cube", label: "Concept 02" },
+  { id: "loop", label: "Concept 03" },
+  { id: "monogram", label: "Concept 04" },
 ];
 
 export const kitItems: KitItem[] = [
