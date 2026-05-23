@@ -31,7 +31,8 @@ function BrandKitStepComponent({
   onComplete,
 }: BrandKitStepProps) {
   const styleLabel = styleOptions.find((item) => item.id === selectedStyle)?.title ?? "Modern";
-  const personality = brandStrategy?.personality?.slice(0, 2) ?? ["Clean", "Forward-looking"];
+  const personality = brandStrategy?.personality?.slice(0, 2) ?? [];
+  const canShowKit = Boolean(brandStrategy && selectedName && selectedLogo);
 
   return (
     <div className="form-content kit-content">
@@ -40,59 +41,77 @@ function BrandKitStepComponent({
         <p>Review and finalize your complete brand kit.</p>
       </header>
 
-      <section className="kit-summary-section">
-        <h3>Your brand summary</h3>
-        <div className="brand-summary">
-          <LogoConceptArt kind={selectedLogo} />
-          <div className="summary-copy">
-            <h4>{selectedName}</h4>
-            <p>
-              {styleLabel} <span>•</span> {personality.join(" • ")}
-            </p>
-            <p>{brandStrategy?.tagline ?? "Empowering teams with clarity and flow."}</p>
-          </div>
-          <button type="button" className="edit-button">
-            <EditIcon />
-            Edit details
-          </button>
-        </div>
-      </section>
+      {canShowKit ? (
+        <>
+          <section className="kit-summary-section">
+            <h3>Your brand summary</h3>
+            <div className="brand-summary">
+              <LogoConceptArt kind={selectedLogo} />
+              <div className="summary-copy">
+                <h4>{selectedName}</h4>
+                <p>
+                  {styleLabel}
+                  {personality.length ? (
+                    <>
+                      <span>•</span> {personality.join(" • ")}
+                    </>
+                  ) : null}
+                </p>
+                <p>{brandStrategy?.tagline}</p>
+              </div>
+              <button type="button" className="edit-button">
+                <EditIcon />
+                Edit details
+              </button>
+            </div>
+          </section>
 
-      <section className="kit-included">
-        <h3>What&apos;s included in your brand kit</h3>
-        <div className="kit-grid">
-          {kitItems.map((item) => (
-            <article className="kit-card" key={item.id}>
-              <KitArt kind={item.art} />
-              <h4>{item.title}</h4>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+          <section className="kit-included">
+            <h3>What&apos;s included in your brand kit</h3>
+            <div className="kit-grid">
+              {kitItems.map((item) => (
+                <article className="kit-card" key={item.id}>
+                  <KitArt kind={item.art} />
+                  <h4>{item.title}</h4>
+                  <p>{item.body}</p>
+                </article>
+              ))}
+            </div>
+          </section>
 
-      <section className="next-section">
-        <h3>What&apos;s next?</h3>
-        <p>{brandStrategy?.positioning ?? "Your brand kit is ready! You can now:"}</p>
-        <div className="action-row">
-          <button type="button">
-            <EyeIcon />
-            View brand kit
-          </button>
-          <button type="button">
-            <DownloadIcon />
-            Download assets
-          </button>
-          <button type="button">
-            <TeamIcon />
-            Invite team members
-          </button>
-          <button type="button">
+          <section className="next-section">
+            <h3>What&apos;s next?</h3>
+            <p>{brandStrategy?.positioning}</p>
+            <div className="action-row">
+              <button type="button">
+                <EyeIcon />
+                View brand kit
+              </button>
+              <button type="button">
+                <DownloadIcon />
+                Download assets
+              </button>
+              <button type="button">
+                <TeamIcon />
+                Invite team members
+              </button>
+              <button type="button">
+                <ClipboardIcon />
+                Create brand guidelines
+              </button>
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="kit-summary-section">
+          <h3>Your brand kit</h3>
+          <div className="wizard-empty-state wizard-empty-panel">
             <ClipboardIcon />
-            Create brand guidelines
-          </button>
-        </div>
-      </section>
+            <strong>No brand kit yet</strong>
+            <span>Complete the previous steps to build a brand kit.</span>
+          </div>
+        </section>
+      )}
 
       <footer className="footer-actions">
         <button type="button" className="back-button" onClick={onBack}>

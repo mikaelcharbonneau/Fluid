@@ -33,7 +33,7 @@ export default async function BrandsPage() {
           </div>
           <h1>Your brands</h1>
           <p>Every brand identity you create with Fluid is saved here.</p>
-          <Link className="brand-action brand-action-primary brands-create" href="/">
+          <Link className="brand-action brand-action-primary brands-create" href="/brands/create">
             Create new brand
           </Link>
         </div>

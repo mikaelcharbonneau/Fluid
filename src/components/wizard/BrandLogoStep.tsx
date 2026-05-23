@@ -18,9 +18,11 @@ interface BrandLogoStepProps {
   setLogoPreference: Dispatch<SetStateAction<string>>;
   selectedLogo: string;
   setSelectedLogo: Dispatch<SetStateAction<string>>;
+  selectedName: string;
   brandStrategy: BrandStrategy | null;
   onBack: () => void;
   onNext: () => void;
+  nextDisabled?: boolean;
 }
 
 function BrandLogoStepComponent({
@@ -30,9 +32,11 @@ function BrandLogoStepComponent({
   setLogoPreference,
   selectedLogo,
   setSelectedLogo,
+  selectedName,
   brandStrategy,
   onBack,
   onNext,
+  nextDisabled = false,
 }: BrandLogoStepProps) {
   return (
     <div className="form-content logo-content">
@@ -88,33 +92,44 @@ function BrandLogoStepComponent({
         />
       )}
 
-      <section className="concept-section">
-        <h3>AI-generated concepts</h3>
-        <div className="concept-grid">
-          {logoConcepts.map((concept) => (
-            <button
-              type="button"
-              className={selectedLogo === concept.id ? "logo-concept selected" : "logo-concept"}
-              key={concept.id}
-              onClick={() => setSelectedLogo(concept.id)}
-            >
-              {selectedLogo === concept.id && (
-                <span className="concept-check" aria-hidden="true">
-                  <CheckIcon />
-                </span>
-              )}
-              <LogoConceptArt kind={concept.id} />
-              <strong>{concept.label}</strong>
-            </button>
-          ))}
-        </div>
-        <button type="button" className="generate-button">
-          <RefreshIcon />
-          Generate more
-        </button>
-      </section>
+      {brandStrategy ? (
+        <section className="concept-section">
+          <h3>AI-generated concepts</h3>
+          <div className="concept-grid">
+            {logoConcepts.map((concept) => (
+              <button
+                type="button"
+                className={selectedLogo === concept.id ? "logo-concept selected" : "logo-concept"}
+                key={concept.id}
+                onClick={() => setSelectedLogo(concept.id)}
+              >
+                {selectedLogo === concept.id && (
+                  <span className="concept-check" aria-hidden="true">
+                    <CheckIcon />
+                  </span>
+                )}
+                <LogoConceptArt kind={concept.id} />
+                <strong>{selectedName || concept.label}</strong>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="generate-button">
+            <RefreshIcon />
+            Generate more
+          </button>
+        </section>
+      ) : (
+        <section className="concept-section">
+          <h3>AI-generated concepts</h3>
+          <div className="wizard-empty-state wizard-empty-panel">
+            <SparkleIcon />
+            <strong>No logo concepts yet</strong>
+            <span>Create a brand strategy first to generate logo concepts.</span>
+          </div>
+        </section>
+      )}
 
-      <FooterNav onBack={onBack} onNext={onNext} />
+      <FooterNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
     </div>
   );
 }

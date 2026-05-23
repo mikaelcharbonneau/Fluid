@@ -50,14 +50,22 @@ export function ChoiceCard({
   );
 }
 
-export function FooterNav({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+export function FooterNav({
+  onBack,
+  onNext,
+  nextDisabled = false,
+}: {
+  onBack: () => void;
+  onNext: () => void;
+  nextDisabled?: boolean;
+}) {
   return (
     <footer className="footer-actions">
       <button type="button" className="back-button" onClick={onBack}>
         <ArrowLeftIcon />
         Back
       </button>
-      <button type="button" className="continue-button" onClick={onNext}>
+      <button type="button" className="continue-button" onClick={onNext} disabled={nextDisabled}>
         Continue
         <ArrowRightIcon />
       </button>
@@ -69,21 +77,29 @@ export function StepCard({
   step,
   active,
   completed,
+  locked,
   onClick,
 }: {
   step: StepMeta;
   active: boolean;
   completed: boolean;
+  locked?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className={["step-card", active ? "active" : "", completed ? "completed" : ""]
+      className={[
+        "step-card",
+        active ? "active" : "",
+        completed ? "completed" : "",
+        locked ? "locked" : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       style={{ "--step-accent": step.accent } as CSSProperties}
       type="button"
       aria-current={active ? "step" : undefined}
+      disabled={locked}
       onClick={onClick}
     >
       <span className="step-number">{step.number}</span>

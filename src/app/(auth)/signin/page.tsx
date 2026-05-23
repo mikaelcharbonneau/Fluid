@@ -93,12 +93,15 @@ function SignInContent() {
   const params = useSearchParams();
   const redirectTo = params.get("redirectTo") ?? "/";
   const error = params.get("error");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
+  const isSignup = authMode === "signup";
 
   const signInWith = async (provider: "google" | "apple") => {
     const supabase = createClient();
@@ -114,7 +117,7 @@ function SignInContent() {
     event.preventDefault();
     setFormMessage(null);
 
-    const invalid = validateCredentials("signin", { email, password });
+    const invalid = validateCredentials(authMode, { email, password, confirmPassword });
     if (invalid) {
       setFormMessage(invalid);
       return;
@@ -122,8 +125,35 @@ function SignInContent() {
 
     setPending(true);
     const supabase = createClient();
+    const trimmedEmail = email.trim();
+
+    if (isSignup) {
+      const callback = new URL("/auth/callback", window.location.origin);
+      callback.searchParams.set("redirectTo", redirectTo);
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: { emailRedirectTo: callback.toString() },
+      });
+
+      setPending(false);
+
+      if (signUpError) {
+        setFormMessage(signUpError.message);
+        return;
+      }
+
+      if (data.session) {
+        window.location.assign(redirectTo);
+        return;
+      }
+
+      setFormMessage("Account created. Check your email to confirm it, then log in.");
+      return;
+    }
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: trimmedEmail,
       password,
     });
     setPending(false);
@@ -181,16 +211,22 @@ function SignInContent() {
       </header>
 
       <section className="login-form-column" aria-label="Log in">
-        <p className="login-kicker">Welcome back</p>
+        <p className="login-kicker">{isSignup ? "Start creating" : "Welcome back"}</p>
         <h1>
-          Log in to
+          {isSignup ? "Create your" : "Log in to"}
           <br />
-          your <span>account</span>
+          {isSignup ? (
+            <span>account</span>
+          ) : (
+            <>
+              your <span>account</span>
+            </>
+          )}
         </h1>
         <p className="login-lead">
-          Access your projects, branding kit
+          {isSignup ? "Create your first project, brand kit" : "Access your projects, branding kit"}
           <br />
-          and creative dashboard.
+          {isSignup ? "and creative dashboard." : "and creative dashboard."}
         </p>
 
         {(error || formMessage) && (
@@ -218,7 +254,7 @@ function SignInContent() {
               <input
                 id="login-password"
                 type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                autoComplete={isSignup ? "new-password" : "current-password"}
                 placeholder="Enter your password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -233,7 +269,21 @@ function SignInContent() {
             </span>
           </div>
 
-          <div className="login-form-options">
+          {isSignup && (
+            <div className="login-field">
+              <label htmlFor="login-confirm-password">Confirm password</label>
+              <input
+                id="login-confirm-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </div>
+          )}
+
+          <div className={`login-form-options${isSignup ? " login-form-options-signup" : ""}`}>
             <label className="login-checkbox">
               <input
                 type="checkbox"
@@ -242,13 +292,23 @@ function SignInContent() {
               />
               <span>Remember me</span>
             </label>
-            <button type="button" onClick={onForgotPassword}>
-              Forgot password?
-            </button>
+            {!isSignup && (
+              <button type="button" onClick={onForgotPassword}>
+                Forgot password?
+              </button>
+            )}
           </div>
 
           <button type="submit" className="login-submit" disabled={pending}>
-            <span>{pending ? "Logging in" : "Log in"}</span>
+            <span>
+              {pending
+                ? isSignup
+                  ? "Creating account"
+                  : "Logging in"
+                : isSignup
+                  ? "Create account"
+                  : "Log in"}
+            </span>
             <ArrowRight />
           </button>
         </form>
@@ -269,7 +329,18 @@ function SignInContent() {
         </div>
 
         <p className="login-signup">
-          Don&apos;t have an account? <Link href="/">Sign up</Link>
+          {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode(isSignup ? "signin" : "signup");
+              setFormMessage(null);
+              setPassword("");
+              setConfirmPassword("");
+            }}
+          >
+            {isSignup ? "Log in" : "Sign up"}
+          </button>
         </p>
       </section>
 

@@ -11,8 +11,10 @@ interface BrandNameStepProps {
   generatedNames: string[];
   brandStrategy: BrandStrategy | null;
   saveName: (name: string) => void;
+  selectName: (name: string) => void;
   onBack: () => void;
   onNext: () => void;
+  nextDisabled?: boolean;
 }
 
 function BrandNameStepComponent({
@@ -23,8 +25,10 @@ function BrandNameStepComponent({
   generatedNames,
   brandStrategy,
   saveName,
+  selectName,
   onBack,
   onNext,
+  nextDisabled = false,
 }: BrandNameStepProps) {
   return (
     <div className="form-content name-content">
@@ -62,22 +66,35 @@ function BrandNameStepComponent({
             </p>
           </div>
           <div className="name-list">
-            {generatedNames.map((name) => (
-              <div className={selectedName === name ? "name-row selected" : "name-row"} key={name}>
-                <button
-                  className={savedNames.includes(name) ? "heart-button saved" : "heart-button"}
-                  type="button"
-                  aria-label={`Save ${name}`}
-                  onClick={() => saveName(name)}
-                >
-                  <HeartIcon />
-                </button>
-                <strong>{name}</strong>
-                <button className="select-name-button" type="button" onClick={() => saveName(name)}>
-                  Select
-                </button>
+            {generatedNames.length ? (
+              generatedNames.map((name) => (
+                <div className={selectedName === name ? "name-row selected" : "name-row"} key={name}>
+                  <button
+                    className={savedNames.includes(name) ? "heart-button saved" : "heart-button"}
+                    type="button"
+                    aria-label={`Save ${name}`}
+                    onClick={() => saveName(name)}
+                  >
+                    <HeartIcon />
+                  </button>
+                  <strong>{name}</strong>
+                  <button
+                    className="select-name-button"
+                    type="button"
+                    aria-pressed={selectedName === name}
+                    onClick={() => selectName(name)}
+                  >
+                    Select
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="wizard-empty-state">
+                <HeartIcon />
+                <strong>No suggested names yet</strong>
+                <span>Create a brand strategy first to generate name options.</span>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -89,15 +106,28 @@ function BrandNameStepComponent({
           <div className={savedNames.length ? "saved-panel has-items" : "saved-panel"}>
             {savedNames.length ? (
               savedNames.map((name) => (
-                <button
-                  className="saved-name"
-                  type="button"
+                <div
+                  className={selectedName === name ? "saved-name-row selected" : "saved-name-row"}
                   key={name}
-                  onClick={() => saveName(name)}
                 >
-                  <HeartIcon />
-                  {name}
-                </button>
+                  <button
+                    className="heart-button saved"
+                    type="button"
+                    aria-label={`Remove ${name} from saved names`}
+                    onClick={() => saveName(name)}
+                  >
+                    <HeartIcon />
+                  </button>
+                  <strong>{name}</strong>
+                  <button
+                    className="select-name-button"
+                    type="button"
+                    aria-pressed={selectedName === name}
+                    onClick={() => selectName(name)}
+                  >
+                    Select
+                  </button>
+                </div>
               ))
             ) : (
               <div className="empty-saved">
@@ -110,7 +140,7 @@ function BrandNameStepComponent({
         </div>
       </section>
 
-      <FooterNav onBack={onBack} onNext={onNext} />
+      <FooterNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
     </div>
   );
 }

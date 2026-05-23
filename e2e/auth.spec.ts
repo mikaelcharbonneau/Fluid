@@ -14,8 +14,16 @@ test("sign-in page renders provider buttons", async ({ page }) => {
   await expect(page.getByRole("button", { name: /continue with apple/i })).toBeVisible();
 });
 
-test("unauthenticated visit to the wizard redirects to sign-in", async ({ page }) => {
-  await page.goto("/");
+test("sign-up toggle opens account creation form", async ({ page }) => {
+  await page.goto("/signin");
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await expect(page.getByLabel("Confirm password")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
+});
+
+test("unauthenticated visit to the create-brand wizard redirects to sign-in", async ({ page }) => {
+  await page.goto("/brands/create");
   await expect(page).toHaveURL(/\/signin/);
 });
 

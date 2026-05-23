@@ -6,15 +6,17 @@ import {
 } from "./brand-workflow";
 
 describe("brandBasicsSchema", () => {
-  it("rejects empty required fields", () => {
+  it("rejects an empty brand description", () => {
     const result = brandBasicsSchema.safeParse({ about: "", audience: "" });
     expect(result.success).toBe(false);
   });
 
-  it("accepts valid input and defaults competitors to an empty array", () => {
-    const result = brandBasicsSchema.safeParse({ about: "A tool", audience: "Designers" });
+  it("accepts valid input and defaults optional fields", () => {
+    const result = brandBasicsSchema.safeParse({ about: "A tool" });
     expect(result.success).toBe(true);
     if (result.success) {
+      expect(result.data.audience).toBe("");
+      expect(result.data.difference).toBe("");
       expect(result.data.competitors).toEqual([]);
     }
   });

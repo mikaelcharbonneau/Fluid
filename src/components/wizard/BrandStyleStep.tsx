@@ -11,6 +11,7 @@ interface BrandStyleStepProps {
   brandStrategy: BrandStrategy | null;
   onBack: () => void;
   onNext: () => void;
+  nextDisabled?: boolean;
 }
 
 function BrandStyleStepComponent({
@@ -19,6 +20,7 @@ function BrandStyleStepComponent({
   brandStrategy,
   onBack,
   onNext,
+  nextDisabled = false,
 }: BrandStyleStepProps) {
   return (
     <div className="form-content style-content">
@@ -59,7 +61,7 @@ function BrandStyleStepComponent({
         </div>
       </section>
 
-      <FooterNav onBack={onBack} onNext={onNext} />
+      <FooterNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
     </div>
   );
 }

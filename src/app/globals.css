@@ -59,7 +59,7 @@ button {
   display: flex;
   gap: 12px;
   width: 100%;
-  min-height: 100vh;
+  min-height: 100svh;
   padding: 14px 13px 11px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -68,8 +68,7 @@ button {
 .sidebar,
 .workspace-shell {
   position: relative;
-  height: calc(100vh - 25px);
-  min-height: 780px;
+  min-height: max(780px, calc(100svh - 25px));
   background: var(--surface);
   border: 1px solid rgba(236, 223, 221, 0.7);
   box-shadow: var(--shadow-panel);
@@ -84,6 +83,8 @@ button {
 
 .workspace-shell {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius-shell);
 }
 
@@ -108,6 +109,7 @@ button {
 }
 
 .nav-item {
+  appearance: none;
   position: relative;
   z-index: 2;
   display: flex;
@@ -117,6 +119,8 @@ button {
   padding: 0 15px;
   border-radius: 8px;
   color: #06080c;
+  background: transparent;
+  border: 0;
   text-decoration: none;
   font-size: 13px;
   font-weight: 650;
@@ -132,6 +136,19 @@ button {
   background: rgba(255, 255, 255, 0.48);
   box-shadow: inset 0 0 0 1px rgba(234, 223, 221, 0.55);
   transform: translateX(1px);
+}
+
+.nav-item.disabled,
+.nav-item:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.nav-item.disabled:hover,
+.nav-item:disabled:hover {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .nav-item.active {
@@ -253,15 +270,21 @@ button {
   line-height: 1;
 }
 
-.profile-card {
+.profile-menu-wrap {
   position: absolute;
   left: 15px;
   bottom: 42px;
   z-index: 2;
+  width: 217px;
+}
+
+.profile-card {
+  position: relative;
   display: flex;
   align-items: center;
-  width: 217px;
+  width: 100%;
   height: 70px;
+  overflow: hidden;
   padding: 0 17px 0 14px;
   color: #080b10;
   background: rgba(252, 250, 250, 0.92);
@@ -272,6 +295,80 @@ button {
     transform 180ms ease,
     box-shadow 180ms ease,
     border-color 180ms ease;
+}
+
+.profile-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  overflow: hidden;
+  padding: 8px;
+  background: rgba(252, 250, 250, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  box-shadow:
+    0 22px 44px rgba(77, 52, 49, 0.1),
+    0 4px 12px rgba(42, 31, 31, 0.05);
+  backdrop-filter: blur(14px);
+}
+
+.profile-menu-head {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px 11px;
+  border-bottom: 1px solid rgba(226, 216, 214, 0.72);
+  margin-bottom: 6px;
+}
+
+.profile-menu-head strong,
+.profile-menu-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-head strong {
+  color: #080b10;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.profile-menu-head span {
+  color: #6f7890;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.profile-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  color: #141927;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1;
+}
+
+.profile-menu button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.profile-menu button:disabled {
+  cursor: default;
+  color: #9299ad;
+}
+
+.profile-menu button.danger {
+  color: #a83445;
 }
 
 .profile-card:hover {
@@ -298,17 +395,26 @@ button {
 .profile-copy {
   display: grid;
   gap: 5px;
+  min-width: 0;
+  flex: 1 1 auto;
   margin-left: 12px;
+  overflow: hidden;
   text-align: left;
 }
 
 .profile-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
 }
 
 .profile-copy em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #6f7890;
   font-size: 11px;
   font-style: normal;
@@ -319,6 +425,7 @@ button {
 .chevron-icon {
   width: 18px;
   height: 18px;
+  flex: 0 0 auto;
   margin-left: auto;
   fill: none;
   stroke: currentColor;
@@ -437,14 +544,13 @@ button {
 }
 
 .builder-grid {
-  position: absolute;
-  left: 43px;
-  right: 39px;
-  top: 253px;
-  bottom: 39px;
+  position: relative;
   z-index: 2;
   display: flex;
   gap: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 31px 39px 39px 43px;
 }
 
 .steps-panel,
@@ -460,6 +566,8 @@ button {
   flex: 0 0 254px;
   grid-template-rows: repeat(5, 1fr);
   gap: 12px;
+  overflow: auto;
+  scrollbar-gutter: stable;
   padding: 20px 14px 40px;
 }
 
@@ -490,6 +598,19 @@ button {
     0 12px 24px rgba(77, 52, 49, 0.04),
     0 1px 0 rgba(255, 255, 255, 0.75);
   transform: translateY(-1px);
+}
+
+.step-card.locked,
+.step-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.step-card.locked:hover,
+.step-card:disabled:hover {
+  border-color: rgba(226, 214, 212, 0.86);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  transform: none;
 }
 
 .step-card.active {
@@ -575,13 +696,30 @@ button {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .form-content {
   position: relative;
   height: 100%;
-  padding: 42px 40px 37px;
+  min-height: 0;
+  padding: 42px 40px 104px;
+}
+
+.basics-content {
+  height: auto;
+  min-height: 100%;
+  padding-bottom: 34px;
+}
+
+.style-content,
+.name-content,
+.logo-content,
+.kit-content {
+  height: auto;
+  min-height: 100%;
+  padding-bottom: 34px;
 }
 
 .footer-actions {
@@ -598,6 +736,15 @@ button {
 .footer-actions .back-button,
 .footer-actions .continue-button {
   position: static;
+}
+
+.style-content .footer-actions,
+.name-content .footer-actions,
+.logo-content .footer-actions,
+.kit-content .footer-actions {
+  position: static;
+  margin-top: 30px;
+  padding-top: 0;
 }
 
 .form-title h2 {
@@ -868,9 +1015,9 @@ button {
 
 .field-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 386px) minmax(310px, 397px);
-  gap: 29px;
-  margin-top: 40px;
+  grid-template-columns: minmax(300px, 1fr) minmax(280px, 0.92fr);
+  gap: 24px;
+  margin-top: 32px;
 }
 
 .field-block {
@@ -885,6 +1032,12 @@ button {
   font-weight: 740;
   line-height: 1.1;
   letter-spacing: -0.15px;
+}
+
+.field-block > span em {
+  color: #6d7895;
+  font-style: normal;
+  font-weight: 560;
 }
 
 .field-block textarea {
@@ -944,7 +1097,7 @@ button {
 
 .right-fields {
   display: grid;
-  gap: 29px;
+  gap: 18px;
 }
 
 .field-block .short-field {
@@ -956,7 +1109,8 @@ button {
 }
 
 .competitors {
-  margin-top: 29px;
+  max-width: min(760px, 100%);
+  margin-top: 22px;
 }
 
 .competitor-copy h3 {
@@ -986,7 +1140,6 @@ button {
   align-items: center;
   height: 43px;
   margin-top: 15px;
-  padding-left: 14px;
   color: #6c7795;
   background: linear-gradient(180deg, #fffdfd 0%, #fbf7f6 100%);
   border: 1px solid var(--line-strong);
@@ -997,6 +1150,29 @@ button {
   font-size: 12px;
   font-weight: 650;
   line-height: 1;
+}
+
+.competitor-input input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 14px;
+  color: #1f2944;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.competitor-input input::placeholder {
+  color: #6c7795;
+  opacity: 1;
+}
+
+.competitor-input input:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .competitor-input button {
@@ -1012,6 +1188,14 @@ button {
   border-left: 1px solid transparent;
   font-size: 13px;
   font-weight: 500;
+}
+
+.competitor-message {
+  margin: 8px 0 0;
+  color: #6f2536;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .plus-icon,
@@ -1154,6 +1338,13 @@ button {
   transform: none;
 }
 
+.basics-content .continue-button {
+  position: static;
+  display: flex;
+  width: fit-content;
+  margin: 12px 0 0 auto;
+}
+
 .ai-status,
 .agent-insight {
   display: flex;
@@ -1231,14 +1422,15 @@ button {
 .basics-content .agent-insight {
   max-width: 720px;
   margin-top: 22px;
-  margin-bottom: -14px;
+  margin-bottom: 0;
 }
 
 .brand-preview {
+  display: none;
   position: absolute;
-  left: 40px;
+  left: auto;
+  right: 178px;
   bottom: 47px;
-  display: grid;
   grid-template-columns: 42px 1fr auto;
   align-items: center;
   gap: 14px;
@@ -1558,15 +1750,23 @@ button {
   justify-self: end;
   width: 55px;
   height: 30px;
+  color: #151a2b;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(219, 209, 207, 0.9);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font-size: 10.5px;
+  font-weight: 770;
+}
+
+.name-row.selected .select-name-button,
+.saved-name-row.selected .select-name-button {
   color: #fff;
   background: linear-gradient(180deg, #05080d 0%, #010205 100%);
-  border: 0;
-  border-radius: 6px;
+  border-color: transparent;
   box-shadow:
     0 8px 15px rgba(5, 7, 11, 0.16),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  font-size: 10.5px;
-  font-weight: 770;
 }
 
 .saved-panel {
@@ -1615,25 +1815,80 @@ button {
   font-weight: 500;
 }
 
-.saved-name {
-  display: inline-flex;
+.wizard-empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 172px;
+  padding: 24px;
+  color: #586489;
+  text-align: center;
+}
+
+.wizard-empty-state svg {
+  width: 42px;
+  height: 42px;
+  color: #d3d7e2;
+  fill: none;
+  stroke: currentColor;
+}
+
+.wizard-empty-state strong {
+  margin-top: 12px;
+  color: #596487;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.wizard-empty-state span {
+  max-width: 280px;
+  margin-top: 5px;
+  color: #65708e;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.wizard-empty-panel {
+  margin-top: 15px;
+  border: 1px solid rgba(220, 210, 208, 0.92);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(255, 253, 253, 0.64), rgba(252, 250, 250, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.saved-name-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 58px;
   align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 12px;
+  min-height: 40px;
+  gap: 8px;
+  padding: 4px 10px 4px 8px;
   color: #151a2b;
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid rgba(219, 209, 207, 0.9);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 720;
+  transition: background-color 160ms ease;
 }
 
-.saved-name .heart-icon {
-  width: 16px;
-  height: 16px;
+.saved-name-row:hover,
+.saved-name-row.selected {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.saved-name-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #151a2b;
+  font-size: 12px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-name-row .heart-button {
   color: #f271a6;
-  fill: currentColor;
 }
 
 .logo-preferences {
@@ -2225,13 +2480,13 @@ button {
 .logo-content .continue-button,
 .kit-content .back-button,
 .kit-content .continue-button {
-  bottom: 17px;
+  bottom: auto;
 }
 
 .name-content .footer-actions,
 .logo-content .footer-actions,
 .kit-content .footer-actions {
-  bottom: 17px;
+  bottom: auto;
 }
 
 @keyframes ribbon-drift {
@@ -2257,9 +2512,9 @@ button {
 
 @media (max-width: 1450px) {
   .builder-grid {
-    left: 34px;
-    right: 30px;
+    inset: auto;
     gap: 16px;
+    margin: 28px 30px 30px 34px;
   }
 
   .steps-panel {
@@ -2302,6 +2557,10 @@ button {
   .field-grid {
     grid-template-columns: 1fr;
     margin-top: 30px;
+  }
+
+  .competitors {
+    max-width: 100%;
   }
 
   .field-block textarea {
@@ -2350,11 +2609,100 @@ button {
   }
 }
 
+@media (max-height: 1100px) and (min-width: 1181px) {
+  .sidebar,
+  .workspace-shell {
+    min-height: calc(100svh - 25px);
+  }
+
+  .screen-heading {
+    padding-top: 36px;
+  }
+
+  .screen-heading h1 {
+    margin-top: 42px;
+    margin-bottom: 10px;
+    font-size: 40px;
+  }
+
+  .screen-heading p {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .builder-grid {
+    margin-top: 30px;
+    margin-bottom: 31px;
+  }
+
+  .steps-panel {
+    gap: 10px;
+    padding: 16px 14px;
+  }
+
+  .step-card {
+    min-height: 92px;
+    gap: 13px;
+    padding: 15px 16px;
+  }
+
+  .step-card p {
+    font-size: 12.4px;
+    line-height: 1.42;
+  }
+
+  .form-content {
+    padding-top: 34px;
+    padding-bottom: 84px;
+  }
+
+  .basics-content .agent-insight {
+    margin-top: 18px;
+  }
+
+  .field-grid {
+    gap: 24px;
+    margin-top: 28px;
+  }
+
+  .field-block textarea {
+    height: 168px;
+  }
+
+  .field-block .short-field {
+    height: 58px;
+  }
+
+  .field-block .medium-field {
+    height: 74px;
+  }
+
+  .right-fields {
+    gap: 16px;
+  }
+
+  .competitors {
+    margin-top: 18px;
+  }
+
+  .competitor-input {
+    margin-top: 12px;
+  }
+
+  .chips {
+    margin-top: 12px;
+  }
+
+  .continue-button,
+  .back-button {
+    bottom: 36px;
+  }
+}
+
 @media (max-height: 840px) and (min-width: 761px) {
   .sidebar,
   .workspace-shell {
-    height: calc(100vh - 25px);
-    min-height: 0;
+    min-height: calc(100svh - 25px);
   }
 
   .sidebar {
@@ -2394,8 +2742,11 @@ button {
     height: 32px;
   }
 
-  .profile-card {
+  .profile-menu-wrap {
     bottom: 21px;
+  }
+
+  .profile-card {
     height: 58px;
   }
 
@@ -2424,8 +2775,9 @@ button {
   }
 
   .builder-grid {
-    top: 212px;
-    bottom: 20px;
+    inset: auto;
+    margin-top: 22px;
+    margin-bottom: 20px;
   }
 
   .steps-panel {
@@ -2565,14 +2917,14 @@ button {
     display: none;
   }
 
-  .profile-card {
+  .profile-menu-wrap {
     display: none;
   }
 
   .builder-grid {
-    left: 24px;
-    right: 24px;
+    inset: auto;
     gap: 14px;
+    margin: 28px 24px 24px;
   }
 
   .screen-heading {
@@ -2628,7 +2980,7 @@ button {
   }
 
   .builder-grid {
-    top: 228px;
+    inset: auto;
     gap: 12px;
   }
 
@@ -2735,12 +3087,10 @@ button {
 
   .builder-grid {
     position: relative;
-    left: auto;
-    right: auto;
-    top: auto;
-    bottom: auto;
+    inset: auto;
     display: grid;
     gap: 16px;
+    margin: 0;
     padding: 28px 18px 22px;
   }
 
@@ -3448,6 +3798,21 @@ button {
   color: #e48ca0;
   text-decoration: none;
   font-weight: 620;
+}
+
+.login-signup button {
+  margin-left: 10px;
+  padding: 0;
+  color: #e48ca0;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.login-signup button:hover {
+  color: #d97891;
 }
 
 .login-brand-stage {

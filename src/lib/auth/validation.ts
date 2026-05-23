@@ -27,12 +27,14 @@ export function validateCredentials(mode: AuthMode, input: CredentialInput): str
   if (mode === "reset") return null; // a reset request only needs an email
 
   if (!input.password) return "Enter your password.";
+  if ((mode === "signup" || mode === "update") && input.password.length < 6) {
+    return "Use at least 6 characters for your password.";
+  }
+  if ((mode === "signup" || mode === "update") && input.password !== input.confirmPassword) {
+    return "Passwords do not match.";
+  }
 
   // TODO(you): add the rules that shape your signup/reset UX. Suggestions:
-  //   - "signup" & "update": enforce a minimum password length
-  //     (Supabase's default minimum is 6 — you may want stricter)
-  //   - "signup" & "update": require input.password === input.confirmPassword,
-  //     otherwise the "Confirm password" field is cosmetic
   //   - optionally a stricter email format check than the browser's `type=email`
   // Return a single user-facing string for the first failure, or null when OK.
 

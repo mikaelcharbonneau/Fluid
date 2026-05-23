@@ -17,7 +17,7 @@ export function BrandList({ initialBrands }: { initialBrands: BrandView[] }) {
       <div className="brands-empty">
         <h2>No brands yet</h2>
         <p>Create your first AI-guided brand identity to see it saved here.</p>
-        <Link className="brand-action brand-action-primary" href="/">
+        <Link className="brand-action brand-action-primary" href="/brands/create">
           Create a brand
         </Link>
       </div>

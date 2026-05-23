@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { ArrowRightIcon, CloseSmallIcon, PlusIcon, SparkleIcon } from "@/components/icons";
 import { AgentInsight } from "./shared";
@@ -32,6 +32,28 @@ function BrandBasicsStepComponent({
   strategyError,
 }: BrandBasicsStepProps) {
   const isLoading = strategyStatus === "loading";
+  const hasRequiredFields = Boolean(about.trim());
+  const [competitorInput, setCompetitorInput] = useState("");
+  const [competitorMessage, setCompetitorMessage] = useState("");
+  const canAddCompetitor = competitors.length < 5;
+
+  const addCompetitor = () => {
+    const name = competitorInput.trim();
+    setCompetitorMessage("");
+
+    if (!name) return;
+    if (!canAddCompetitor) {
+      setCompetitorMessage("You can add up to 5 competitors.");
+      return;
+    }
+    if (competitors.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      setCompetitorMessage("This competitor is already added.");
+      return;
+    }
+
+    setCompetitors((items) => [...items, name]);
+    setCompetitorInput("");
+  };
 
   return (
     <div className="form-content basics-content">
@@ -60,7 +82,9 @@ function BrandBasicsStepComponent({
 
         <div className="right-fields">
           <label className="field-block">
-            <span>Who is your audience?</span>
+            <span>
+              Who is your audience? <em>(optional)</em>
+            </span>
             <textarea
               className="short-field"
               value={audience}
@@ -69,7 +93,9 @@ function BrandBasicsStepComponent({
             />
           </label>
           <label className="field-block">
-            <span>What makes your brand different?</span>
+            <span>
+              What makes your brand different? <em>(optional)</em>
+            </span>
             <textarea
               className="medium-field"
               value={difference}
@@ -88,12 +114,33 @@ function BrandBasicsStepComponent({
           <p>Add up to 5 competitors to help our AI understand your space.</p>
         </div>
         <div className="competitor-input">
-          <span>Search for competitors or enter websites</span>
-          <button type="button" aria-label="Add competitor">
+          <input
+            type="text"
+            value={competitorInput}
+            onChange={(event) => {
+              setCompetitorInput(event.target.value);
+              setCompetitorMessage("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addCompetitor();
+              }
+            }}
+            placeholder="Search for competitors or enter websites"
+            aria-label="Competitor name or website"
+            disabled={!canAddCompetitor}
+          />
+          <button type="button" aria-label="Add competitor" onClick={addCompetitor}>
             <PlusIcon />
             Add
           </button>
         </div>
+        {competitorMessage && (
+          <p className="competitor-message" role="status">
+            {competitorMessage}
+          </p>
+        )}
         <div className="chips" aria-label="Selected competitors">
           {competitors.map((name) => (
             <button
@@ -138,8 +185,13 @@ function BrandBasicsStepComponent({
         </div>
       </div>
 
-      <button type="button" className="continue-button" onClick={onNext} disabled={isLoading}>
-        {isLoading ? "Creating" : "Create strategy"}
+      <button
+        type="button"
+        className="continue-button"
+        onClick={onNext}
+        disabled={isLoading || !hasRequiredFields}
+      >
+        {isLoading ? "Creating" : "Continue"}
         <ArrowRightIcon />
       </button>
     </div>
