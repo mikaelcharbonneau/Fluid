@@ -1,0 +1,6 @@
+/* Universal reset — every original Fluid page shipped this in its shell.
+   Design tokens (fonts, colors, body typography) live in design-tokens.css,
+   imported before this file in the root layout. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+a { color: inherit; text-decoration: none; }

@@ -1,0 +1,131 @@
+
+  /* ------------------------------------------------------------------
+     Prototype frame. The existing screens were built for a 1440×variable
+     artboard inside the design canvas — here we mount one screen at a
+     time into the full viewport, letting the existing AShell's header +
+     rail + main fill it.
+     ------------------------------------------------------------------ */
+  html, body, #root { height: 100%; margin: 0; background: var(--bg); }
+  body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow: hidden; }
+  #root { overflow: hidden; }
+
+  /* The existing .ab class is the screen frame. We size it to the
+     viewport; each screen's AShell already lays out top dock + rail +
+     main inside it. */
+  .ab {
+    position: relative;
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--fg-1);
+    font-family: var(--font-body);
+    font-size: 14px;
+    letter-spacing: -0.005em;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  .ab * { box-sizing: border-box; }
+  .ab button { font: inherit; cursor: pointer; border: 0; }
+
+  /* AShell's `main` is `overflow: hidden` so the canvas could clip long
+     screens to their artboard height. In the prototype we want long
+     screens (Home, Brands, Assets, Guides) to scroll naturally. */
+  .ab > div > main { overflow-y: auto !important; overflow-x: hidden !important; }
+  .ab > div > main::-webkit-scrollbar { width: 10px; }
+  .ab > div > main::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.10); border-radius: 8px;
+    border: 2.5px solid var(--bg);
+  }
+  .ab > div > main::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.20); }
+  .ab > div > main::-webkit-scrollbar-track { background: transparent; }
+
+  /* Make the rail icons + wordmark feel pressable. The existing AShell
+     renders rail icons as plain <div>s — we add the hover affordance
+     here without editing source. */
+  .ab > div > aside > div {
+    cursor: pointer;
+    transition: background-color 140ms var(--ease-out), transform 200ms var(--ease-out);
+    border-radius: 10px;
+    margin: 2px 6px;
+    padding-left: 0; padding-right: 0;
+  }
+  .ab > div > aside > div:hover { background-color: var(--bg-sunken); }
+  .ab > div > aside > div:active { transform: scale(0.97); }
+  /* Don't react on the flex spacer */
+  .ab > div > aside > div:empty:hover { background-color: transparent; cursor: default; }
+
+  /* Wordmark + breadcrumb segments clickable */
+  .ab > header .fl-wordmark { cursor: pointer; transition: opacity 140ms; }
+  .ab > header .fl-wordmark:hover { opacity: 0.7; }
+  .ab > header nav span { cursor: pointer; }
+  .ab > header nav span:hover { color: var(--fg-1) !important; }
+
+  /* ------------------------------------------------------------------
+     Screen transition. Each route change re-mounts the screen container;
+     CSS animates it in with a quiet rise + fade.
+     ------------------------------------------------------------------ */
+  .proto-screen {
+    height: 100%; width: 100%;
+    animation: protoIn 380ms var(--ease-out);
+  }
+  @keyframes protoIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .proto-screen { animation: none; }
+    .ab > div > aside > div { transition: none; }
+  }
+
+  /* ------------------------------------------------------------------
+     Mini toast for non-routing CTAs ("Export kit" etc).
+     ------------------------------------------------------------------ */
+  #proto-toast-host {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    pointer-events: none;
+  }
+  .proto-toast {
+    background: #0E0F12; color: #fff;
+    padding: 10px 18px; border-radius: 999px;
+    font-family: var(--font-body); font-size: 13px; font-weight: 600;
+    box-shadow: 0 12px 30px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.08);
+    opacity: 0; transform: translateY(8px) scale(0.96);
+    transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
+  }
+  .proto-toast.show { opacity: 1; transform: translateY(0) scale(1); }
+
+  /* ------------------------------------------------------------------
+     Floating "shortcut to anywhere" pill. A tiny scaffold in the corner
+     for non-CTA navigation (e.g. jumping to Settings from inside the
+     wizard, or peeking the empty-library state). Kept quiet.
+     ------------------------------------------------------------------ */
+  .proto-jump {
+    position: fixed; right: 18px; bottom: 18px; z-index: 50;
+    background: #0E0F12; color: #fff;
+    padding: 8px 12px 8px 8px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer;
+    transition: transform 200ms var(--ease-out), box-shadow 200ms;
+  }
+  .proto-jump:hover { transform: translateY(-1px); box-shadow: 0 18px 36px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06); }
+  .proto-jump .dot {
+    width: 18px; height: 18px; border-radius: 999px;
+    background: url("/assets/uuid/dccfeee5-b7cc-45c3-89b3-ef4db2191c23.jpg") center / cover no-repeat;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+  }
+
+  /* Continuous vertical scroll for the brand collage on Home (matches
+     the existing animation hook from Fluid Redesign.html). */
+  @keyframes collageScroll { from { transform: translateY(0); } to { transform: translateY(var(--shift, 0)); } }
+  @media (prefers-reduced-motion: reduce) { .collage-col { animation: none !important; } }
+
+  /* AI shimmer for skeletons */
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  .skel {
+    background: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.04) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+    border-radius: 6px;
+  }
