@@ -48,7 +48,7 @@
 
   /* funnel → into the app after logging in */
   var APP = "/app#home";
-  var go = function () { var f=(APP.split("#")[1]||""); try{window.parent.postMessage({__fluidNav:"/app"+(f?"/"+f:"")},"*");}catch(e){} };
+  var go = function () { window.location.assign(APP); };
   var form = document.querySelector(".auth-fields");
   if (form) form.addEventListener("submit", function (e) { e.preventDefault(); go(); });
   document.querySelectorAll(".oauth-btn").forEach(function (b) { b.addEventListener("click", go); });
