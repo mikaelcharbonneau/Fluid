@@ -195,7 +195,9 @@ const ARailIcon = ({ d, active, label }) => (
   </div>
 );
 
-const AShell = ({ children, activeNav = 'brands', breadcrumb }) => (
+const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
+  const { user } = useBrandDraft();
+  return (
   <div className="ab" style={{display:'flex',flexDirection:'column'}}>
     {/* Top dock */}
     <header style={{
@@ -228,7 +230,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => (
         <SearchIcon size={12}/> Search brands, assets…
         <span style={{marginLeft:18,padding:'2px 6px',borderRadius:5,background:'var(--bg-sunken)',fontSize:10,fontFamily:'var(--font-mono)',color:'var(--fg-3)'}}>⌘K</span>
       </button>
-      <div style={{width: 26, height: 26, borderRadius: 999, background: '#000', color:'#fff', fontSize: 11, fontWeight: 700, display:'inline-flex',alignItems:'center',justifyContent:'center'}}>M</div>
+      <div title={(user && (user.name || user.email)) || ''} style={{width: 26, height: 26, borderRadius: 999, background: '#000', color:'#fff', fontSize: 11, fontWeight: 700, display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{(user && user.initial) || '·'}</div>
     </header>
 
     {/* Body: rail + main */}
@@ -253,7 +255,8 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => (
       </main>
     </div>
   </div>
-);
+  );
+};
 
 // =====================================================================
 // A1 · Brands library — empty state
@@ -2316,6 +2319,69 @@ const KitTile = ({ label, children, style }) => (
   </div>
 );
 
+// Real brand-kit summary — shows what the user captured in the wizard, with
+// the visual assets as placeholders until generation lands (Phase 3). Replaces
+// the demo brand kit (DirA_Kit, now unused) as the step5 screen.
+const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Color palette', 'Typography', 'Guidelines'];
+
+const DirA_KitSummary = () => {
+  const { draft } = useBrandDraft();
+  const { navigate } = useRouter();
+  const b = draft || {};
+  const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === b.style_id) || {}).name || (b.style_id || '—');
+  const rows = [
+    { k: 'Name', v: b.name_choice || b.name || '—' },
+    { k: 'Brief', v: b.brief || '—' },
+    { k: 'Audience', v: b.audience || '—' },
+    { k: 'Style', v: styleName },
+    { k: 'Logo direction', v: b.logo_choice || '—' },
+  ];
+  return (
+    <AShell activeNav="brands" breadcrumb={['Brands', b.name || 'Brand kit']}>
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <div style={{ padding: '44px 56px 64px', maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 30 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+            <div>
+              <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Brand kit · {b.status === 'live' ? 'Live' : 'Draft'}</div>
+              <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 48, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>{b.name || 'Your brand'}</h1>
+            </div>
+            <button onClick={() => navigate('step4')} style={{ padding: '11px 16px', borderRadius: 12, background: 'var(--bg-elev)', color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line)', flex: '0 0 auto' }}>Iterate</button>
+          </div>
+
+          <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Your brief</div>
+            {rows.map((r) => (
+              <div key={r.k} style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
+                <div style={{ width: 130, flex: '0 0 130px', fontSize: 12.5, color: 'var(--fg-3)', fontWeight: 600 }}>{r.k}</div>
+                <div style={{ flex: 1, fontSize: 14.5, color: '#000', lineHeight: 1.5 }}>{r.v}</div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 14 }}>Brand assets</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+              {KIT_ASSET_TILES.map((label) => (
+                <div key={label} style={{ borderRadius: 16, background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)', padding: 20, minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--fluid-gradient)', opacity: 0.45 }} />
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000' }}>{label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-4)', marginTop: 3 }}>Generated with AI — coming soon</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p style={{ fontSize: 13.5, color: 'var(--fg-3)', lineHeight: 1.5, maxWidth: 580 }}>
+            Fluid will generate your logo, palette, type and guidelines from this brief in an upcoming release. Your brand and everything you've entered is already saved.
+          </p>
+        </div>
+      </div>
+    </AShell>
+  );
+};
+
 const DirA_Kit = () => (
   <AShell breadcrumb={['Brands', 'Cadence']}>
     <div style={{padding: '24px 36px 36px', display:'flex',flexDirection:'column',gap:18, height:'100%', overflow:'hidden'}}>
@@ -3212,6 +3278,79 @@ const BA_BrandCard = ({ brand }) => {
   );
 };
 
+// Reusable empty state — shown when a screen has no real content yet.
+const AEmptyState = ({ title, body, ctaLabel, onCta }) => (
+  <div style={{
+    border: '1px dashed var(--line-strong)', borderRadius: 20,
+    padding: '56px 40px', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', textAlign: 'center', gap: 12, background: 'var(--bg-elev)',
+  }}>
+    <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--fluid-gradient)', marginBottom: 4 }} />
+    <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', margin: 0, color: '#000' }}>{title}</h3>
+    <p style={{ fontSize: 14.5, color: 'var(--fg-2)', maxWidth: 420, lineHeight: 1.5, margin: 0 }}>{body}</p>
+    {ctaLabel && (
+      <button onClick={onCta} style={{ marginTop: 8, padding: '11px 18px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <PlusIcon size={14} /> {ctaLabel}
+      </button>
+    )}
+  </div>
+);
+
+const BA_EmptyState = ({ onCreate }) => (
+  <AEmptyState
+    title="No brands yet"
+    body="Start your first brand and it'll live here — every name, logo, palette and guideline you build with Fluid."
+    ctaLabel="Create your first brand"
+    onCta={onCreate}
+  />
+);
+
+// Assets & Guides have no real content until brand generation (Phase 3), so
+// new accounts see honest empty states rather than demo-brand material.
+const DirA_AssetsScreen = () => {
+  const { navigate } = useRouter();
+  return (
+    <AShell activeNav="assets" breadcrumb={['Assets']}>
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <div style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div>
+            <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Assets</div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Your assets.</h1>
+          </div>
+          <AEmptyState
+            title="No assets yet"
+            body="Logos, wordmarks, app icons and exports show up here once you build a brand. Create one to get started."
+            ctaLabel="Create a brand"
+            onCta={() => navigate('step1')}
+          />
+        </div>
+      </div>
+    </AShell>
+  );
+};
+
+const DirA_GuidesScreen = () => {
+  const { navigate } = useRouter();
+  return (
+    <AShell activeNav="guides" breadcrumb={['Guides']}>
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <div style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div>
+            <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Guides</div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Brand guidelines.</h1>
+          </div>
+          <AEmptyState
+            title="No guidelines yet"
+            body="Fluid writes usage rules for your logo, color, type and voice once your brand is generated. Build a brand to see them here."
+            ctaLabel="Create a brand"
+            onCta={() => navigate('step1')}
+          />
+        </div>
+      </div>
+    </AShell>
+  );
+};
+
 // Relative "time ago" for real saved-brand timestamps.
 function relTime(iso) {
   if (!iso) return '';
@@ -3262,14 +3401,11 @@ const DirA_BrandsActive = () => {
   const { navigate } = useRouter();
   const [filter, setFilter] = useBAState('all');
   const filters = [
-    { key: 'all', label: 'All', count: BRANDS_ACTIVE.length },
-    { key: 'live', label: 'Live', count: BRANDS_ACTIVE.filter((b) => b.status === 'live').length },
-    { key: 'draft', label: 'Drafts', count: BRANDS_ACTIVE.filter((b) => b.status === 'draft').length },
-    { key: 'pinned', label: 'Pinned', count: BRANDS_ACTIVE.filter((b) => b.pinned).length },
+    { key: 'all', label: 'All', count: brands.length },
+    { key: 'live', label: 'Live', count: brands.filter((b) => b.status === 'live').length },
+    { key: 'draft', label: 'Drafts', count: brands.filter((b) => b.status === 'draft').length },
   ];
-  const shown = BRANDS_ACTIVE.filter((b) =>
-    filter === 'all' ? true : filter === 'pinned' ? b.pinned : b.status === filter
-  );
+  const shown = brands.filter((b) => (filter === 'all' ? true : b.status === filter));
 
   return (
     <AShell activeNav="brands" breadcrumb={['Brands']}>
@@ -3279,7 +3415,7 @@ const DirA_BrandsActive = () => {
           {/* ── Header ─────────────────────────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
             <div>
-              <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Library · {brands.length + BRANDS_ACTIVE.length} brands</div>
+              <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Library · {brands.length} {brands.length === 1 ? 'brand' : 'brands'}</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>
                 Your brands.
               </h1>
@@ -3317,21 +3453,24 @@ const DirA_BrandsActive = () => {
             </button>
           </div>
 
-          {/* ── Brand grid ─────────────────────────────────────────── */}
-          <div className="bacard-grid">
-            {brands.map((b) => (
-              <BA_RealBrandCard
-                key={b.id}
-                brand={b}
-                onOpen={() => {
-                  loadBrand(b.id);
-                  const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
-                  navigate(step);
-                }}
-              />
-            ))}
-            {shown.map((b) => <BA_BrandCard key={b.key} brand={b} />)}
-          </div>
+          {/* ── Brand grid / empty state ───────────────────────────── */}
+          {brands.length === 0 ? (
+            <BA_EmptyState onCreate={() => navigate('step1')} />
+          ) : (
+            <div className="bacard-grid">
+              {shown.map((b) => (
+                <BA_RealBrandCard
+                  key={b.id}
+                  brand={b}
+                  onOpen={() => {
+                    loadBrand(b.id);
+                    const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
+                    navigate(step);
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           {/* ── Slim create strip ──────────────────────────────────── */}
           <div style={{
@@ -4259,74 +4398,66 @@ const ActivityItem = ({ icon, accent, lead, body, when }) =>
   </div>;
 
 
-const DirA_Home = () =>
+const DirA_Home = () => {
+  const { user, brands, loadBrand } = useBrandDraft();
+  const { navigate } = useRouter();
+  const drafts = brands.filter((b) => b.status === 'draft');
+  const firstName = user && user.name ? user.name.trim().split(/\s+/)[0] : 'there';
+  const hour = new Date().getHours();
+  const partOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const progressLine = drafts.length === 0
+    ? "You have no brands in progress yet. Start your first one with Fluid."
+    : drafts.length === 1
+      ? "You have 1 brand in progress. Pick it up, or start something new."
+      : "You have " + drafts.length + " brands in progress. Pick one up, or start something new.";
+  return (
 <AShell activeNav="home" breadcrumb={['Home']}>
     <div style={{ padding: '48px 56px 64px', maxWidth: 1240, display: 'flex', flexDirection: 'column', gap: 40 }}>
 
       {/* ── Greeting ───────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
         <div>
-          <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Monday · June 1</div>
+          <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>{today}</div>
           <h1 style={{
           fontFamily: 'var(--font-display)', fontWeight: 800,
           fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000'
-        }}>Good morning, Mara.</h1>
+        }}>Good {partOfDay}, {firstName}.</h1>
           <p style={{ fontSize: 16, color: 'var(--fg-2)', marginTop: 14, maxWidth: 520, lineHeight: 1.5 }}>
-            You have <strong style={{ color: 'var(--fg-1)' }}>4 brands in progress</strong>. Pick one up, or start something new with Fluid.
+            {progressLine}
           </p>
         </div>
       </div>
 
       {/* ════ YOUR BRANDS — pick up where you left off ════════════════ */}
+      {drafts.length > 0 && (
       <section>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
           <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Pick up where you left off</div>
-          <button style={{ padding: '7px 12px', borderRadius: 10, background: 'transparent', color: 'var(--fg-2)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, border: 0, cursor: 'pointer' }}>
+          <button onClick={() => navigate('brands')} style={{ padding: '7px 12px', borderRadius: 10, background: 'transparent', color: 'var(--fg-2)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, border: 0, cursor: 'pointer' }}>
             All brands <ArrowRight size={11} />
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          <ResumeCard
-          name="Apple" kind="Consumer technology"
-          step={4} total={5} stepLabel="Logo" updated="2h ago"
-          mood={{ bg: '#F1F1F3', fg: '#1D1D1F' }}
-          mark={{ text: 'A', weight: 700, size: 22, tracking: '-0.04em' }}
-          logo={<BrandLogoImg brand="apple" fill />}
-          typeFont={APPLE_DISPLAY} typeName="SF Pro"
-          palette={['#1F1F1F', '#E3E4E6', '#F1E0C5', '#A5C4D6', '#B6AB9C']} />
-        
-          <ResumeCard
-          name="Figma" kind="Design platform"
-          step={5} total={5} stepLabel="Brand kit" updated="3d ago"
-          mood={{ bg: '#FFFFFF', fg: '#0E0E0E' }}
-          mark={{ text: 'F', weight: 700, size: 22, tracking: '-0.04em' }}
-          logo={<FigmaLogo size={28} />}
-          typeFont={FIGMA_TYPE} typeName="Whyte / Inter"
-          palette={['#F24E1E', '#FF7262', '#A259FF', '#1ABCFE', '#0ACF83']} />
-        
-          <ResumeCard
-          name="Perplexity" kind="AI answer engine"
-          step={3} total={5} stepLabel="Naming" updated="1h ago"
-          mood={{ bg: '#FBF7EE', fg: '#1F4E47' }}
-          mark={{ text: 'P', weight: 700, size: 22, tracking: '-0.03em' }}
-          logo={<BrandLogoImg brand="perplexity" fill />}
-          typeFont={PERPLEXITY_DISPLAY} typeName="FK Display"
-          palette={['#0F0F0F', '#1F4E47', '#5C8C82', '#E8DFC8', '#FBF7EE']} />
-        
-          <ResumeCard
-          name="Tesla" kind="Electric vehicles"
-          step={2} total={5} stepLabel="Style" updated="yesterday"
-          mood={{ bg: '#E31937', fg: '#FFFFFF' }}
-          mark={{ text: 'T', weight: 700, size: 22, tracking: '0.02em' }}
-          logo={<BrandLogoImg brand="tesla" fill />}
-          typeFont={TESLA_TYPE} typeName="Gotham"
-          palette={['#E31937', '#A6001E', '#000000', '#A6A6A6', '#FFFFFF']} />
-        
+          {drafts.slice(0, 4).map((b) => (
+            <div key={b.id}
+              onClick={() => { loadBrand(b.id); navigate('step' + (b.step || 1)); }}
+              style={{ borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+              <div style={{ height: 96, background: 'var(--fluid-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: '#fff' }}>{(b.name || 'U').trim().charAt(0).toUpperCase()}</span>
+              </div>
+              <div style={{ padding: '13px 15px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || 'Untitled brand'}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>Step {b.step || 1} of 5</span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
+      )}
 
       {/* divider — separates your existing brands from creating a new one */}
-      <div style={{ height: 1, background: 'var(--line)' }} />
+      {drafts.length > 0 && <div style={{ height: 1, background: 'var(--line)' }} />}
 
       {/* ════ START SOMETHING NEW — create a brand ════════════════════ */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -4423,7 +4554,9 @@ const DirA_Home = () =>
 
 
     </div>
-  </AShell>;
+  </AShell>
+  );
+};
 
 
 Object.assign(window, { DirA_Home, QuickPath });
@@ -4587,15 +4720,20 @@ const SectionHead = ({ eyebrow, title, desc }) => (
 // ---------------------------------------------------------------------
 // Section: Account
 // ---------------------------------------------------------------------
-const SecAccount = () => (
+const SecAccount = () => {
+  const { user } = useBrandDraft();
+  const name = (user && user.name) || '';
+  const email = (user && user.email) || '';
+  const initial = (user && user.initial) || '·';
+  return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <SectionHead eyebrow="Settings · Account" title="Account." desc="Your personal profile and sign-in. This is how teammates see you across Fluid." />
+    <SectionHead eyebrow="Settings · Account" title="Account." desc="Your personal profile and sign-in. This is how you appear across Fluid." />
 
     <Card title="Profile">
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingBottom: 22, marginBottom: 4, borderBottom: '1px solid var(--line)' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 999, background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, flex: '0 0 64px' }}>M</div>
+        <div style={{ width: 64, height: 64, borderRadius: 999, background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, flex: '0 0 64px' }}>{initial}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: '#000', letterSpacing: '-0.02em' }}>Mara Ellison</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: '#000', letterSpacing: '-0.02em' }}>{name || 'Your name'}</div>
           <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>PNG, JPG or SVG · up to 2&nbsp;MB</div>
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
@@ -4604,8 +4742,8 @@ const SecAccount = () => (
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, paddingTop: 18 }}>
-        <Field label="Full name" value="Mara Ellison" />
-        <Field label="Email" value="mara@northlight.studio" suffix={<Chip tone="live">Verified</Chip>} />
+        <Field label="Full name" value={name || '—'} />
+        <Field label="Email" value={email || '—'} suffix={<Chip tone="live">Verified</Chip>} />
         <SelectField label="Language" value="English (US)" />
         <SelectField label="Time zone" value="GMT−8 · Pacific" />
       </div>
@@ -4633,28 +4771,32 @@ const SecAccount = () => (
 
     <SaveBar />
   </div>
-);
+  );
+};
 
 // ---------------------------------------------------------------------
 // Section: Workspace
 // ---------------------------------------------------------------------
-const SecWorkspace = () => (
+const SecWorkspace = () => {
+  const { user, brands } = useBrandDraft();
+  const wsName = user && user.name ? user.name.trim().split(/\s+/)[0] + "'s workspace" : 'Your workspace';
+  const wsInitial = (user && user.initial) || '·';
+  const brandCount = brands.length + ' ' + (brands.length === 1 ? 'brand' : 'brands');
+  return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <SectionHead eyebrow="Settings · Workspace" title="Workspace." desc="The shared home for your team's brands, assets and guidelines." />
+    <SectionHead eyebrow="Settings · Workspace" title="Workspace." desc="The home for your brands, assets and guidelines." />
 
     <Card title="Identity">
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingBottom: 22, marginBottom: 4, borderBottom: '1px solid var(--line)' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--fl-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, color: '#000', flex: '0 0 64px', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)' }}>N</div>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--fl-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, color: '#000', flex: '0 0 64px', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)' }}>{wsInitial}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: '#000', letterSpacing: '-0.02em' }}>Northlight</div>
-          <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>4 members · 4 brands</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: '#000', letterSpacing: '-0.02em' }}>{wsName}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>{brandCount}</div>
         </div>
         <button style={{ padding: '9px 14px', borderRadius: 10, background: 'var(--bg-sunken)', color: 'var(--fg-1)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Replace icon</button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, paddingTop: 18 }}>
-        <Field label="Workspace name" value="Northlight" />
-        <Field label="Workspace URL" value="fluid.app/northlight" mono suffix={<span style={{ fontSize: 11, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>Copy</span>} />
-        <SelectField label="Default region" value="North America" />
+        <Field label="Workspace name" value={wsName} />
         <SelectField label="Default language" value="English (US)" />
       </div>
     </Card>
@@ -4672,13 +4814,14 @@ const SecWorkspace = () => (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--destructive)' }}>Delete workspace</div>
-          <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 3, maxWidth: 460, lineHeight: 1.45 }}>Permanently remove Northlight and all of its brands, assets and guidelines. This cannot be undone.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 3, maxWidth: 460, lineHeight: 1.45 }}>Permanently remove this workspace and all of its brands, assets and guidelines. This cannot be undone.</div>
         </div>
         <button style={{ padding: '9px 16px', borderRadius: 10, background: 'transparent', color: 'var(--destructive)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px rgba(214,69,69,.4)', flex: '0 0 auto' }}>Delete workspace</button>
       </div>
     </Card>
   </div>
-);
+  );
+};
 
 // ---------------------------------------------------------------------
 // Section: Fluid AI  (the distinctive one)
@@ -4962,8 +5105,7 @@ const SETTINGS_NAV = [
   { id: 'account',      label: 'Account',         d: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></> },
   { id: 'workspace',    label: 'Workspace',       d: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></> },
   { id: 'fluid',        label: 'Fluid AI',        d: <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></> },
-  { id: 'members',      label: 'Members',         d: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></> },
-  { id: 'plan',         label: 'Plan & billing',  d: <><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></> },
+  // Members and Plan/Billing hidden until those features exist.
   { id: 'integrations', label: 'Integrations',    d: <><path d="M6 3v12M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" /></> },
   { id: 'notifications',label: 'Notifications',   d: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></> },
 ];
@@ -5084,7 +5226,7 @@ const ROUTE_META = {
   'step2':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step3':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step4':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
-  'step5':        { activeNav: 'brands',   breadcrumb: ['Brands', 'Cadence'] },
+  'step5':        { activeNav: 'brands',   breadcrumb: ['Brands', 'Brand kit'] },
 };
 
 // Crumb label → route the user expects to land on when clicking it.
@@ -5861,14 +6003,14 @@ const SCREEN_FOR_ROUTE = {
   'home':         () => <DirA_Home />,
   'brands':       () => <DirA_BrandsActive />,
   'brands-empty': () => <DirA_Brands />,        // the editorial empty-state library
-  'assets':       () => <DirA_Assets />,
-  'guides':       () => <DirA_Guides />,
+  'assets':       () => <DirA_AssetsScreen />,
+  'guides':       () => <DirA_GuidesScreen />,
   'settings':     () => <DirA_Settings />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Style />,
   'step3':        () => <DirA_Step3_Name />,
   'step4':        () => <DirA_Step4_Logo />,
-  'step5':        () => <DirA_Kit />,
+  'step5':        () => <DirA_KitSummary />,
 };
 
 // The actual prototype frame — reads route, renders the matching screen
@@ -5997,10 +6139,19 @@ const BrandDraftCtx = React.createContext(null);
 const useBrandDraft = () => React.useContext(BrandDraftCtx) || {};
 window.useBrandDraft = useBrandDraft;
 
+async function apiGetMe() {
+  try {
+    const r = await fetch('/api/me', { cache: 'no-store' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
 function BrandDraftProvider({ children }) {
   const { route } = useRouter();
   const [brands, setBrands] = React.useState([]);
   const [draft, setDraft] = React.useState(null);
+  const [user, setUser] = React.useState(null);
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
   const saveTimer = React.useRef(null);
@@ -6009,6 +6160,7 @@ function BrandDraftProvider({ children }) {
     setBrands(await apiListBrands());
   }, []);
   React.useEffect(() => { refresh(); }, [refresh]);
+  React.useEffect(() => { apiGetMe().then(setUser); }, []);
 
   // Debounced field autosave.
   const setField = React.useCallback((key, value) => {
@@ -6059,7 +6211,7 @@ function BrandDraftProvider({ children }) {
     apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
   }, [route]);
 
-  const value = { brands, draft, setField, startNew, loadBrand, refresh };
+  const value = { brands, draft, user, setField, startNew, loadBrand, refresh };
   return <BrandDraftCtx.Provider value={value}>{children}</BrandDraftCtx.Provider>;
 }
 window.BrandDraftProvider = BrandDraftProvider;
