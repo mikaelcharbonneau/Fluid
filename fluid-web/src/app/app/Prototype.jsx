@@ -1947,14 +1947,14 @@ const DirA_Step2_Style = () => (
 // the agent's reasoning is legible at a glance. Selected card gets a
 // black ring; favorited cards get a coral heart.
 // =====================================================================
-const ANameCard = ({ n, kind, why, domain, fit, fav, sel }) => {
+const ANameCard = ({ n, kind, why, domain, fit, fav, sel, onClick }) => {
   const dom = {
     available: { fg:'#0E6B5E', bg:'rgba(68,217,199,.18)', label:'.com avail', dot:'#44D9C7' },
     taken:     { fg:'#A8421F', bg:'rgba(253,121,71,.14)', label:'.com taken', dot:'#FD7947' },
     pricey:    { fg:'#7C5A14', bg:'rgba(253,186,80,.20)', label:'.com $14k',  dot:'#FDBA50' },
   }[domain];
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background:'var(--bg-elev)', borderRadius:18, padding:18,
       boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
       display:'flex', flexDirection:'column', gap:14, position:'relative', cursor:'pointer',
@@ -1998,7 +1998,23 @@ const ANameCard = ({ n, kind, why, domain, fit, fav, sel }) => {
   );
 };
 
-const DirA_Step3_Name = () => (
+const NAME_OPTIONS = [
+  { n:'Cadence', kind:'abstract / rhythm', why:"Rituals are cadence — the same word your audience already uses.", domain:'available', fit:94, fav:true },
+  { n:'Ritual',  kind:'literal',           why:"On the nose. Owns the category — but .com is parked.", domain:'taken', fit:88 },
+  { n:'Quiet',   kind:'emotional',         why:"Mirrors 'quiet surface' from your brief. A whisper of a brand.", domain:'available', fit:86, fav:true },
+  { n:'Lumiq',   kind:'invented',          why:"Light + ritual. Short, .com clean, distinct in search.", domain:'available', fit:79 },
+  { n:'Tendril', kind:'metaphor',          why:"A practice that grows quietly. Feels organic, almost monastic.", domain:'available', fit:74 },
+  { n:'Hours',   kind:'literal',           why:"Time as ritual. Domain is premium but obtainable.", domain:'pricey', fit:71 },
+  { n:'Vespers', kind:'evocative',         why:"Evening prayers — ritual + retrospect. Memorable, niche.", domain:'available', fit:68 },
+  { n:'North',   kind:'abstract',          why:"A direction, not a destination. Plays with weekly themes.", domain:'taken', fit:64 },
+  { n:'Kindle',  kind:'invented',          why:"Daily ignition. Domain owned by Amazon — would need a suffix.", domain:'taken', fit:58 },
+];
+
+const DirA_Step3_Name = () => {
+  const { draft, setField } = useBrandDraft();
+  const chosen = (draft && draft.name_choice) || 'Cadence';
+  const chooseName = (name) => { setField('name_choice', name); setField('name', name); };
+  return (
   <AWizardLayout
     step={3}
     title="Find the right name."
@@ -2020,6 +2036,7 @@ const DirA_Step3_Name = () => (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v16M4 12h16"/></svg>
         <input
           placeholder="Type your own name…"
+          onKeyDown={(e) => { if (e.key === 'Enter' && e.currentTarget.value.trim()) chooseName(e.currentTarget.value.trim()); }}
           style={{flex:1, border:0, background:'transparent', outline:'none', fontSize:13, color:'var(--fg-1)', fontFamily:'inherit'}}
         />
         <span style={{fontSize:10.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)'}}>↵</span>
@@ -2050,18 +2067,14 @@ const DirA_Step3_Name = () => (
 
     {/* 3 × 3 name grid */}
     <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12}}>
-      <ANameCard n="Cadence" kind="abstract / rhythm" why="Rituals are cadence — the same word your audience already uses." domain="available" fit={94} fav sel/>
-      <ANameCard n="Ritual"  kind="literal"           why="On the nose. Owns the category — but .com is parked." domain="taken"     fit={88} />
-      <ANameCard n="Quiet"   kind="emotional"         why="Mirrors 'quiet surface' from your brief. A whisper of a brand." domain="available" fit={86} fav/>
-      <ANameCard n="Lumiq"   kind="invented"          why="Light + ritual. Short, .com clean, distinct in search." domain="available" fit={79} />
-      <ANameCard n="Tendril" kind="metaphor"          why="A practice that grows quietly. Feels organic, almost monastic." domain="available" fit={74} />
-      <ANameCard n="Hours"   kind="literal"           why="Time as ritual. Domain is premium but obtainable." domain="pricey"   fit={71} />
-      <ANameCard n="Vespers" kind="evocative"         why="Evening prayers — ritual + retrospect. Memorable, niche." domain="available" fit={68} />
-      <ANameCard n="North"   kind="abstract"          why="A direction, not a destination. Plays with weekly themes." domain="taken"    fit={64} />
-      <ANameCard n="Kindle"  kind="invented"          why="Daily ignition. Domain owned by Amazon — would need a suffix." domain="taken"   fit={58} />
+      {NAME_OPTIONS.map((o) => (
+        <ANameCard key={o.n} n={o.n} kind={o.kind} why={o.why} domain={o.domain} fit={o.fit}
+          fav={o.fav} sel={chosen === o.n} onClick={() => chooseName(o.n)} />
+      ))}
     </div>
   </AWizardLayout>
-);
+  );
+};
 
 // =====================================================================
 // A5 · Step 4 · Logo Concept Selection Screen
@@ -2120,9 +2133,9 @@ const ALogoMark = ({ shape, size = 88 }) => {
   return null;
 };
 
-const ALogoConceptCard = ({ n, name, descriptor, shape, sel, status }) => {
+const ALogoConceptCard = ({ n, name, descriptor, shape, sel, status, onClick }) => {
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background:'var(--bg-elev)', borderRadius: 18, padding: 16,
       boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
       display:'flex', flexDirection:'column', gap:12, cursor:'pointer',
@@ -2180,7 +2193,17 @@ const ALogoConceptCard = ({ n, name, descriptor, shape, sel, status }) => {
   );
 };
 
-const DirA_Step4_Logo = () => (
+const LOGO_CONCEPTS = [
+  { n:1, name:'Ribbon mark', descriptor:"A single fluid line — cadence as movement. Best at large scale; works mono and gradient.", shape:'ribbon' },
+  { n:2, name:'Monogram', descriptor:"Confident, square. The dot signals the period — a beat. Strongest at app-icon scale.", shape:'monogram' },
+  { n:3, name:'Wordmark', descriptor:"The full name. The full stop carries the cadence — quiet, decisive. Editorial-leaning.", shape:'wordmark' },
+  { n:4, name:'Sundial', descriptor:"A circle with a marker — time, ritual, return. Slowest to read; best as small mnemonic.", shape:'circle', status:'streaming' },
+];
+
+const DirA_Step4_Logo = () => {
+  const { draft, setField } = useBrandDraft();
+  const chosen = (draft && draft.logo_choice) || 'Ribbon mark';
+  return (
   <AWizardLayout
     step={4}
     title="Pick a logo direction."
@@ -2195,10 +2218,10 @@ const DirA_Step4_Logo = () => (
     <div style={{display:'grid', gridTemplateColumns:'2.4fr 1fr', gap:18, alignItems:'start'}}>
       {/* 4 concept cards in a 2 × 2 grid */}
       <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14}}>
-        <ALogoConceptCard n={1} name="Ribbon mark" descriptor="A single fluid line — cadence as movement. Best at large scale; works mono and gradient." shape="ribbon" sel/>
-        <ALogoConceptCard n={2} name="Monogram" descriptor="Confident, square. The dot signals the period — a beat. Strongest at app-icon scale." shape="monogram"/>
-        <ALogoConceptCard n={3} name="Wordmark" descriptor="The full name. The full stop carries the cadence — quiet, decisive. Editorial-leaning." shape="wordmark"/>
-        <ALogoConceptCard n={4} name="Sundial" descriptor="A circle with a marker — time, ritual, return. Slowest to read; best as small mnemonic." shape="circle" status="streaming"/>
+        {LOGO_CONCEPTS.map((c) => (
+          <ALogoConceptCard key={c.n} n={c.n} name={c.name} descriptor={c.descriptor} shape={c.shape}
+            status={c.status} sel={chosen === c.name} onClick={() => setField('logo_choice', c.name)} />
+        ))}
       </div>
 
       {/* Refinement panel for selected concept */}
@@ -2271,7 +2294,8 @@ const DirA_Step4_Logo = () => (
       </div>
     </div>
   </AWizardLayout>
-);
+  );
+};
 
 // =====================================================================
 // A5 · Step 5 · Brand Kit Screen (Finalized)
