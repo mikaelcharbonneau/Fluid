@@ -844,7 +844,11 @@ const ACompetitorChip = ({ name, domain }) => (
   </div>
 );
 
-const DirA_Step1_Brief = () => (
+const DirA_Step1_Brief = () => {
+  const { draft, setField } = useBrandDraft();
+  const brief = (draft && draft.brief) || '';
+  const audience = (draft && draft.audience) || '';
+  return (
   <AWizardLayout
     step={1}
     title="Tell us about your idea."
@@ -864,14 +868,18 @@ const DirA_Step1_Brief = () => (
           boxShadow:'inset 0 0 0 1px var(--line)',
           padding: '18px 18px 14px',
         }}>
-          <div style={{
-            fontFamily:'var(--font-display)', fontSize: 22, fontWeight: 500,
-            letterSpacing:'-0.018em', color:'#000', lineHeight: 1.4,
-            minHeight: 84,
-          }}>
-            A productivity tool for founders who run on rituals — not roadmaps. Daily focus prompts, weekly retros, monthly themes — all in one quiet surface.
-            <span style={{display:'inline-block',width:2,height:22,background:'#000',verticalAlign:-4,marginLeft:2,animation:'tdot 1.1s infinite'}}/>
-          </div>
+          <textarea
+            value={brief}
+            onChange={(e) => setField('brief', e.target.value)}
+            placeholder="A productivity tool for founders who run on rituals — not roadmaps. Daily focus prompts, weekly retros, monthly themes — all in one quiet surface."
+            rows={3}
+            style={{
+              width:'100%', resize:'vertical', border:'none', outline:'none', background:'transparent',
+              fontFamily:'var(--font-display)', fontSize: 22, fontWeight: 500,
+              letterSpacing:'-0.018em', color:'#000', lineHeight: 1.4,
+              minHeight: 84,
+            }}
+          />
           <div style={{display:'flex', alignItems:'center', gap:8, marginTop:14, paddingTop:14, borderTop:'1px dashed var(--line)'}}>
             <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600, display:'inline-flex',alignItems:'center',gap:6}}>
               <Sparkle size={11}/> Rewrite shorter
@@ -905,12 +913,17 @@ const DirA_Step1_Brief = () => (
             display:'flex', flexDirection:'column', gap:10,
             minHeight: 124,
           }}>
-            <div style={{
-              fontFamily:'var(--font-display)', fontSize:16, fontWeight:500,
-              letterSpacing:'-0.012em', color:'var(--fg-1)', lineHeight:1.45,
-            }}>
-              Solo founders &amp; indie makers, 25–40, already living in Notion, Linear, or Sunsama.
-            </div>
+            <textarea
+              value={audience}
+              onChange={(e) => setField('audience', e.target.value)}
+              placeholder="Solo founders & indie makers, 25–40, already living in Notion, Linear, or Sunsama."
+              rows={3}
+              style={{
+                width:'100%', resize:'vertical', border:'none', outline:'none', background:'transparent',
+                fontFamily:'var(--font-display)', fontSize:16, fontWeight:500,
+                letterSpacing:'-0.012em', color:'var(--fg-1)', lineHeight:1.45,
+              }}
+            />
             <div style={{flex:1}}/>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
@@ -961,7 +974,8 @@ const DirA_Step1_Brief = () => (
       </div>
     </div>
   </AWizardLayout>
-);
+  );
+};
 
 // =====================================================================
 // A3 · Step 2 · Style Selection Screen
@@ -1621,8 +1635,9 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
 // Expandable visual-style picker — collapsed: 4 direction cards only;
 // expanded: cards + refinement sliders for the selected direction.
 const AVisualStyleSection = () => {
+  const { draft, setField } = useBrandDraft();
   const [expanded, setExpanded] = useState(false);
-  const [selectedId, setSelectedId] = useState('modern-minimal');
+  const [selectedId, setSelectedId] = useState((draft && draft.style_id) || 'modern-minimal');
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
 
   return (
@@ -1641,7 +1656,7 @@ const AVisualStyleSection = () => {
             name={opt.name}
             descriptor={opt.descriptor}
             sel={selectedId === opt.id}
-            onClick={() => setSelectedId(opt.id)}
+            onClick={() => { setSelectedId(opt.id); setField('style_id', opt.id); }}
           />
         ))}
       </div>
@@ -3173,10 +3188,54 @@ const BA_BrandCard = ({ brand }) => {
   );
 };
 
+// Relative "time ago" for real saved-brand timestamps.
+function relTime(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'Just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 172800) return 'Yesterday';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+// Card for a real, user-saved brand (no mock Hero art — a gradient tile).
+const BA_RealBrandCard = ({ brand, onOpen }) => (
+  <div
+    onClick={onOpen}
+    style={{
+      borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)',
+      boxShadow: 'inset 0 0 0 1px var(--line)', display: 'flex', flexDirection: 'column',
+    }}
+  >
+    <div style={{ height: 132, background: 'var(--fluid-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: '#fff', letterSpacing: '-0.03em' }}>
+        {(brand.name || 'U').trim().charAt(0).toUpperCase()}
+      </span>
+    </div>
+    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {brand.name || 'Untitled brand'}
+        </span>
+        <BA_StatusPill status={brand.status} />
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--fg-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {brand.brief ? brand.brief : 'No description yet'}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>
+        Edited {relTime(brand.updated_at)}
+      </div>
+    </div>
+  </div>
+);
+
 // =====================================================================
 // The screen
 // =====================================================================
 const DirA_BrandsActive = () => {
+  const { brands, loadBrand } = useBrandDraft();
+  const { navigate } = useRouter();
   const [filter, setFilter] = useBAState('all');
   const filters = [
     { key: 'all', label: 'All', count: BRANDS_ACTIVE.length },
@@ -3196,7 +3255,7 @@ const DirA_BrandsActive = () => {
           {/* ── Header ─────────────────────────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
             <div>
-              <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Library · {BRANDS_ACTIVE.length} brands</div>
+              <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Library · {brands.length + BRANDS_ACTIVE.length} brands</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>
                 Your brands.
               </h1>
@@ -3236,6 +3295,17 @@ const DirA_BrandsActive = () => {
 
           {/* ── Brand grid ─────────────────────────────────────────── */}
           <div className="bacard-grid">
+            {brands.map((b) => (
+              <BA_RealBrandCard
+                key={b.id}
+                brand={b}
+                onOpen={() => {
+                  loadBrand(b.id);
+                  const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
+                  navigate(step);
+                }}
+              />
+            ))}
             {shown.map((b) => <BA_BrandCard key={b.key} brand={b} />)}
           </div>
 
@@ -5858,6 +5928,118 @@ function QuickJump() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Brand persistence (Phase 2b) — talks to /api/brands, holds the current
+// draft, and autosaves as the user moves through the wizard.
+// ══════════════════════════════════════════════════════════════════════
+async function apiListBrands() {
+  try {
+    const r = await fetch('/api/brands', { cache: 'no-store' });
+    if (!r.ok) return [];
+    return (await r.json()).brands || [];
+  } catch { return []; }
+}
+async function apiCreateBrand(body) {
+  try {
+    const r = await fetch('/api/brands', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    if (!r.ok) return null;
+    return (await r.json()).brand;
+  } catch { return null; }
+}
+async function apiUpdateBrand(id, patch) {
+  try {
+    const r = await fetch('/api/brands/' + id, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) return null;
+    return (await r.json()).brand;
+  } catch { return null; }
+}
+
+// Until the name step is wired up, derive a readable brand name from the brief
+// so saved brands don't all read "Untitled brand".
+function deriveBrandName(brief) {
+  const words = String(brief || '').trim().split(/\s+/).filter(Boolean).slice(0, 4);
+  if (words.length === 0) return 'Untitled brand';
+  const s = words.join(' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const BrandDraftCtx = React.createContext(null);
+const useBrandDraft = () => React.useContext(BrandDraftCtx) || {};
+window.useBrandDraft = useBrandDraft;
+
+function BrandDraftProvider({ children }) {
+  const { route } = useRouter();
+  const [brands, setBrands] = React.useState([]);
+  const [draft, setDraft] = React.useState(null);
+  const draftRef = React.useRef(draft);
+  draftRef.current = draft;
+  const saveTimer = React.useRef(null);
+
+  const refresh = React.useCallback(async () => {
+    setBrands(await apiListBrands());
+  }, []);
+  React.useEffect(() => { refresh(); }, [refresh]);
+
+  // Debounced field autosave.
+  const setField = React.useCallback((key, value) => {
+    // Editing the brief also refreshes the derived brand name.
+    const patch = key === 'brief'
+      ? { brief: value, name: deriveBrandName(value) }
+      : { [key]: value };
+    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+    const d = draftRef.current;
+    if (!d || !d.id) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const updated = await apiUpdateBrand(d.id, patch);
+      if (updated) refresh();
+    }, 500);
+  }, [refresh]);
+
+  const startNew = React.useCallback(async () => {
+    const b = await apiCreateBrand({ step: 1 });
+    if (b) { setDraft(b); refresh(); }
+    return b;
+  }, [refresh]);
+
+  const loadBrand = React.useCallback((id) => {
+    const b = brands.find((x) => x.id === id);
+    if (b) setDraft(b);
+    return b;
+  }, [brands]);
+
+  // Clear the draft whenever we leave the wizard, so "Start a new brand"
+  // always begins fresh (resume re-selects an explicit brand).
+  React.useEffect(() => {
+    if (!/^step[1-5]$/.test(route)) setDraft(null);
+  }, [route]);
+
+  // Create a draft when the brief screen opens with none active.
+  React.useEffect(() => {
+    if (route === 'step1' && !draftRef.current) startNew();
+  }, [route, startNew]);
+
+  // Persist wizard progress; mark the brand "live" at the kit.
+  React.useEffect(() => {
+    const d = draftRef.current;
+    if (!d || !d.id || !/^step[1-5]$/.test(route)) return;
+    const step = Number(route.slice(4));
+    const patch = { step };
+    if (route === 'step5') patch.status = 'live';
+    apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
+  }, [route]);
+
+  const value = { brands, draft, setField, startNew, loadBrand, refresh };
+  return <BrandDraftCtx.Provider value={value}>{children}</BrandDraftCtx.Provider>;
+}
+window.BrandDraftProvider = BrandDraftProvider;
+
 function App() {
   const [t, setTweak] = useTweaks(PROTO_DEFAULTS);
 
@@ -5867,6 +6049,7 @@ function App() {
 
   return (
     <RouterProvider>
+      <BrandDraftProvider>
       <PrototypeFrame />
       {t.showQuickJump && <QuickJump />}
 
@@ -5892,6 +6075,7 @@ function App() {
           Always-visible route switcher in the bottom-right. Off → navigate purely through the in-product CTAs and the left rail.
         </div>
       </TweaksPanel>
+      </BrandDraftProvider>
     </RouterProvider>
   );
 }
