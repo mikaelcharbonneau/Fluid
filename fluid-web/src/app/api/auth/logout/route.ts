@@ -1,19 +1,30 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import { SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
-async function signOut() {
-  const supabase = await createClient();
+// POST-only: signing out mutates auth state, so it must not run on a GET —
+// a cross-site top-level navigation to a GET logout could drop the session
+// without the user's intent. The in-app "Log out" control submits a POST form.
+//
+// The Supabase client is bound directly to the redirect response so the
+// session-clearing Set-Cookie headers ride along with the 303 (a separate
+// NextResponse.redirect() would drop them).
+export async function POST(request: NextRequest) {
+  const response = NextResponse.redirect(new URL("/login", request.url), 303);
+
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+      },
+    },
+  });
+
   await supabase.auth.signOut();
-}
-
-// GET so the in-app "Log out" link can be a plain <a href> that navigates.
-export async function GET(request: Request) {
-  await signOut();
-  return NextResponse.redirect(new URL("/login", request.url));
-}
-
-// POST for programmatic sign-out (e.g. fetch from a button).
-export async function POST() {
-  await signOut();
-  return NextResponse.json({ ok: true });
+  return response;
 }
