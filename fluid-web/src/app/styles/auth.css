@@ -169,3 +169,33 @@
 @media (pointer: coarse) {
   .oauth-btn, .auth-input, .pw-toggle, .btn.btn-block { cursor: auto; }
 }
+
+/* ---- auth error + toast (added in Phase 2 for real authentication) ---- */
+.auth-error {
+  margin-top: 14px;
+  font: 500 13px/1.5 var(--font-body);
+  color: var(--destructive);
+}
+.auth-error:empty { display: none; }
+
+.auth-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 12px);
+  max-width: min(90vw, 360px);
+  padding: 11px 16px;
+  border-radius: var(--r-md);
+  background: #0a0a0b;
+  color: #fff;
+  font: 500 13px/1.4 var(--font-body);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease-out), transform var(--t-base) var(--ease-out);
+  z-index: 1000;
+}
+.auth-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

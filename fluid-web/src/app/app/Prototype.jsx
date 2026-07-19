@@ -4531,7 +4531,7 @@ const SecAccount = () => (
 
     <Card title="Session">
       <Row title="Log out" desc="Sign out of Fluid on this device." last>
-        <a href="/login" data-no-route style={{ padding: '9px 16px', borderRadius: 10, background: 'transparent', color: 'var(--destructive)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', boxShadow: 'inset 0 0 0 1px rgba(214,69,69,0.4)' }}>Log out</a>
+        <a href="/api/auth/logout" data-no-route style={{ padding: '9px 16px', borderRadius: 10, background: 'transparent', color: 'var(--destructive)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', boxShadow: 'inset 0 0 0 1px rgba(214,69,69,0.4)' }}>Log out</a>
       </Row>
     </Card>
 

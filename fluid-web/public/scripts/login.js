@@ -46,10 +46,66 @@
     });
   }
 
-  /* funnel → into the app after logging in */
-  var APP = "/app#home";
-  var go = function () { window.location.assign(APP); };
+  /* ---- inline error + toast helpers (styled by auth.css) ---- */
+  function showError(msg) {
+    var el = document.getElementById("auth-error");
+    if (!el) {
+      el = document.createElement("p");
+      el.id = "auth-error";
+      el.className = "auth-error";
+      var fields = document.querySelector(".auth-fields");
+      if (fields) fields.parentNode.insertBefore(el, fields.nextSibling);
+    }
+    el.textContent = msg;
+  }
+  function clearError() {
+    var el = document.getElementById("auth-error");
+    if (el) el.textContent = "";
+  }
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.className = "auth-toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add("show"); });
+    setTimeout(function () {
+      t.classList.remove("show");
+      setTimeout(function () { t.remove(); }, 260);
+    }, 2200);
+  }
+
+  /* ---- real login against Supabase via the auth route handler ---- */
   var form = document.querySelector(".auth-fields");
-  if (form) form.addEventListener("submit", function (e) { e.preventDefault(); go(); });
-  document.querySelectorAll(".oauth-btn").forEach(function (b) { b.addEventListener("click", go); });
+  var submitBtn = form && form.querySelector('button[type="submit"]');
+
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      clearError();
+      var email = (document.getElementById("li-email") || {}).value || "";
+      var password = (document.getElementById("li-pw") || {}).value || "";
+      if (submitBtn) submitBtn.disabled = true;
+
+      fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, password: password }),
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (res.ok) { window.location.assign("/app#home"); return; }
+          showError((res.d && res.d.error) || "Something went wrong. Try again.");
+          if (submitBtn) submitBtn.disabled = false;
+        })
+        .catch(function () {
+          showError("Network error. Check your connection and try again.");
+          if (submitBtn) submitBtn.disabled = false;
+        });
+    });
+  }
+
+  /* Social sign-in is not wired up yet — keep the buttons, explain the state. */
+  document.querySelectorAll(".oauth-btn").forEach(function (b) {
+    b.addEventListener("click", function () { toast("Social sign-in is coming soon — use email for now."); });
+  });
 })();
