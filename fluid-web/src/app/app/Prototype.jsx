@@ -860,7 +860,7 @@ const DirA_Step1_Brief = () => {
     progress="Step 1 of 5"
     nextLabel="Continue to Style"
     onNext={() => {}}
-    isThinking={true}
+    isThinking={false}
   >
     <div style={{display:'flex', flexDirection:'column', gap:14}}>
       {/* 01 · Brand description — the hero field */}
@@ -946,11 +946,7 @@ const DirA_Step1_Brief = () => {
             display:'flex', flexDirection:'column', gap:12,
             minHeight: 124,
           }}>
-            <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-              <ACompetitorChip name="Notion" domain="notion.so"/>
-              <ACompetitorChip name="Sunsama" domain="sunsama.com"/>
-              <ACompetitorChip name="Linear" domain="linear.app"/>
-            </div>
+            <div style={{display:'flex', flexWrap:'wrap', gap:6}}></div>
             <div style={{flex:1}}/>
             <div style={{
               display:'flex', alignItems:'center', gap:8,
@@ -1640,7 +1636,7 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
 const AVisualStyleSection = () => {
   const { draft, setField } = useBrandDraft();
   const [expanded, setExpanded] = useState(false);
-  const [selectedId, setSelectedId] = useState((draft && draft.style_id) || 'modern-minimal');
+  const [selectedId, setSelectedId] = useState((draft && draft.style_id) || null);
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
 
   return (
@@ -1791,7 +1787,7 @@ const DirA_Step2_Style = () => (
     step={2}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
-    status="live"
+    status="Draft"
     progress="Step 2 of 5"
     nextLabel="Continue to Name"
     onNext={() => {}}
@@ -2015,7 +2011,7 @@ const NAME_OPTIONS = [
 
 const DirA_Step3_Name = () => {
   const { draft, setField } = useBrandDraft();
-  const chosen = (draft && draft.name_choice) || 'Cadence';
+  const chosen = (draft && draft.name_choice) || null;
   const chooseName = (name) => { setField('name_choice', name); setField('name', name); };
   return (
   <AWizardLayout
@@ -2200,23 +2196,23 @@ const LOGO_CONCEPTS = [
   { n:1, name:'Ribbon mark', descriptor:"A single fluid line — cadence as movement. Best at large scale; works mono and gradient.", shape:'ribbon' },
   { n:2, name:'Monogram', descriptor:"Confident, square. The dot signals the period — a beat. Strongest at app-icon scale.", shape:'monogram' },
   { n:3, name:'Wordmark', descriptor:"The full name. The full stop carries the cadence — quiet, decisive. Editorial-leaning.", shape:'wordmark' },
-  { n:4, name:'Sundial', descriptor:"A circle with a marker — time, ritual, return. Slowest to read; best as small mnemonic.", shape:'circle', status:'streaming' },
+  { n:4, name:'Sundial', descriptor:"A circle with a marker — time, ritual, return. Slowest to read; best as small mnemonic.", shape:'circle' },
 ];
 
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
-  const chosen = (draft && draft.logo_choice) || 'Ribbon mark';
+  const chosen = (draft && draft.logo_choice) || null;
   return (
   <AWizardLayout
     step={4}
     title="Pick a logo direction."
     subtitle="Four concepts, each with primary mark and three application contexts. Refine after."
-    status="live"
+    status="Draft"
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
     onNext={() => {}}
     onBack={() => {}}
-    isThinking={true}
+    isThinking={false}
   >
     <div style={{display:'grid', gridTemplateColumns:'2.4fr 1fr', gap:18, alignItems:'start'}}>
       {/* 4 concept cards in a 2 × 2 grid */}
