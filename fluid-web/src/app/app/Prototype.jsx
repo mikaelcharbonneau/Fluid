@@ -2354,8 +2354,9 @@ const KitTile = ({ label, children, style }) => (
 
 // Real brand-kit summary — shows what the user captured in the wizard, with
 // the visual assets as placeholders until generation lands (Phase 3).
-// Palette and typography are generated (below); the rest remain placeholders.
-const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Guidelines'];
+// Logo, palette, and typography are generated (below). Guidelines is the last
+// remaining placeholder.
+const KIT_ASSET_TILES = ['Guidelines'];
 
 // A single generated color swatch — block + name / hex / usage.
 const KitSwatch = ({ c }) => (
@@ -2546,6 +2547,98 @@ const KitTypographySection = ({ draft }) => {
   );
 };
 
+// Full-width logo section for the Brand Kit. Generates SVG mark concepts and
+// lets the user pick one (saved to logo_choice). Auto-generates on open.
+const KitLogoSection = ({ draft }) => {
+  const { setField } = useBrandDraft();
+  const brandId = draft && draft.id;
+  const hasBrief = !!(draft && String(draft.brief || '').trim());
+  const cached = (draft && draft.data && draft.data.logos) || [];
+  const chosen = (draft && draft.logo_choice) || null;
+  const [logos, setLogos] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const requestedFor = React.useRef(null);
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGenerateLogos(brandId);
+    if (res.error) setError(res.error);
+    else setLogos(res.logos);
+    setLoading(false);
+  }, [brandId]);
+
+  React.useEffect(() => {
+    if (!brandId || !hasBrief || logos.length) return;
+    if (requestedFor.current === brandId) return;
+    requestedFor.current = brandId;
+    generate();
+  }, [brandId, hasBrief, logos.length, generate]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Logo</div>
+        <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
+          padding: '6px 11px', borderRadius: 8, background: 'transparent', color: 'var(--fg-2)',
+          fontSize: 11.5, fontWeight: 600, boxShadow: 'inset 0 0 0 1px var(--line)',
+          display: 'inline-flex', alignItems: 'center', gap: 6, border: 0,
+          cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
+        }}>
+          <Sparkle size={11} /> {logos.length ? 'Regenerate' : 'Generate'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 12, background: 'rgba(253,121,71,.10)', boxShadow: 'inset 0 0 0 1px rgba(253,121,71,.30)', fontSize: 12.5, color: '#A8421F', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span>{error}</span>
+          <button onClick={() => generate()} style={{ padding: '5px 10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11.5, fontWeight: 600, border: 0, cursor: 'pointer' }}>Try again</button>
+        </div>
+      )}
+
+      {!error && !logos.length && !hasBrief && (
+        <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 22, fontSize: 13, color: 'var(--fg-3)' }}>Add a brief and Fluid will design logo marks here.</div>
+      )}
+
+      {!error && !logos.length && hasBrief && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ background: 'var(--bg-elev)', borderRadius: 16, boxShadow: 'inset 0 0 0 1px var(--line)', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{loading && i === 1 ? <Thinking /> : null}</div>
+          ))}
+        </div>
+      )}
+
+      {logos.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, opacity: loading ? 0.5 : 1 }}>
+          {logos.map((c) => {
+            const sel = chosen === c.name;
+            return (
+              <div key={c.name} onClick={() => setField && setField('logo_choice', c.name)} style={{
+                background: 'var(--bg-elev)', borderRadius: 16, padding: 16, cursor: 'pointer',
+                boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Concept</span>
+                  {sel && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#000', padding: '3px 8px', borderRadius: 99, letterSpacing: '0.04em' }}>SELECTED</span>}
+                </div>
+                <div style={{ background: '#fff', borderRadius: 12, height: 148, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+                  <SvgMark svg={c.svg} size={120} />
+                </div>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#000', letterSpacing: '-0.018em' }}>{c.name}</div>
+                  {c.descriptor && <div style={{ fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.4, marginTop: 2 }}>{c.descriptor}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DirA_KitSummary = () => {
   const { draft } = useBrandDraft();
   const { navigate } = useRouter();
@@ -2580,6 +2673,8 @@ const DirA_KitSummary = () => {
             ))}
           </div>
 
+          <KitLogoSection draft={draft} />
+
           <KitPaletteSection draft={draft} />
 
           <KitTypographySection draft={draft} />
@@ -2600,7 +2695,7 @@ const DirA_KitSummary = () => {
           </div>
 
           <p style={{ fontSize: 13.5, color: 'var(--fg-3)', lineHeight: 1.5, maxWidth: 580 }}>
-            Fluid will generate your logo and guidelines from this brief in upcoming releases. Your brand and everything you've entered is already saved.
+            Fluid will generate your full brand guidelines from this brief in an upcoming release. Your brand and everything you've entered is already saved.
           </p>
         </div>
       </div>
@@ -4866,6 +4961,28 @@ async function apiGenerateTypography(brandId) {
     return { typography: j.typography || null };
   } catch { return { error: 'Network error.' }; }
 }
+// Phase 3 — ask Claude for SVG logo concepts for this brand.
+async function apiGenerateLogos(brandId) {
+  try {
+    const r = await fetch('/api/generate/logo', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    return { logos: j.logos || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Render model-generated SVG safely: an <img> data-URI can't execute scripts,
+// unlike innerHTML. The SVG is also sanitized server-side (defense in depth).
+const SvgMark = ({ svg, size = 120, bg }) => (
+  <img
+    src={'data:image/svg+xml;utf8,' + encodeURIComponent(svg)}
+    alt="Logo concept"
+    width={size} height={size}
+    style={{ width: size, height: size, display: 'block', background: bg || 'transparent', borderRadius: 8 }}
+  />
+);
 // Load a Google Fonts family once (idempotent by href). Weights are omitted so
 // the request never 400s on a family that lacks a requested weight; the browser
 // synthesizes bolder weights for the specimen.
