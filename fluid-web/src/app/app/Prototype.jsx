@@ -636,6 +636,7 @@ const ACard = ({ n, title, sub, state, children, style, span }) => {
 
 // Progress tracker for the wizard flow
 const AStepProgress = ({ step }) => {
+  const { navigate } = useRouter();
   const steps = [
     { n: 1, label: 'Brief' },
     { n: 2, label: 'Style' },
@@ -645,10 +646,18 @@ const AStepProgress = ({ step }) => {
   ];
   return (
     <div style={{display:'flex',alignItems:'center',gap:10}}>
-      {steps.map((s, i) => (
+      {steps.map((s, i) => {
+        // Completed (earlier) steps are clickable to jump back; the current and
+        // future steps are not.
+        const done = s.n < step;
+        return (
         <React.Fragment key={s.n}>
           {i > 0 && <div style={{width:16,height:1.5,background:s.n <= step ? '#000' : 'var(--line)'}}/>}
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <div
+            onClick={done ? () => navigate('step' + s.n) : undefined}
+            title={done ? 'Back to ' + s.label : undefined}
+            style={{display:'flex',alignItems:'center',gap:6, cursor: done ? 'pointer' : 'default'}}
+          >
             <div style={{
               width:22,height:22,borderRadius:'50%',
               background: s.n === step ? '#000' : (s.n < step ? 'var(--line-strong)' : 'transparent'),
@@ -662,13 +671,19 @@ const AStepProgress = ({ step }) => {
             <span style={{fontSize:12,fontWeight:s.n === step ? 700 : 500,color:s.n === step ? '#000' : 'var(--fg-3)'}}>{s.label}</span>
           </div>
         </React.Fragment>
-      ))}
+        );
+      })}
     </div>
   );
 };
 
 // Wizard layout wrapper
-const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, nextLabel, onBack, backLabel, isThinking }) => (
+const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, nextLabel, backLabel, isThinking }) => {
+  const { navigate } = useRouter();
+  // Back steps to the previous wizard step (available from step 2 on).
+  const canBack = step > 1;
+  const goBack = () => navigate('step' + (step - 1));
+  return (
   <AShell breadcrumb={['Brands', 'New brand']}>
     <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
       {/* Wizard Header */}
@@ -710,27 +725,27 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
           position:'absolute',top:0,left:0,right:0,height:2,
           background:'var(--fl-accent)',
         }}/>
+        {/* Back button first (leftmost), then the Fluid logo, then the status
+            text — the logo sits immediately to the left of the text. */}
+        {canBack ? (
+          <button onClick={goBack} style={{
+            padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
+            fontSize:12,fontWeight:600, border:0, cursor:'pointer', flex:'0 0 auto'
+          }}>
+            {backLabel || 'Back'}
+          </button>
+        ) : <div/>}
         <div style={{
           width: 28, height: 28, borderRadius: 8,
           background:'url("' + __assets['assets/min/fluid-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
-        <div style={{flex:1, minWidth:0, display:'flex', alignItems:'center', gap:16}}>
-          {onBack ? (
-            <button onClick={onBack} style={{
-              padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
-              fontSize:12,fontWeight:600, border:0, cursor:'pointer'
-            }}>
-              {backLabel || 'Back'}
-            </button>
-          ) : <div/>}
-          <div style={{fontSize: 13, color:'rgba(255,255,255,.85)'}}>
-            {isThinking ? (
-              <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
-                Fluid AI is drafting options... <Thinking/>
-              </span>
-            ) : "Fill in card details to refine the strategy."}
-          </div>
+        <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
+          {isThinking ? (
+            <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
+              Fluid AI is drafting options... <Thinking/>
+            </span>
+          ) : "Fill in card details to refine the strategy."}
         </div>
         <button onClick={onNext} style={{
           padding:'8px 14px',borderRadius:8,background:'#fff',color:'#000',
@@ -742,7 +757,8 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
       </div>
     </div>
   </AShell>
-);
+  );
+};
 
 // Summary side panel used in steps 2, 3, 4
 const AContextPanel = ({ brief, styleName, brandName }) => (
@@ -1791,7 +1807,6 @@ const DirA_Step2_Style = () => (
     progress="Step 2 of 5"
     nextLabel="Continue to Name"
     onNext={() => {}}
-    onBack={() => {}}
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -2040,7 +2055,6 @@ const DirA_Step3_Name = () => {
     progress="Step 3 of 5"
     nextLabel="Continue to Logo"
     onNext={() => {}}
-    onBack={() => {}}
     isThinking={loading}
   >
     {/* Top toolbar — own, regenerate */}
@@ -2248,7 +2262,6 @@ const DirA_Step4_Logo = () => {
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
     onNext={() => {}}
-    onBack={() => {}}
     isThinking={false}
   >
     <div style={{display:'grid', gridTemplateColumns:'2.4fr 1fr', gap:18, alignItems:'start'}}>
