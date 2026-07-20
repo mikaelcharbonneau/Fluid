@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { runAssist, type AssistTask, type AssistOption } from "@/lib/ai/assist";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const TASKS: AssistTask[] = [
   "brief_shorter", "brief_punchier", "brief_sharper",
