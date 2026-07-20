@@ -736,8 +736,8 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
           </button>
         ) : <div/>}
         <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background:'url("' + __assets['assets/min/fluid-icon.png'] + '") center / contain no-repeat',
+          width: 28, height: 28,
+          background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
         <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
