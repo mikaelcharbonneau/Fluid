@@ -1951,7 +1951,9 @@ const ANameCard = ({ n, kind, why, domain, fit, fav, sel, onClick }) => {
     available: { fg:'#0E6B5E', bg:'rgba(68,217,199,.18)', label:'.com avail', dot:'#44D9C7' },
     taken:     { fg:'#A8421F', bg:'rgba(253,121,71,.14)', label:'.com taken', dot:'#FD7947' },
     pricey:    { fg:'#7C5A14', bg:'rgba(253,186,80,.20)', label:'.com $14k',  dot:'#FDBA50' },
-  }[domain];
+    // Generated names: we can't verify a domain, so stay honest with a neutral badge.
+    unknown:   { fg:'var(--fg-3)', bg:'var(--bg-sunken)', label:'check .com', dot:'var(--fg-4)' },
+  }[domain] || { fg:'var(--fg-3)', bg:'var(--bg-sunken)', label:'check .com', dot:'var(--fg-4)' };
   return (
     <div onClick={onClick} style={{
       background:'var(--bg-elev)', borderRadius:18, padding:18,
@@ -1997,34 +1999,51 @@ const ANameCard = ({ n, kind, why, domain, fit, fav, sel, onClick }) => {
   );
 };
 
-const NAME_OPTIONS = [
-  { n:'Cadence', kind:'abstract / rhythm', why:"Rituals are cadence — the same word your audience already uses.", domain:'available', fit:94, fav:true },
-  { n:'Ritual',  kind:'literal',           why:"On the nose. Owns the category — but .com is parked.", domain:'taken', fit:88 },
-  { n:'Quiet',   kind:'emotional',         why:"Mirrors 'quiet surface' from your brief. A whisper of a brand.", domain:'available', fit:86, fav:true },
-  { n:'Lumiq',   kind:'invented',          why:"Light + ritual. Short, .com clean, distinct in search.", domain:'available', fit:79 },
-  { n:'Tendril', kind:'metaphor',          why:"A practice that grows quietly. Feels organic, almost monastic.", domain:'available', fit:74 },
-  { n:'Hours',   kind:'literal',           why:"Time as ritual. Domain is premium but obtainable.", domain:'pricey', fit:71 },
-  { n:'Vespers', kind:'evocative',         why:"Evening prayers — ritual + retrospect. Memorable, niche.", domain:'available', fit:68 },
-  { n:'North',   kind:'abstract',          why:"A direction, not a destination. Plays with weekly themes.", domain:'taken', fit:64 },
-  { n:'Kindle',  kind:'invented',          why:"Daily ignition. Domain owned by Amazon — would need a suffix.", domain:'taken', fit:58 },
-];
-
 const DirA_Step3_Name = () => {
   const { draft, setField } = useBrandDraft();
   const chosen = (draft && draft.name_choice) || null;
   const chooseName = (name) => { setField('name_choice', name); setField('name', name); };
+
+  const brandId = draft && draft.id;
+  const hasBrief = !!(draft && String(draft.brief || '').trim());
+  // Seed from any names cached on the brand (so resuming shows the same set).
+  const cached = (draft && draft.data && draft.data.names) || [];
+  const [names, setNames] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const requestedFor = React.useRef(null);
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGenerateNames(brandId);
+    if (res.error) setError(res.error);
+    else setNames(res.names);
+    setLoading(false);
+  }, [brandId]);
+
+  // Auto-generate once when the step opens with a brief but no names yet.
+  React.useEffect(() => {
+    if (!brandId || !hasBrief) return;
+    if (names.length > 0) return;
+    if (requestedFor.current === brandId) return;
+    requestedFor.current = brandId;
+    generate();
+  }, [brandId, hasBrief, names.length, generate]);
+
   return (
   <AWizardLayout
     step={3}
     title="Find the right name."
-    subtitle="Each draft includes Fluid's reasoning and domain status — pick the one that lands."
+    subtitle="Fluid drafts each name with its reasoning — pick the one that lands, or type your own."
     status="Draft"
     progress="Step 3 of 5"
     nextLabel="Continue to Logo"
     onNext={() => {}}
     onBack={() => {}}
+    isThinking={loading}
   >
-    {/* Top toolbar — own, filter, regenerate */}
+    {/* Top toolbar — own, regenerate */}
     <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:18}}>
       <div style={{
         flex:1, display:'flex', alignItems:'center', gap:10,
@@ -2040,37 +2059,55 @@ const DirA_Step3_Name = () => {
         />
         <span style={{fontSize:10.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)'}}>↵</span>
       </div>
-      <button style={{
-        padding:'10px 14px', borderRadius:12, background:'var(--bg-elev)', color:'var(--fg-1)',
-        fontSize:12.5, fontWeight:600, display:'inline-flex', alignItems:'center', gap:8,
-        boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      }}>
-        <span style={{width:15,height:15,borderRadius:4,background:'#000',color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center'}}><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-        .com required
-      </button>
-      <button style={{
-        padding:'10px 14px', borderRadius:12, background:'var(--bg-elev)', color:'var(--fg-1)',
-        fontSize:12.5, fontWeight:600,
-        boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      }}>
-        Length: ≤ 8 char
-      </button>
-      <button style={{
+      <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
         padding:'10px 14px', borderRadius:12, background:'#000', color:'#fff',
         fontSize:12.5, fontWeight:600, display:'inline-flex', alignItems:'center', gap:8,
-        border:0, cursor:'pointer',
+        border:0, cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
       }}>
-        <Sparkle size={12} color="#fff"/> Generate 9 more
+        <Sparkle size={12} color="#fff"/> {names.length ? 'Regenerate' : 'Generate names'}
       </button>
     </div>
 
-    {/* 3 × 3 name grid */}
-    <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12}}>
-      {NAME_OPTIONS.map((o) => (
-        <ANameCard key={o.n} n={o.n} kind={o.kind} why={o.why} domain={o.domain} fit={o.fit}
-          fav={o.fav} sel={chosen === o.n} onClick={() => chooseName(o.n)} />
-      ))}
-    </div>
+    {error && (
+      <div style={{
+        marginBottom:16, padding:'12px 14px', borderRadius:12,
+        background:'rgba(253,121,71,.10)', boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',
+        fontSize:12.5, color:'#A8421F', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+      }}>
+        <span>{error}</span>
+        <button onClick={() => generate()} style={{padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',fontSize:11.5,fontWeight:600,border:0,cursor:'pointer'}}>Try again</button>
+      </div>
+    )}
+
+    {/* Prompt to add a brief if we can't generate yet */}
+    {!hasBrief && !names.length && (
+      <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5}}>
+        Add a brief in Step 1 and Fluid will draft names here.
+      </div>
+    )}
+
+    {/* Loading skeletons on the first generation */}
+    {loading && !names.length && (
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12}}>
+        {Array.from({length:9}).map((_, i) => (
+          <div key={i} style={{
+            background:'var(--bg-elev)', borderRadius:18, minHeight:178,
+            boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}><Thinking/></div>
+        ))}
+      </div>
+    )}
+
+    {/* Name grid */}
+    {names.length > 0 && (
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12, opacity: loading ? 0.5 : 1}}>
+        {names.map((o) => (
+          <ANameCard key={o.name} n={o.name} kind={o.kind} why={o.why} domain="unknown" fit={o.fit}
+            sel={chosen === o.name} onClick={() => chooseName(o.name)} />
+        ))}
+      </div>
+    )}
   </AWizardLayout>
   );
 };
@@ -4597,6 +4634,19 @@ async function apiUpdateBrand(id, patch) {
     if (!r.ok) return null;
     return (await r.json()).brand;
   } catch { return null; }
+}
+// Phase 3 — ask Claude for name candidates for this brand. Resolves to
+// { names } on success or { error } so the caller can show a message.
+async function apiGenerateNames(brandId) {
+  try {
+    const r = await fetch('/api/generate/names', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    return { names: j.names || [] };
+  } catch { return { error: 'Network error.' }; }
 }
 
 // Until the name step is wired up, derive a readable brand name from the brief
