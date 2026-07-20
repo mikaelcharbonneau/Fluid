@@ -26,29 +26,31 @@ export interface LogoBrief {
 const MODEL = "claude-opus-4-8";
 const COUNT = 3;
 
+// We use a plain delimiter format (not JSON) because SVG is full of quotes and
+// slashes that make JSON-in-JSON escaping fragile and error-prone.
 const SYSTEM = `You are Fluid, an expert logo designer. Given a brand brief you
 design distinct logo marks and express each as clean, self-contained SVG code.
 
 Hard rules for every SVG:
-- Root element is <svg> with viewBox='0 0 120 120', width='120', height='120',
-  and xmlns='http://www.w3.org/2000/svg'.
-- Use SINGLE QUOTES for all attribute values (not double quotes).
+- Root element is <svg> with viewBox="0 0 120 120", width="120", height="120",
+  and xmlns="http://www.w3.org/2000/svg".
 - Self-contained only: no <script>, no <foreignObject>, no <image>, no external
-  href/url references, no CSS <style> with @import. Inline shapes, paths, and
-  gradients only.
-- Keep it simple and confident — a mark that reads at small sizes. Aim for
-  clean geometry, monograms, or minimal wordmarks. Avoid clutter and tiny detail.
+  href/url references, no CSS @import. Inline shapes, paths, and gradients only.
+- Keep it simple and confident — a mark that reads at small sizes. Aim for clean
+  geometry, monograms, or minimal wordmarks. Avoid clutter and tiny detail.
 - Assume a light background. Use color purposefully; the brand's primary color
   is provided when available.
 
 Design ${COUNT} genuinely different concepts (e.g. an abstract mark, a monogram,
-and a wordmark or symbol). For each provide:
-- "name": a short concept name.
-- "descriptor": one sentence on the idea and where it works best.
-- "svg": the SVG markup as a single string, following the rules above.
+and a wordmark or symbol).
 
-Respond with ONLY a JSON array of ${COUNT} objects with those keys.
-No prose before or after, no markdown code fences.`;
+Output EXACTLY this format and nothing else — no prose, no code fences. Repeat
+the block ${COUNT} times:
+
+===LOGO===
+NAME: <short concept name>
+NOTE: <one sentence on the idea and where it works best>
+<svg viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">...</svg>`;
 
 function buildUserPrompt(input: LogoBrief): string {
   const lines = [`Brand brief: ${input.brief.trim()}`];
@@ -58,7 +60,7 @@ function buildUserPrompt(input: LogoBrief): string {
   if (name) lines.push(`Brand name: ${name}`);
   if (style) lines.push(`Chosen visual direction: ${style}`);
   if (color) lines.push(`Brand primary color: ${color}`);
-  lines.push(`\nDesign ${COUNT} logo concepts as a JSON array.`);
+  lines.push(`\nDesign ${COUNT} logo concepts in the required format.`);
   return lines.join("\n");
 }
 
@@ -91,27 +93,25 @@ export function sanitizeSvg(input: string): string | null {
 }
 
 function extractLogos(text: string): LogoConcept[] {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) raw = fence[1].trim();
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("No JSON array found in model response.");
+  const raw = text.replace(/```[a-z]*\n?|```/gi, "").trim();
+
+  // Split on the delimiter; fall back to splitting on <svg boundaries if the
+  // model omitted the delimiter but still produced multiple SVGs.
+  let segments = raw.split(/===\s*LOGO\s*===/i).map((s) => s.trim()).filter(Boolean);
+  if (segments.length <= 1) {
+    // One blob: split before each <svg so each segment carries its own mark.
+    segments = raw.split(/(?=<svg\b)/i).map((s) => s.trim()).filter(Boolean);
   }
 
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as unknown;
-  if (!Array.isArray(parsed)) throw new Error("Model response was not an array.");
-
   const concepts: LogoConcept[] = [];
-  for (const item of parsed) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const svg = sanitizeSvg(String(o.svg ?? ""));
-    if (!svg) continue; // drop concepts whose SVG didn't pass sanitization
+  for (const seg of segments) {
+    const svg = sanitizeSvg(seg);
+    if (!svg) continue; // no usable SVG in this segment
+    const nameMatch = seg.match(/NAME:\s*(.+)/i);
+    const noteMatch = seg.match(/NOTE:\s*(.+)/i);
     concepts.push({
-      name: String(o.name ?? "").trim() || "Concept",
-      descriptor: String(o.descriptor ?? "").trim(),
+      name: (nameMatch ? nameMatch[1].trim() : "") || "Concept",
+      descriptor: noteMatch ? noteMatch[1].trim() : "",
       svg,
     });
   }
@@ -127,10 +127,11 @@ export async function generateBrandLogos(
   }
 
   const client = new Anthropic();
+  // No extended thinking here: SVG generation doesn't need it and it materially
+  // reduces latency, which kept logo generation from finishing in time.
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 8000,
-    thinking: { type: "adaptive" },
     system: SYSTEM,
     messages: [{ role: "user", content: buildUserPrompt(input) }],
   });

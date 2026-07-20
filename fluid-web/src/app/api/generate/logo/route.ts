@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateBrandLogos } from "@/lib/ai/logo";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // POST /api/generate/logo — generate SVG logo concepts for one of the caller's
 // brands and cache them on the brand record. Body: { brandId: string }.
