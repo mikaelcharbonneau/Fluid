@@ -2335,28 +2335,8 @@ const DirA_Step4_Logo = () => {
 
 // =====================================================================
 // A5 · Step 5 · Brand Kit Screen (Finalized)
+// Logo, palette, typography, and guidelines are all AI-generated below.
 // =====================================================================
-const KitTile = ({ label, children, style }) => (
-  <div style={{
-    background: 'var(--bg-elev)', borderRadius: 18,
-    padding: 18,
-    boxShadow: 'var(--shadow-sm)',
-    display:'flex',flexDirection:'column',gap:12,
-    ...style,
-  }}>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-      <div className="eyebrow" style={{color:'var(--fg-3)', fontSize: 10.5}}>{label}</div>
-      <button style={{padding:'3px 8px',borderRadius:6,background:'transparent',color:'var(--fg-3)',fontSize:11,fontWeight:500,boxShadow:'inset 0 0 0 1px var(--line)', border: 0, cursor:'pointer'}}>Edit</button>
-    </div>
-    <div style={{flex:1, minHeight: 0}}>{children}</div>
-  </div>
-);
-
-// Real brand-kit summary — shows what the user captured in the wizard, with
-// the visual assets as placeholders until generation lands (Phase 3).
-// Logo, palette, and typography are generated (below). Guidelines is the last
-// remaining placeholder.
-const KIT_ASSET_TILES = ['Guidelines'];
 
 // A single generated color swatch — block + name / hex / usage.
 const KitSwatch = ({ c }) => (
@@ -2639,6 +2619,149 @@ const KitLogoSection = ({ draft }) => {
   );
 };
 
+// A labelled block within the guidelines document.
+const GuideBlock = ({ label, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</div>
+    {children}
+  </div>
+);
+
+// Full-width brand-guidelines section — the capstone. Synthesizes a written
+// guide from the brief and the generated assets. Generated on explicit click so
+// it reads the palette / type / logo after they've been cached.
+const KitGuidelinesSection = ({ draft }) => {
+  const brandId = draft && draft.id;
+  const hasBrief = !!(draft && String(draft.brief || '').trim());
+  const cached = (draft && draft.data && draft.data.guidelines) || null;
+  const [g, setG] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGenerateGuidelines(brandId);
+    if (res.error) setError(res.error);
+    else setG(res.guidelines);
+    setLoading(false);
+  }, [brandId]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Brand guidelines</div>
+        {(g || hasBrief) && (
+          <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
+            padding: '6px 11px', borderRadius: 8, background: g ? 'transparent' : '#000', color: g ? 'var(--fg-2)' : '#fff',
+            fontSize: 11.5, fontWeight: 600, boxShadow: g ? 'inset 0 0 0 1px var(--line)' : 'none',
+            display: 'inline-flex', alignItems: 'center', gap: 6, border: 0,
+            cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
+          }}>
+            <Sparkle size={11} color={g ? undefined : '#fff'} /> {loading ? 'Writing…' : g ? 'Regenerate' : 'Generate guide'}
+          </button>
+        )}
+      </div>
+
+      <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 24 }}>
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 12.5, color: '#A8421F', marginBottom: g ? 16 : 0 }}>
+            <span>{error}</span>
+            <button onClick={() => generate()} style={{ padding: '5px 10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11.5, fontWeight: 600, border: 0, cursor: 'pointer' }}>Try again</button>
+          </div>
+        )}
+
+        {!g && !error && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+            {loading ? <Thinking /> : (
+              <div style={{ fontSize: 13, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+                {hasBrief
+                  ? 'Assemble a written brand guide — positioning, voice, messaging, and usage — from your brief and the assets above.'
+                  : 'Add a brief and Fluid will write your brand guide here.'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {g && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, opacity: loading ? 0.5 : 1 }}>
+            {g.positioning && (
+              <GuideBlock label="Positioning">
+                <p style={{ fontSize: 15, lineHeight: 1.6, color: '#000', margin: 0, maxWidth: 660 }}>{g.positioning}</p>
+              </GuideBlock>
+            )}
+
+            {g.messaging && g.messaging.tagline && (
+              <GuideBlock label="Tagline">
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, color: '#000', letterSpacing: '-0.02em' }}>{g.messaging.tagline}</div>
+              </GuideBlock>
+            )}
+
+            {g.voice && (g.voice.traits.length > 0 || g.voice.description) && (
+              <GuideBlock label="Voice & tone">
+                {g.voice.traits.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                    {g.voice.traits.map((t) => (
+                      <span key={t} style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', padding: '4px 10px', borderRadius: 99, boxShadow: 'inset 0 0 0 1px var(--line)' }}>{t}</span>
+                    ))}
+                  </div>
+                )}
+                {g.voice.description && <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--fg-1)', margin: 0, maxWidth: 660 }}>{g.voice.description}</p>}
+              </GuideBlock>
+            )}
+
+            {g.messaging && g.messaging.pillars && g.messaging.pillars.length > 0 && (
+              <GuideBlock label="Key messages">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {g.messaging.pillars.map((p, i) => (
+                    <div key={i} style={{ background: 'var(--bg)', borderRadius: 12, padding: 14, boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13.5, color: '#000', marginBottom: 4 }}>{p.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.45 }}>{p.body}</div>
+                    </div>
+                  ))}
+                </div>
+              </GuideBlock>
+            )}
+
+            {(g.dos.length > 0 || g.donts.length > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                <GuideBlock label="Do">
+                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {g.dos.map((d, i) => (
+                      <li key={i} style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.45, display: 'flex', gap: 8 }}>
+                        <span style={{ color: '#0E6B5E', fontWeight: 700 }}>✓</span> {d}
+                      </li>
+                    ))}
+                  </ul>
+                </GuideBlock>
+                <GuideBlock label="Don't">
+                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {g.donts.map((d, i) => (
+                      <li key={i} style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.45, display: 'flex', gap: 8 }}>
+                        <span style={{ color: '#A8421F', fontWeight: 700 }}>✕</span> {d}
+                      </li>
+                    ))}
+                  </ul>
+                </GuideBlock>
+              </div>
+            )}
+
+            {g.usage && (g.usage.logo || g.usage.color || g.usage.type) && (
+              <GuideBlock label="Asset usage">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {g.usage.logo && <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}><b style={{ color: '#000' }}>Logo — </b>{g.usage.logo}</div>}
+                  {g.usage.color && <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}><b style={{ color: '#000' }}>Color — </b>{g.usage.color}</div>}
+                  {g.usage.type && <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}><b style={{ color: '#000' }}>Type — </b>{g.usage.type}</div>}
+                </div>
+              </GuideBlock>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DirA_KitSummary = () => {
   const { draft } = useBrandDraft();
   const { navigate } = useRouter();
@@ -2679,24 +2802,7 @@ const DirA_KitSummary = () => {
 
           <KitTypographySection draft={draft} />
 
-          <div>
-            <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 14 }}>Brand assets</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-              {KIT_ASSET_TILES.map((label) => (
-                <div key={label} style={{ borderRadius: 16, background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)', padding: 20, minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--fluid-gradient)', opacity: 0.45 }} />
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000' }}>{label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--fg-4)', marginTop: 3 }}>Generated with AI — coming soon</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p style={{ fontSize: 13.5, color: 'var(--fg-3)', lineHeight: 1.5, maxWidth: 580 }}>
-            Fluid will generate your full brand guidelines from this brief in an upcoming release. Your brand and everything you've entered is already saved.
-          </p>
+          <KitGuidelinesSection draft={draft} />
         </div>
       </div>
     </AShell>
@@ -4971,6 +5077,18 @@ async function apiGenerateLogos(brandId) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { error: j.error || 'Generation failed.' };
     return { logos: j.logos || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Phase 3 — ask Claude to synthesize written brand guidelines.
+async function apiGenerateGuidelines(brandId) {
+  try {
+    const r = await fetch('/api/generate/guidelines', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    return { guidelines: j.guidelines || null };
   } catch { return { error: 'Network error.' }; }
 }
 // Render model-generated SVG safely: an <img> data-URI can't execute scripts,
