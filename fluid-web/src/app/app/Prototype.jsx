@@ -881,6 +881,31 @@ const DirA_Step1_Brief = () => {
   const removeCompetitor = (name) => {
     setField('competitors', competitors.filter((c) => c !== name).join(', '));
   };
+
+  // Inline AI assists. `assisting` holds the task id currently running.
+  const brandId = draft && draft.id;
+  const hasBrief = !!String(brief).trim();
+  const [assisting, setAssisting] = React.useState('');
+  const [assistErr, setAssistErr] = React.useState('');
+  const runAssist = async (task) => {
+    if (!brandId || assisting) return;
+    if (!hasBrief) { setAssistErr('Add a brand description first.'); return; }
+    setAssisting(task); setAssistErr('');
+    const { result, error } = await apiAssist(brandId, task);
+    if (error) setAssistErr(error);
+    else if (result) {
+      if (task === 'audience' && result.text) setField('audience', result.text);
+      else if (task === 'competitors' && result.items) {
+        const merged = [...competitors];
+        result.items.forEach((it) => { if (it && !merged.some((c) => c.toLowerCase() === it.toLowerCase())) merged.push(it); });
+        setField('competitors', merged.join(', '));
+      } else if (result.text) setField('brief', result.text);
+    }
+    setAssisting('');
+  };
+  const pill = { padding:'5px 10px', borderRadius:8, background:'var(--bg-sunken)', color:'var(--fg-2)', fontSize:11, fontWeight:600, display:'inline-flex', alignItems:'center', gap:6, border:0, cursor:'pointer' };
+  const busy = (t) => assisting === t;
+
   return (
   <AWizardLayout
     step={1}
@@ -914,14 +939,15 @@ const DirA_Step1_Brief = () => {
             }}
           />
           <div style={{display:'flex', alignItems:'center', gap:8, marginTop:14, paddingTop:14, borderTop:'1px dashed var(--line)'}}>
-            <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600, display:'inline-flex',alignItems:'center',gap:6}}>
-              <Sparkle size={11}/> Rewrite shorter
+            <button onClick={() => runAssist('brief_shorter')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('brief_shorter') ? 0.5 : 1}}>
+              <Sparkle size={11}/> {busy('brief_shorter') ? 'Rewriting…' : 'Rewrite shorter'}
             </button>
-            <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600}}>Make it punchier</button>
-            <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600}}>Sharpen the angle</button>
+            <button onClick={() => runAssist('brief_punchier')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('brief_punchier') ? 0.5 : 1}}>{busy('brief_punchier') ? 'Working…' : 'Make it punchier'}</button>
+            <button onClick={() => runAssist('brief_sharper')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('brief_sharper') ? 0.5 : 1}}>{busy('brief_sharper') ? 'Working…' : 'Sharpen the angle'}</button>
             <div style={{flex:1}}/>
             <span style={{fontSize:10.5,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
           </div>
+          {assistErr && <div style={{marginTop:10, fontSize:11.5, color:'#A8421F'}}>{assistErr}</div>}
         </div>
       </AFieldCard>
 
@@ -949,8 +975,8 @@ const DirA_Step1_Brief = () => {
             <div style={{flex:1}}/>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600, display:'inline-flex',alignItems:'center',gap:6}}>
-              <Sparkle size={11}/> Suggest from description
+            <button onClick={() => runAssist('audience')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('audience') ? 0.5 : 1}}>
+              <Sparkle size={11}/> {busy('audience') ? 'Suggesting…' : 'Suggest from description'}
             </button>
             <div style={{flex:1}}/>
             <span style={{fontSize:10.5,color:'var(--fg-4)'}}>Helps tone &amp; visual register</span>
@@ -989,8 +1015,8 @@ const DirA_Step1_Brief = () => {
             </div>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600, display:'inline-flex',alignItems:'center',gap:6}}>
-              <Sparkle size={11}/> Suggest 3 more
+            <button onClick={() => runAssist('competitors')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('competitors') ? 0.5 : 1}}>
+              <Sparkle size={11}/> {busy('competitors') ? 'Suggesting…' : 'Suggest 3 more'}
             </button>
             <div style={{flex:1}}/>
             <span style={{fontSize:10.5,color:'var(--fg-4)'}}>Helps positioning &amp; differentiation</span>
@@ -1015,20 +1041,20 @@ const DirA_Step1_Brief = () => {
 // =====================================================================
 
 // Sparkle button — section-level "Let AI choose" affordance
-const ALetAI = () => (
-  <button style={{
+const ALetAI = ({ onClick, busy }) => (
+  <button onClick={onClick} disabled={busy} style={{
     display:'inline-flex', alignItems:'center', gap:6,
     padding:'6px 12px', borderRadius: 99,
     background:'#0E0F12', color:'#fff',
-    fontSize: 11.5, fontWeight: 600, border:0, cursor:'pointer',
-    boxShadow:'0 1px 4px rgba(0,0,0,.18)',
+    fontSize: 11.5, fontWeight: 600, border:0, cursor: busy ? 'default' : 'pointer',
+    boxShadow:'0 1px 4px rgba(0,0,0,.18)', opacity: busy ? 0.7 : 1,
   }}>
-    <Sparkle size={11} color="#FDBA50"/> Let AI choose
+    <Sparkle size={11} color="#FDBA50"/> {busy ? 'Choosing…' : 'Let AI choose'}
   </button>
 );
 
 // Section heading: number badge + title + meta + AI button
-const ASectionHead = ({ n, title, sub, count, ai }) => (
+const ASectionHead = ({ n, title, sub, count, ai, onAI, aiBusy }) => (
   <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:14}}>
     <div style={{display:'flex', alignItems:'center', gap:12, minWidth:0}}>
       {n && (
@@ -1048,7 +1074,7 @@ const ASectionHead = ({ n, title, sub, count, ai }) => (
     </div>
     <div style={{display:'flex', alignItems:'center', gap:10}}>
       {count && <span style={{fontSize:11, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>{count}</span>}
-      {ai && <ALetAI/>}
+      {ai && <ALetAI onClick={onAI} busy={aiBusy}/>}
     </div>
   </div>
 );
@@ -1677,6 +1703,16 @@ const AVisualStyleSection = () => {
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
   const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
+  const brandId = draft && draft.id;
+  const [picking, setPicking] = useState(false);
+  const letAIChoose = async () => {
+    if (!brandId || picking) return;
+    setPicking(true);
+    const opts = VISUAL_STYLE_OPTIONS.map((o) => ({ id: o.id, label: o.name, desc: o.descriptor }));
+    const { result } = await apiAssist(brandId, 'pick_style', opts);
+    if (result && result.choice) { setSelectedId(result.choice); setField('style_id', result.choice); }
+    setPicking(false);
+  };
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -1684,7 +1720,7 @@ const AVisualStyleSection = () => {
         n="01"
         title="Visual style"
         sub="Each card is a full preview of that visual direction."
-        ai
+        ai onAI={letAIChoose} aiBusy={picking}
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {VISUAL_STYLE_OPTIONS.map((opt) => (
@@ -1848,12 +1884,32 @@ const INSPIRATION_BRANDS = [
 ];
 
 const DirA_Step2_Style = () => {
+  const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
+  const brandId = draft && draft.id;
+  const [picking, setPicking] = React.useState('');
 
   // Load all preview fonts once when the step opens.
   React.useEffect(() => {
     OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
   }, []);
+
+  const pickPalette = async () => {
+    if (!brandId || picking) return;
+    setPicking('palette');
+    const opts = PALETTE_OPTIONS.map((p) => ({ id: p.name, label: p.name, desc: p.mood }));
+    const { result } = await apiAssist(brandId, 'pick_palette', opts);
+    if (result && result.choice) setStep2({ palette: result.choice });
+    setPicking('');
+  };
+  const pickFont = async () => {
+    if (!brandId || picking) return;
+    setPicking('font');
+    const opts = OPEN_SOURCE_FONT_PAIRS.map((p) => ({ id: p.id, label: p.name, desc: p.mood + ' — ' + p.display.family + ' / ' + p.body.family }));
+    const { result } = await apiAssist(brandId, 'pick_font', opts);
+    if (result && result.choice) setStep2({ font: result.choice });
+    setPicking('');
+  };
 
   return (
   <AWizardLayout
@@ -1918,7 +1974,7 @@ const DirA_Step2_Style = () => {
 
     {/* 2b · Color palette */}
     <div style={{marginBottom: 24}}>
-      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai/>
+      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai onAI={pickPalette} aiBusy={picking === 'palette'}/>
       <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10}}>
         {PALETTE_OPTIONS.map((p) => (
           <APaletteOption key={p.name} name={p.name} mood={p.mood} palette={p.palette}
@@ -1931,7 +1987,7 @@ const DirA_Step2_Style = () => {
 
     {/* 2c · Typography */}
     <div style={{marginBottom: 12}}>
-      <ASectionHead n="03" title="Typography" sub="Open-source pairs, previewed in the real fonts, used across the kit." ai/>
+      <ASectionHead n="03" title="Typography" sub="Open-source pairs, previewed in the real fonts, used across the kit." ai onAI={pickFont} aiBusy={picking === 'font'}/>
       <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
         {OPEN_SOURCE_FONT_PAIRS.map((p) => (
           <AFontPairOption
@@ -5093,6 +5149,19 @@ async function apiDeleteBrand(id) {
     const r = await fetch('/api/brands/' + id, { method: 'DELETE' });
     return r.ok;
   } catch { return false; }
+}
+// Phase 3 — inline AI assists (rewrite brief, suggest audience/competitors,
+// pick a Step 2 option). Returns { result } or { error }.
+async function apiAssist(brandId, task, options) {
+  try {
+    const r = await fetch('/api/generate/assist', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, task, options }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Assist failed.' };
+    return { result: j.result || {} };
+  } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask Claude for name candidates for this brand. Resolves to
 // { names } on success or { error } so the caller can show a message.
