@@ -836,7 +836,7 @@ const AFieldCard = ({ n, title, optional, meta, children }) => (
 );
 
 // Pill-style competitor chip with a remove ×
-const ACompetitorChip = ({ name, domain }) => (
+const ACompetitorChip = ({ name, domain, onRemove }) => (
   <div style={{
     display:'inline-flex', alignItems:'center', gap:8,
     background:'var(--bg)', borderRadius: 99,
@@ -848,12 +848,12 @@ const ACompetitorChip = ({ name, domain }) => (
       background:'var(--bg-sunken)', color:'var(--fg-2)',
       display:'inline-flex', alignItems:'center', justifyContent:'center',
       fontFamily:'var(--font-display)', fontSize: 10, fontWeight:800,
-    }}>{name[0]}</div>
+    }}>{(name[0] || '?').toUpperCase()}</div>
     <div style={{display:'flex', flexDirection:'column', lineHeight:1}}>
       <span style={{fontSize:12, fontWeight:600, color:'var(--fg-1)'}}>{name}</span>
-      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', marginTop:2}}>{domain}</span>
+      {domain ? <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', marginTop:2}}>{domain}</span> : null}
     </div>
-    <button style={{
+    <button onClick={onRemove} aria-label={'Remove ' + name} style={{
       width:20, height:20, borderRadius:99, marginLeft: 2,
       background:'transparent', border:0, cursor:'pointer',
       color:'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center',
@@ -867,6 +867,20 @@ const DirA_Step1_Brief = () => {
   const { draft, setField } = useBrandDraft();
   const brief = (draft && draft.brief) || '';
   const audience = (draft && draft.audience) || '';
+  // Competitors are stored as a comma-separated string; edit them as chips.
+  const competitors = ((draft && draft.competitors) || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const [compInput, setCompInput] = React.useState('');
+  const addCompetitor = (raw) => {
+    const v = String(raw || '').trim().replace(/,+$/, '').trim();
+    if (!v) return;
+    if (competitors.some((c) => c.toLowerCase() === v.toLowerCase())) { setCompInput(''); return; }
+    setField('competitors', [...competitors, v].join(', '));
+    setCompInput('');
+  };
+  const removeCompetitor = (name) => {
+    setField('competitors', competitors.filter((c) => c !== name).join(', '));
+  };
   return (
   <AWizardLayout
     step={1}
@@ -907,17 +921,6 @@ const DirA_Step1_Brief = () => {
             <button style={{padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',fontSize:11,fontWeight:600}}>Sharpen the angle</button>
             <div style={{flex:1}}/>
             <span style={{fontSize:10.5,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
-          </div>
-        </div>
-
-        {/* Inline starter examples */}
-        <div style={{display:'flex', alignItems:'center', gap:10, paddingTop:6}}>
-          <span style={{fontSize:11, color:'var(--fg-3)', fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase'}}>Starters</span>
-          <div style={{display:'flex', gap:6, flexWrap:'wrap', flex:1}}>
-            <Chip tone="neutral">SaaS for ops teams</Chip>
-            <Chip tone="neutral">DTC skincare</Chip>
-            <Chip tone="neutral">B2B fintech</Chip>
-            <Chip tone="neutral">Creator tool</Chip>
           </div>
         </div>
       </AFieldCard>
@@ -962,7 +965,11 @@ const DirA_Step1_Brief = () => {
             display:'flex', flexDirection:'column', gap:12,
             minHeight: 124,
           }}>
-            <div style={{display:'flex', flexWrap:'wrap', gap:6}}></div>
+            <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+              {competitors.map((c) => (
+                <ACompetitorChip key={c} name={c} onRemove={() => removeCompetitor(c)} />
+              ))}
+            </div>
             <div style={{flex:1}}/>
             <div style={{
               display:'flex', alignItems:'center', gap:8,
@@ -972,6 +979,9 @@ const DirA_Step1_Brief = () => {
             }}>
               <SearchIcon size={12}/>
               <input
+                value={compInput}
+                onChange={(e) => setCompInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompetitor(e.currentTarget.value); } }}
                 placeholder="Add a competitor by name or URL…"
                 style={{flex:1, border:0, background:'transparent', outline:'none', fontSize:12.5, color:'var(--fg-2)', fontFamily:'inherit'}}
               />
@@ -3156,14 +3166,27 @@ function relTime(iso) {
 }
 
 // Card for a real, user-saved brand (no mock Hero art — a gradient tile).
-const BA_RealBrandCard = ({ brand, onOpen }) => (
+const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
   <div
     onClick={onOpen}
     style={{
       borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)',
       boxShadow: 'inset 0 0 0 1px var(--line)', display: 'flex', flexDirection: 'column',
+      position: 'relative',
     }}
   >
+    <button
+      onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}
+      aria-label={'Delete ' + (brand.name || 'brand')}
+      title="Delete brand"
+      style={{
+        position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 8,
+        background: 'rgba(0,0,0,.35)', color: '#fff', border: 0, cursor: 'pointer',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)',
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </button>
     <div style={{ height: 132, background: 'var(--fluid-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: '#fff', letterSpacing: '-0.03em' }}>
         {(brand.name || 'U').trim().charAt(0).toUpperCase()}
@@ -3190,9 +3213,14 @@ const BA_RealBrandCard = ({ brand, onOpen }) => (
 // The screen
 // =====================================================================
 const DirA_BrandsActive = () => {
-  const { brands, loadBrand } = useBrandDraft();
+  const { brands, loadBrand, refresh } = useBrandDraft();
   const { navigate } = useRouter();
   const [filter, setFilter] = useBAState('all');
+  const deleteBrand = async (b) => {
+    if (typeof window !== 'undefined' &&
+        !window.confirm('Delete "' + (b.name || 'this brand') + '"? This can\'t be undone.')) return;
+    if (await apiDeleteBrand(b.id)) refresh();
+  };
   const filters = [
     { key: 'all', label: 'All', count: brands.length },
     { key: 'live', label: 'Live', count: brands.filter((b) => b.status === 'live').length },
@@ -3260,6 +3288,7 @@ const DirA_BrandsActive = () => {
                     const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
                     navigate(step);
                   }}
+                  onDelete={() => deleteBrand(b)}
                 />
               ))}
             </div>
@@ -5042,6 +5071,12 @@ async function apiUpdateBrand(id, patch) {
     if (!r.ok) return null;
     return (await r.json()).brand;
   } catch { return null; }
+}
+async function apiDeleteBrand(id) {
+  try {
+    const r = await fetch('/api/brands/' + id, { method: 'DELETE' });
+    return r.ok;
+  } catch { return false; }
 }
 // Phase 3 — ask Claude for name candidates for this brand. Resolves to
 // { names } on success or { error } so the caller can show a message.
