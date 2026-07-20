@@ -1486,8 +1486,8 @@ const TeslaHero = () => {
 // The footer carries only the brand-styled style pill + name + category;
 // the palette lives inside the hero so it is shown exactly once and stays
 // consistent with the rest of the brand sheet.
-const AInspirationCard = ({ name, category, style, hero, sel }) => (
-  <div style={{
+const AInspirationCard = ({ name, category, style, hero, sel, onClick }) => (
+  <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 18,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     overflow:'hidden', display:'flex', flexDirection:'column',
@@ -1657,13 +1657,26 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
   </div>
 );
 
+// Shared read/write for Step 2 picks, namespaced under brand data.step2 so it
+// never collides with the generated data.palette / data.typography, etc.
+const useStep2 = () => {
+  const { draft, setField } = useBrandDraft();
+  const step2 = (draft && draft.data && draft.data.step2) || {};
+  const setStep2 = (patch) =>
+    setField('data', { ...((draft && draft.data) || {}), step2: { ...step2, ...patch } });
+  return { step2, setStep2 };
+};
+
 // Expandable visual-style picker — collapsed: 4 direction cards only;
 // expanded: cards + refinement sliders for the selected direction.
 const AVisualStyleSection = () => {
   const { draft, setField } = useBrandDraft();
+  const { step2, setStep2 } = useStep2();
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState((draft && draft.style_id) || null);
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
+  const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
+  const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -1717,9 +1730,9 @@ const AVisualStyleSection = () => {
             <span style={{ fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>3 attributes</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <ASlider left="Quiet" right="Bold" value={32} />
-            <ASlider left="Classic" right="Modern" value={58} />
-            <ASlider left="Warm" right="Cool" value={28} />
+            <ASlider left="Quiet" right="Bold" value={refine.bold} onChange={(v) => setRefine('bold', v)} />
+            <ASlider left="Classic" right="Modern" value={refine.modern} onChange={(v) => setRefine('modern', v)} />
+            <ASlider left="Warm" right="Cool" value={refine.cool} onChange={(v) => setRefine('cool', v)} />
           </div>
         </div>
       )}
@@ -1727,7 +1740,8 @@ const AVisualStyleSection = () => {
   );
 };
 
-const ASlider = ({ left, right, value }) => (
+// Draggable refinement slider (native range input for reliable interaction).
+const ASlider = ({ left, right, value, onChange }) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 12,
     boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -1736,20 +1750,17 @@ const ASlider = ({ left, right, value }) => (
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--fg-3)', letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:8}}>
       <span>{left}</span><span>{right}</span>
     </div>
-    <div style={{position:'relative', height: 4, background:'var(--bg-sunken)', borderRadius: 99}}>
-      <div style={{position:'absolute', left:0, top:0, bottom:0, width: value+'%', background:'#000', borderRadius: 99}}/>
-      <div style={{
-        position:'absolute', left: `calc(${value}% - 8px)`, top: -6,
-        width: 16, height: 16, borderRadius: 99, background: '#000',
-        boxShadow: '0 0 0 4px var(--bg-elev), 0 1px 4px rgba(0,0,0,.18)',
-      }}/>
-    </div>
+    <input
+      type="range" min="0" max="100" value={value}
+      onChange={(e) => onChange && onChange(Number(e.target.value))}
+      style={{ width: '100%', accentColor: '#000', cursor: 'pointer', display: 'block' }}
+    />
   </div>
 );
 
 // Palette option — a labeled set of swatches
-const APaletteOption = ({ name, mood, palette, sel }) => (
-  <div style={{
+const APaletteOption = ({ name, mood, palette, sel, onClick }) => (
+  <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     padding: 14, display:'flex', flexDirection:'column', gap: 10,
@@ -1773,8 +1784,8 @@ const APaletteOption = ({ name, mood, palette, sel }) => (
 );
 
 // Font pair option — display + body sample
-const AFontPairOption = ({ name, mood, display, body, sel }) => (
-  <div style={{
+const AFontPairOption = ({ name, mood, display, body, sel, onClick }) => (
+  <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     padding: 14, display:'flex', flexDirection:'column', gap: 10,
@@ -1808,7 +1819,43 @@ const AFontPairOption = ({ name, mood, display, body, sel }) => (
   </div>
 );
 
-const DirA_Step2_Style = () => (
+// Curated palettes for the "build it piece by piece" path.
+const PALETTE_OPTIONS = [
+  { name:'Quiet earth', mood:'warm · paper', palette:['#1F232A', '#A8421F', '#FDBA50', '#F4EFE7', '#E8D9B5'] },
+  { name:'Sun & sea', mood:'optimistic · bright', palette:['#0F1115', '#FD7947', '#FDBA50', '#44D9C7', '#F4EFE7'] },
+  { name:'Studio mono', mood:'quiet · single accent', palette:['#000000', '#1A1A1A', '#7A7A7A', '#E8E8E8', '#FD7947'] },
+  { name:'Cool clinical', mood:'technical · trustworthy', palette:['#0F1115', '#22272F', '#A4ADBA', '#E5E7EB', '#3B82F6'] },
+  { name:'Garden', mood:'organic · soft', palette:['#1F2A22', '#5C7A4F', '#A8B89A', '#F4EFE7', '#FDBBC0'] },
+];
+
+// Open-source (Google Fonts) type pairings, previewed in the actual fonts.
+const OPEN_SOURCE_FONT_PAIRS = [
+  { id:'fraunces-inter', name:'Editorial', mood:'warm · literary', display:{family:'Fraunces', category:'serif', weight:600}, body:{family:'Inter', category:'sans-serif', weight:400} },
+  { id:'space-inter', name:'Studio', mood:'modern · technical', display:{family:'Space Grotesk', category:'sans-serif', weight:600}, body:{family:'Inter', category:'sans-serif', weight:400} },
+  { id:'playfair-source', name:'Classic', mood:'refined · timeless', display:{family:'Playfair Display', category:'serif', weight:700}, body:{family:'Source Sans 3', category:'sans-serif', weight:400} },
+  { id:'archivo-libre', name:'Confident', mood:'bold · graphic', display:{family:'Archivo', category:'sans-serif', weight:800}, body:{family:'Libre Franklin', category:'sans-serif', weight:400} },
+  { id:'dmserif-dmsans', name:'Elegant', mood:'high-contrast · modern', display:{family:'DM Serif Display', category:'serif', weight:400}, body:{family:'DM Sans', category:'sans-serif', weight:400} },
+  { id:'sora-plex', name:'Futuristic', mood:'digital · precise', display:{family:'Sora', category:'sans-serif', weight:700}, body:{family:'IBM Plex Sans', category:'sans-serif', weight:400} },
+];
+
+const fontFamilyCss = (face) => '"' + face.family + '", ' + (FONT_FALLBACK[face.category] || 'sans-serif');
+
+const INSPIRATION_BRANDS = [
+  { name:'Apple', category:'Consumer tech · Premium', hero:<AppleHero/>, style:{ label:'Minimal · Refined', pill:{ bg:'#FFFFFF', color:'#1D1D1F', font: APPLE_DISPLAY, weight: 500, tracking:'-0.005em', shadow:'inset 0 0 0 1px #D2D2D7', dot:'#1D1D1F' } } },
+  { name:'Figma', category:'Design tool · Collaborative', hero:<FigmaHero/>, style:{ label:'Playful · Vibrant', pill:{ bg:'#0E0E0E', color:'#FFFFFF', font: FIGMA_TYPE, weight: 700, tracking:'-0.005em', dot:'#A259FF', dotSize: 6 } } },
+  { name:'Perplexity', category:'AI search · Editorial', hero:<PerplexityHero/>, style:{ label:'Editorial · Considered', pill:{ bg:'#FBF7EE', color:'#1F4E47', font: PERPLEXITY_DISPLAY, weight: 500, italic: true, tracking:'-0.005em', size: 11.5, shadow:'inset 0 0 0 1px #E8DFC8', dot:'#1F4E47' } } },
+  { name:'Tesla', category:'Automotive · Technology', hero:<TeslaHero/>, style:{ label:'Bold · Technical', pill:{ bg:'#E31937', color:'#FFFFFF', font: TESLA_TYPE, weight: 700, tracking:'0.18em', transform:'uppercase', size: 9.5, padding:'5px 11px', dot:'#000000', dotSize: 5 } } },
+];
+
+const DirA_Step2_Style = () => {
+  const { step2, setStep2 } = useStep2();
+
+  // Load all preview fonts once when the step opens.
+  React.useEffect(() => {
+    OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
+  }, []);
+
+  return (
   <AWizardLayout
     step={2}
     title="Choose your visual direction."
@@ -1825,63 +1872,14 @@ const DirA_Step2_Style = () => (
       count="4 of 28"
     />
     <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 14}}>
-      {/* Apple — minimal, refined, premium */}
-      <AInspirationCard
-        name="Apple" category="Consumer tech · Premium"
-        hero={<AppleHero/>}
-        style={{
-          label:'Minimal · Refined',
-          pill:{
-            bg:'#FFFFFF', color:'#1D1D1F',
-            font: APPLE_DISPLAY, weight: 500, tracking:'-0.005em',
-            shadow:'inset 0 0 0 1px #D2D2D7',
-            dot:'#1D1D1F',
-          },
-        }}
-      />
-      {/* Figma — playful, vibrant, collaborative */}
-      <AInspirationCard
-        name="Figma" category="Design tool · Collaborative" sel
-        hero={<FigmaHero/>}
-        style={{
-          label:'Playful · Vibrant',
-          pill:{
-            bg:'#0E0E0E', color:'#FFFFFF',
-            font: FIGMA_TYPE, weight: 700, tracking:'-0.005em',
-            dot:'#A259FF', dotSize: 6,
-          },
-        }}
-      />
-      {/* Perplexity — editorial, considered, paper warmth */}
-      <AInspirationCard
-        name="Perplexity" category="AI search · Editorial"
-        hero={<PerplexityHero/>}
-        style={{
-          label:'Editorial · Considered',
-          pill:{
-            bg:'#FBF7EE', color:'#1F4E47',
-            font: PERPLEXITY_DISPLAY, weight: 500, italic: true,
-            tracking:'-0.005em', size: 11.5,
-            shadow:'inset 0 0 0 1px #E8DFC8',
-            dot:'#1F4E47',
-          },
-        }}
-      />
-      {/* Tesla — red-dominant, bold, technical */}
-      <AInspirationCard
-        name="Tesla" category="Automotive · Technology"
-        hero={<TeslaHero/>}
-        style={{
-          label:'Bold · Technical',
-          pill:{
-            bg:'#E31937', color:'#FFFFFF',
-            font: TESLA_TYPE, weight: 700,
-            tracking:'0.18em', transform:'uppercase', size: 9.5,
-            padding:'5px 11px',
-            dot:'#000000', dotSize: 5,
-          },
-        }}
-      />
+      {INSPIRATION_BRANDS.map((b) => (
+        <AInspirationCard
+          key={b.name}
+          name={b.name} category={b.category} hero={b.hero} style={b.style}
+          sel={step2.inspiration === b.name}
+          onClick={() => setStep2({ inspiration: step2.inspiration === b.name ? null : b.name })}
+        />
+      ))}
     </div>
     {/* Expand hint */}
     <div style={{display:'flex', alignItems:'center', justifyContent:'center', marginTop: 14, marginBottom: 28}}>
@@ -1922,47 +1920,34 @@ const DirA_Step2_Style = () => (
     <div style={{marginBottom: 24}}>
       <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai/>
       <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10}}>
-        <APaletteOption name="Quiet earth" mood="warm · paper" sel
-          palette={['#1F232A', '#A8421F', '#FDBA50', '#F4EFE7', '#E8D9B5']}/>
-        <APaletteOption name="Sun & sea" mood="optimistic · bright"
-          palette={['#0F1115', '#FD7947', '#FDBA50', '#44D9C7', '#F4EFE7']}/>
-        <APaletteOption name="Studio mono" mood="quiet · single accent"
-          palette={['#000000', '#1A1A1A', '#7A7A7A', '#E8E8E8', '#FD7947']}/>
-        <APaletteOption name="Cool clinical" mood="technical · trustworthy"
-          palette={['#0F1115', '#22272F', '#A4ADBA', '#E5E7EB', '#3B82F6']}/>
-        <APaletteOption name="Garden" mood="organic · soft"
-          palette={['#1F2A22', '#5C7A4F', '#A8B89A', '#F4EFE7', '#FDBBC0']}/>
+        {PALETTE_OPTIONS.map((p) => (
+          <APaletteOption key={p.name} name={p.name} mood={p.mood} palette={p.palette}
+            sel={step2.palette === p.name}
+            onClick={() => setStep2({ palette: step2.palette === p.name ? null : p.name })}
+          />
+        ))}
       </div>
     </div>
 
     {/* 2c · Typography */}
     <div style={{marginBottom: 12}}>
-      <ASectionHead n="03" title="Typography" sub="A display + body pair Fluid will use across the kit." ai/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 10}}>
-        <AFontPairOption
-          name="Notebook" mood="editorial · warm" sel
-          display={{font:'var(--font-display)', name:'Tiempos', weight: 600, tracking:'-0.022em', sample:'Aa'}}
-          body={{font:'var(--font-body)', name:'Söhne', weight: 400, sample:'A quiet surface for daily ritual.'}}
-        />
-        <AFontPairOption
-          name="Studio" mood="modern · technical"
-          display={{font:'var(--font-display)', name:'Söhne', weight: 700, tracking:'-0.03em', sample:'Aa'}}
-          body={{font:'var(--font-body)', name:'Inter', weight: 400, sample:'Build the next thing — confidently.'}}
-        />
-        <AFontPairOption
-          name="Whisper" mood="minimal · monochromatic"
-          display={{font:'var(--font-display)', name:'Söhne · Light', weight: 400, tracking:'-0.02em', sample:'Aa'}}
-          body={{font:'var(--font-body)', name:'Söhne Mono', weight: 400, sample:'Less, but louder.'}}
-        />
-        <AFontPairOption
-          name="Anthem" mood="bold · display"
-          display={{font:'var(--font-display)', name:'Söhne · Black', weight: 900, tracking:'-0.04em', sample:'Aa'}}
-          body={{font:'var(--font-body)', name:'Inter', weight: 500, sample:'Wake up. Right now.'}}
-        />
+      <ASectionHead n="03" title="Typography" sub="Open-source pairs, previewed in the real fonts, used across the kit." ai/>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
+        {OPEN_SOURCE_FONT_PAIRS.map((p) => (
+          <AFontPairOption
+            key={p.id}
+            name={p.name} mood={p.mood}
+            sel={step2.font === p.id}
+            onClick={() => setStep2({ font: step2.font === p.id ? null : p.id })}
+            display={{ font: fontFamilyCss(p.display), name: p.display.family, weight: p.display.weight, sample: 'Aa' }}
+            body={{ font: fontFamilyCss(p.body), name: p.body.family, weight: p.body.weight, sample: 'The quick brown fox jumps over the lazy dog.' }}
+          />
+        ))}
       </div>
     </div>
   </AWizardLayout>
-);
+  );
+};
 
 // =====================================================================
 // A4 · Step 3 · Name Generation Screen
