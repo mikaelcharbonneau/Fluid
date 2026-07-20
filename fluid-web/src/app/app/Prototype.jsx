@@ -2354,8 +2354,8 @@ const KitTile = ({ label, children, style }) => (
 
 // Real brand-kit summary — shows what the user captured in the wizard, with
 // the visual assets as placeholders until generation lands (Phase 3).
-// Color palette is generated (below); the rest remain placeholders for now.
-const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Typography', 'Guidelines'];
+// Palette and typography are generated (below); the rest remain placeholders.
+const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Guidelines'];
 
 // A single generated color swatch — block + name / hex / usage.
 const KitSwatch = ({ c }) => (
@@ -2450,6 +2450,102 @@ const KitPaletteSection = ({ draft }) => {
   );
 };
 
+// Full-width typography section for the Brand Kit. Recommends a Google-Fonts
+// heading + body pairing and renders a live specimen. Auto-generates on open.
+const KitTypographySection = ({ draft }) => {
+  const brandId = draft && draft.id;
+  const hasBrief = !!(draft && String(draft.brief || '').trim());
+  const cached = (draft && draft.data && draft.data.typography) || null;
+  const [type, setType] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const requestedFor = React.useRef(null);
+
+  // Load the web fonts whenever we have a pairing to show.
+  React.useEffect(() => {
+    if (type) { ensureGoogleFont(type.heading.family); ensureGoogleFont(type.body.family); }
+  }, [type]);
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGenerateTypography(brandId);
+    if (res.error) setError(res.error);
+    else setType(res.typography);
+    setLoading(false);
+  }, [brandId]);
+
+  React.useEffect(() => {
+    if (!brandId || !hasBrief || type) return;
+    if (requestedFor.current === brandId) return;
+    requestedFor.current = brandId;
+    generate();
+  }, [brandId, hasBrief, type, generate]);
+
+  const brandName = (draft && (draft.name_choice || draft.name)) || 'Your brand';
+  const ff = (face) => '"' + face.family + '", ' + (FONT_FALLBACK[face.category] || 'sans-serif');
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Typography</div>
+        <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
+          padding: '6px 11px', borderRadius: 8, background: 'transparent', color: 'var(--fg-2)',
+          fontSize: 11.5, fontWeight: 600, boxShadow: 'inset 0 0 0 1px var(--line)',
+          display: 'inline-flex', alignItems: 'center', gap: 6, border: 0,
+          cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
+        }}>
+          <Sparkle size={11} /> {type ? 'Regenerate' : 'Generate'}
+        </button>
+      </div>
+
+      <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 22 }}>
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 12.5, color: '#A8421F' }}>
+            <span>{error}</span>
+            <button onClick={() => generate()} style={{ padding: '5px 10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11.5, fontWeight: 600, border: 0, cursor: 'pointer' }}>Try again</button>
+          </div>
+        )}
+
+        {!error && !type && !hasBrief && (
+          <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>Add a brief and Fluid will recommend a type system here.</div>
+        )}
+
+        {!error && !type && hasBrief && (
+          <div style={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{loading ? <Thinking /> : null}</div>
+        )}
+
+        {type && (
+          <div style={{ opacity: loading ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Heading specimen */}
+            <div>
+              <div style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                Display · {type.heading.family}{type.heading.weights ? ' · ' + type.heading.weights : ''}
+              </div>
+              <div style={{ fontFamily: ff(type.heading), fontWeight: 700, fontSize: 40, lineHeight: 1.05, color: '#000', letterSpacing: '-0.02em' }}>{brandName}</div>
+              <div style={{ fontFamily: ff(type.heading), fontWeight: 600, fontSize: 20, color: 'var(--fg-1)', marginTop: 6 }}>The quick brown fox jumps over the lazy dog</div>
+              {type.heading.usage && <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 6 }}>{type.heading.usage}</div>}
+            </div>
+            {/* Body specimen */}
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 18 }}>
+              <div style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                Body · {type.body.family}{type.body.weights ? ' · ' + type.body.weights : ''}
+              </div>
+              <p style={{ fontFamily: ff(type.body), fontSize: 15, lineHeight: 1.6, color: 'var(--fg-1)', margin: 0, maxWidth: 620 }}>
+                {brandName} helps people move with intention. Every detail is considered, every interaction quiet and deliberate — the kind of product you reach for without thinking. 0123456789
+              </p>
+              {type.body.usage && <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 6 }}>{type.body.usage}</div>}
+            </div>
+            {type.rationale && (
+              <p style={{ fontSize: 12.5, color: 'var(--fg-3)', lineHeight: 1.5, margin: 0, maxWidth: 640 }}>{type.rationale}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DirA_KitSummary = () => {
   const { draft } = useBrandDraft();
   const { navigate } = useRouter();
@@ -2486,6 +2582,8 @@ const DirA_KitSummary = () => {
 
           <KitPaletteSection draft={draft} />
 
+          <KitTypographySection draft={draft} />
+
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 14 }}>Brand assets</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
@@ -2502,7 +2600,7 @@ const DirA_KitSummary = () => {
           </div>
 
           <p style={{ fontSize: 13.5, color: 'var(--fg-3)', lineHeight: 1.5, maxWidth: 580 }}>
-            Fluid will generate your logo, type and guidelines from this brief in upcoming releases. Your brand and everything you've entered is already saved.
+            Fluid will generate your logo and guidelines from this brief in upcoming releases. Your brand and everything you've entered is already saved.
           </p>
         </div>
       </div>
@@ -4756,6 +4854,38 @@ async function apiGeneratePalette(brandId) {
     return { palette: j.palette || null };
   } catch { return { error: 'Network error.' }; }
 }
+// Phase 3 — ask Claude for a typography pairing for this brand.
+async function apiGenerateTypography(brandId) {
+  try {
+    const r = await fetch('/api/generate/typography', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    return { typography: j.typography || null };
+  } catch { return { error: 'Network error.' }; }
+}
+// Load a Google Fonts family once (idempotent by href). Weights are omitted so
+// the request never 400s on a family that lacks a requested weight; the browser
+// synthesizes bolder weights for the specimen.
+function ensureGoogleFont(family) {
+  if (!family || typeof document === 'undefined') return;
+  const href = 'https://fonts.googleapis.com/css2?family=' +
+    encodeURIComponent(family).replace(/%20/g, '+') + '&display=swap';
+  if (document.querySelector('link[data-gfont="' + family + '"]')) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  link.setAttribute('data-gfont', family);
+  document.head.appendChild(link);
+}
+const FONT_FALLBACK = {
+  'serif': 'Georgia, serif',
+  'sans-serif': 'system-ui, sans-serif',
+  'display': 'system-ui, sans-serif',
+  'monospace': 'ui-monospace, monospace',
+};
 
 // Until the name step is wired up, derive a readable brand name from the brief
 // so saved brands don't all read "Untitled brand".
