@@ -2354,7 +2354,101 @@ const KitTile = ({ label, children, style }) => (
 
 // Real brand-kit summary — shows what the user captured in the wizard, with
 // the visual assets as placeholders until generation lands (Phase 3).
-const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Color palette', 'Typography', 'Guidelines'];
+// Color palette is generated (below); the rest remain placeholders for now.
+const KIT_ASSET_TILES = ['Logomark', 'Wordmark', 'App icon', 'Typography', 'Guidelines'];
+
+// A single generated color swatch — block + name / hex / usage.
+const KitSwatch = ({ c }) => (
+  <div style={{ flex: '1 1 140px', minWidth: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ height: 76, borderRadius: 12, background: c.hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)' }} />
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13.5, color: '#000', letterSpacing: '-0.01em' }}>{c.name}</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--fg-3)', textTransform: 'uppercase' }}>{c.hex}</div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{c.role}</div>
+      {c.usage && <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 1, lineHeight: 1.35 }}>{c.usage}</div>}
+    </div>
+  </div>
+);
+
+// Full-width palette section for the Brand Kit. Auto-generates on open when a
+// brief exists and no palette is cached yet; supports regenerate + retry.
+const KitPaletteSection = ({ draft }) => {
+  const brandId = draft && draft.id;
+  const hasBrief = !!(draft && String(draft.brief || '').trim());
+  const cached = (draft && draft.data && draft.data.palette) || null;
+  const [palette, setPalette] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const requestedFor = React.useRef(null);
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGeneratePalette(brandId);
+    if (res.error) setError(res.error);
+    else setPalette(res.palette);
+    setLoading(false);
+  }, [brandId]);
+
+  React.useEffect(() => {
+    if (!brandId || !hasBrief || palette) return;
+    if (requestedFor.current === brandId) return;
+    requestedFor.current = brandId;
+    generate();
+  }, [brandId, hasBrief, palette, generate]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Color palette</div>
+        <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
+          padding: '6px 11px', borderRadius: 8, background: 'transparent', color: 'var(--fg-2)',
+          fontSize: 11.5, fontWeight: 600, boxShadow: 'inset 0 0 0 1px var(--line)',
+          display: 'inline-flex', alignItems: 'center', gap: 6, border: 0,
+          cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
+        }}>
+          <Sparkle size={11} /> {palette ? 'Regenerate' : 'Generate'}
+        </button>
+      </div>
+
+      <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 22 }}>
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 12.5, color: '#A8421F' }}>
+            <span>{error}</span>
+            <button onClick={() => generate()} style={{ padding: '5px 10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11.5, fontWeight: 600, border: 0, cursor: 'pointer' }}>Try again</button>
+          </div>
+        )}
+
+        {!error && !palette && !hasBrief && (
+          <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>Add a brief and Fluid will design a palette here.</div>
+        )}
+
+        {!error && !palette && hasBrief && (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ flex: '1 1 140px', minWidth: 120 }}>
+                <div style={{ height: 76, borderRadius: 12, background: 'var(--bg-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{loading && i === 2 ? <Thinking /> : null}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {palette && (
+          <>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', opacity: loading ? 0.5 : 1 }}>
+              {palette.colors.map((c, i) => <KitSwatch key={c.hex + i} c={c} />)}
+            </div>
+            {palette.rationale && (
+              <p style={{ fontSize: 12.5, color: 'var(--fg-3)', lineHeight: 1.5, margin: '16px 0 0', maxWidth: 640 }}>{palette.rationale}</p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const DirA_KitSummary = () => {
   const { draft } = useBrandDraft();
@@ -2390,6 +2484,8 @@ const DirA_KitSummary = () => {
             ))}
           </div>
 
+          <KitPaletteSection draft={draft} />
+
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 14 }}>Brand assets</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
@@ -2406,7 +2502,7 @@ const DirA_KitSummary = () => {
           </div>
 
           <p style={{ fontSize: 13.5, color: 'var(--fg-3)', lineHeight: 1.5, maxWidth: 580 }}>
-            Fluid will generate your logo, palette, type and guidelines from this brief in an upcoming release. Your brand and everything you've entered is already saved.
+            Fluid will generate your logo, type and guidelines from this brief in upcoming releases. Your brand and everything you've entered is already saved.
           </p>
         </div>
       </div>
@@ -4646,6 +4742,18 @@ async function apiGenerateNames(brandId) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { error: j.error || 'Generation failed.' };
     return { names: j.names || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Phase 3 — ask Claude for a color palette for this brand.
+async function apiGeneratePalette(brandId) {
+  try {
+    const r = await fetch('/api/generate/palette', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    return { palette: j.palette || null };
   } catch { return { error: 'Network error.' }; }
 }
 
