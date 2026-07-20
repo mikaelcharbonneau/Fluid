@@ -1971,58 +1971,31 @@ const DirA_Step2_Style = () => (
 // the agent's reasoning is legible at a glance. Selected card gets a
 // black ring; favorited cards get a coral heart.
 // =====================================================================
-const ANameCard = ({ n, kind, why, domain, fit, fav, sel, onClick }) => {
-  const dom = {
-    available: { fg:'#0E6B5E', bg:'rgba(68,217,199,.18)', label:'.com avail', dot:'#44D9C7' },
-    taken:     { fg:'#A8421F', bg:'rgba(253,121,71,.14)', label:'.com taken', dot:'#FD7947' },
-    pricey:    { fg:'#7C5A14', bg:'rgba(253,186,80,.20)', label:'.com $14k',  dot:'#FDBA50' },
-    // Generated names: we can't verify a domain, so stay honest with a neutral badge.
-    unknown:   { fg:'var(--fg-3)', bg:'var(--bg-sunken)', label:'check .com', dot:'var(--fg-4)' },
-  }[domain] || { fg:'var(--fg-3)', bg:'var(--bg-sunken)', label:'check .com', dot:'var(--fg-4)' };
-  return (
-    <div onClick={onClick} style={{
-      background:'var(--bg-elev)', borderRadius:18, padding:18,
-      boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:14, position:'relative', cursor:'pointer',
-      minHeight: 178,
+// Compact name card — just the name, selectable, with a like (heart) toggle.
+const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
+  <div onClick={onClick} style={{
+    position:'relative', background:'var(--bg-elev)', borderRadius:12,
+    padding:'16px 30px 16px 14px', minHeight:58,
+    boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    display:'flex', alignItems:'center', cursor:'pointer',
+  }}>
+    <span style={{
+      fontFamily:'var(--font-display)', fontWeight:700, fontSize:17,
+      letterSpacing:'-0.02em', color:'#000',
+      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%',
+    }}>{n}</span>
+    <button onClick={(e) => { e.stopPropagation(); onLike(); }} aria-label={liked ? 'Unlike ' + n : 'Like ' + n} style={{
+      position:'absolute', top:8, right:6, width:22, height:22, borderRadius:99,
+      background:'transparent', border:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
     }}>
-      <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between'}}>
-        <span style={{fontSize:10, color:'var(--fg-3)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>{kind}</span>
-        <button style={{
-          width:26, height:26, borderRadius:99,
-          background: fav ? 'rgba(253,121,71,.14)' : 'transparent',
-          border:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill={fav ? '#FD7947' : 'none'} stroke={fav ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-        </button>
-      </div>
-      <div style={{
-        fontFamily:'var(--font-display)', fontWeight:800,
-        fontSize: 32, letterSpacing:'-0.035em', lineHeight: 0.95, color:'#000',
-      }}>{n}<span style={{color: sel ? '#FD7947' : 'var(--fg-4)'}}>.</span></div>
-      <div style={{fontSize:12.5, color:'var(--fg-2)', lineHeight:1.45, flex:1}}>"{why}"</div>
-      <div style={{display:'flex', alignItems:'center', gap:8}}>
-        <span style={{
-          display:'inline-flex', alignItems:'center', gap:5,
-          fontSize:10.5, fontWeight:600,
-          padding:'3px 7px', borderRadius:99,
-          background: dom.bg, color: dom.fg,
-        }}>
-          <span style={{width:5, height:5, borderRadius:99, background:dom.dot}}/> {dom.label}
-        </span>
-        <div style={{flex:1, display:'flex', alignItems:'center', gap:5}}>
-          <span style={{fontSize:10, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>FIT</span>
-          <div style={{flex:1, height:3, background:'var(--bg-sunken)', borderRadius:99, overflow:'hidden'}}>
-            <div style={{width: fit+'%', height:'100%', background:'#000', borderRadius:99}}/>
-          </div>
-          <span style={{fontSize:10, color:'var(--fg-2)', fontFamily:'var(--font-mono)', fontWeight:600}}>{fit}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
+      <svg width="13" height="13" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-4)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </button>
+  </div>
+);
+
+const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
 const DirA_Step3_Name = () => {
   const { draft, setField } = useBrandDraft();
@@ -2031,21 +2004,35 @@ const DirA_Step3_Name = () => {
 
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
-  // Seed from any names cached on the brand (so resuming shows the same set).
-  const cached = (draft && draft.data && draft.data.names) || [];
-  const [names, setNames] = React.useState(cached);
+  // Seed from anything cached on the brand (so resuming shows the same set).
+  const cachedNames = (draft && draft.data && draft.data.names) || [];
+  const cachedLiked = (draft && draft.data && draft.data.liked_names) || [];
+  const [names, setNames] = React.useState(cachedNames);
+  const [liked, setLiked] = React.useState(cachedLiked);
+  const [likedOpen, setLikedOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const requestedFor = React.useRef(null);
+
+  // Persist names + liked together, merging onto whatever else is in data.
+  const persist = React.useCallback((nextNames, nextLiked) => {
+    setField('data', { ...((draft && draft.data) || {}), names: nextNames, liked_names: nextLiked });
+  }, [draft, setField]);
+
+  const toggleLike = (name) => {
+    const next = liked.includes(name) ? liked.filter((x) => x !== name) : [...liked, name];
+    setLiked(next);
+    persist(names, next);
+  };
 
   const generate = React.useCallback(async () => {
     if (!brandId) return;
     setLoading(true); setError('');
     const res = await apiGenerateNames(brandId);
     if (res.error) setError(res.error);
-    else setNames(res.names);
+    else { setNames(res.names); persist(res.names, liked); }
     setLoading(false);
-  }, [brandId]);
+  }, [brandId, persist, liked]);
 
   // Auto-generate once when the step opens with a brief but no names yet.
   React.useEffect(() => {
@@ -2056,19 +2043,24 @@ const DirA_Step3_Name = () => {
     generate();
   }, [brandId, hasBrief, names.length, generate]);
 
+  const toolBtn = {
+    padding:'10px 14px', borderRadius:12, fontSize:12.5, fontWeight:600,
+    display:'inline-flex', alignItems:'center', gap:8, border:0, cursor:'pointer',
+  };
+
   return (
   <AWizardLayout
     step={3}
     title="Find the right name."
-    subtitle="Fluid drafts each name with its reasoning — pick the one that lands, or type your own."
+    subtitle="Fluid drafts 50 names from your brief — pick one, like your favorites, or type your own."
     status="Draft"
     progress="Step 3 of 5"
     nextLabel="Continue to Logo"
     onNext={() => {}}
     isThinking={loading}
   >
-    {/* Top toolbar — own, regenerate */}
-    <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:18}}>
+    {/* Top toolbar — own name, liked names, regenerate */}
+    <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:16}}>
       <div style={{
         flex:1, display:'flex', alignItems:'center', gap:10,
         background:'var(--bg-elev)', borderRadius:12,
@@ -2083,14 +2075,52 @@ const DirA_Step3_Name = () => {
         />
         <span style={{fontSize:10.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)'}}>↵</span>
       </div>
+      <button onClick={() => setLikedOpen((o) => !o)} style={{
+        ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
+        boxShadow:'var(--shadow-xs), inset 0 0 0 1px ' + (likedOpen ? '#000' : 'var(--line)'),
+      }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill={liked.length ? '#FD7947' : 'none'} stroke={liked.length ? '#FD7947' : 'var(--fg-2)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Liked Names{liked.length ? ' (' + liked.length + ')' : ''}
+      </button>
       <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
-        padding:'10px 14px', borderRadius:12, background:'#000', color:'#fff',
-        fontSize:12.5, fontWeight:600, display:'inline-flex', alignItems:'center', gap:8,
-        border:0, cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
+        ...toolBtn, background:'#000', color:'#fff',
+        cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
       }}>
         <Sparkle size={12} color="#fff"/> {names.length ? 'Regenerate' : 'Generate names'}
       </button>
     </div>
+
+    {/* Collapsible liked-names pane */}
+    {likedOpen && (
+      <div style={{
+        marginBottom:16, padding:'16px 18px', borderRadius:14,
+        background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)',
+      }}>
+        <div className="eyebrow" style={{color:'var(--fg-3)', marginBottom:12}}>Liked names · {liked.length}</div>
+        {liked.length === 0 ? (
+          <div style={{fontSize:12.5, color:'var(--fg-3)'}}>Tap the heart on any name to save it here.</div>
+        ) : (
+          <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+            {liked.map((name) => {
+              const sel = chosen === name;
+              return (
+                <div key={name} style={{
+                  display:'inline-flex', alignItems:'center', gap:8,
+                  borderRadius:99, padding:'6px 6px 6px 14px',
+                  background: sel ? '#000' : 'var(--bg)',
+                  boxShadow: sel ? 'none' : 'inset 0 0 0 1px var(--line)',
+                }}>
+                  <span onClick={() => chooseName(name)} style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, color: sel ? '#fff' : '#000', cursor:'pointer'}}>{name}</span>
+                  <button onClick={() => toggleLike(name)} aria-label={'Remove ' + name} style={{width:20, height:20, borderRadius:99, background:'transparent', border:0, cursor:'pointer', color: sel ? 'rgba(255,255,255,.7)' : 'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    )}
 
     {error && (
       <div style={{
@@ -2112,23 +2142,24 @@ const DirA_Step3_Name = () => {
 
     {/* Loading skeletons on the first generation */}
     {loading && !names.length && (
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12}}>
-        {Array.from({length:9}).map((_, i) => (
+      <div style={{display:'grid', gridTemplateColumns:NAME_GRID, gap:10}}>
+        {Array.from({length:18}).map((_, i) => (
           <div key={i} style={{
-            background:'var(--bg-elev)', borderRadius:18, minHeight:178,
+            background:'var(--bg-elev)', borderRadius:12, minHeight:58,
             boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
             display:'flex', alignItems:'center', justifyContent:'center',
-          }}><Thinking/></div>
+          }}>{i === 4 ? <Thinking/> : null}</div>
         ))}
       </div>
     )}
 
     {/* Name grid */}
     {names.length > 0 && (
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12, opacity: loading ? 0.5 : 1}}>
+      <div style={{display:'grid', gridTemplateColumns:NAME_GRID, gap:10, opacity: loading ? 0.5 : 1}}>
         {names.map((o) => (
-          <ANameCard key={o.name} n={o.name} kind={o.kind} why={o.why} domain="unknown" fit={o.fit}
-            sel={chosen === o.name} onClick={() => chooseName(o.name)} />
+          <ANameCard key={o.name} n={o.name}
+            sel={chosen === o.name} liked={liked.includes(o.name)}
+            onClick={() => chooseName(o.name)} onLike={() => toggleLike(o.name)} />
         ))}
       </div>
     )}
