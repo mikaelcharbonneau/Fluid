@@ -32,10 +32,11 @@ const __assets = new Proxy({}, {
 // All components are written to `window` at the bottom because each
 // `<script type="text/babel">` gets its own transform scope.
 
+// Uses the same wordmark file as the marketing site so the two never drift.
 const FluidWordmark = ({ height = 22, color = 'ink' }) => (
   <img
     className="fl-wordmark"
-    src={color === 'mono' ? __assets['assets/min/fluid-wordmark-mono.png'] : __assets['assets/min/fluid-wordmark-primary.png']}
+    src={color === 'mono' ? __assets['assets/min/fluid-wordmark-mono.png'] : __assets['uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png']}
     alt="Fluid"
     style={{ height, width: 'auto', display: 'block' }}
   />
