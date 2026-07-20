@@ -1883,6 +1883,125 @@ const INSPIRATION_BRANDS = [
   { name:'Tesla', category:'Automotive · Technology', hero:<TeslaHero/>, style:{ label:'Bold · Technical', pill:{ bg:'#E31937', color:'#FFFFFF', font: TESLA_TYPE, weight: 700, tracking:'0.18em', transform:'uppercase', size: 9.5, padding:'5px 11px', dot:'#000000', dotSize: 5 } } },
 ];
 
+// A user-uploaded font, previewed in that font, selectable + removable.
+const ACustomFontCard = ({ family, sel, onClick, onRemove }) => (
+  <div onClick={onClick} style={{
+    background:'var(--bg-elev)', borderRadius: 14, position:'relative',
+    boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    padding: 14, display:'flex', flexDirection:'column', gap: 10, cursor:'pointer',
+  }}>
+    {sel && (
+      <div style={{position:'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: 99, background: '#000', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    )}
+    <div style={{ background:'var(--bg)', borderRadius: 8, boxShadow:'inset 0 0 0 1px var(--line)', padding:'12px 14px', minHeight: 78, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+      <div style={{ fontFamily:'"' + family + '", sans-serif', fontSize: 24, color:'#000', lineHeight: 1 }}>Aa</div>
+      <div style={{ fontFamily:'"' + family + '", sans-serif', fontSize: 11, color:'var(--fg-2)', lineHeight: 1.45 }}>The quick brown fox jumps over the lazy dog.</div>
+    </div>
+    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
+      <div style={{minWidth:0}}>
+        <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing:'-0.015em', color:'var(--fg-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{family}</div>
+        <div style={{fontSize: 10.5, color:'var(--fg-3)', marginTop: 1, fontFamily:'var(--font-mono)'}}>Your font</div>
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} aria-label={'Remove ' + family} style={{width:22, height:22, borderRadius:99, background:'transparent', border:0, cursor:'pointer', color:'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center', flex:'0 0 auto'}}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+);
+
+// Dashed "upload your font" card.
+const AUploadFontCard = ({ onPick }) => {
+  const ref = React.useRef(null);
+  return (
+    <div onClick={() => ref.current && ref.current.click()} style={{
+      borderRadius: 14, minHeight: 140, cursor:'pointer',
+      boxShadow:'inset 0 0 0 1.5px var(--line)', background:'var(--bg)',
+      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap: 8, textAlign:'center', padding: 14,
+    }}>
+      <input ref={ref} type="file" accept=".ttf,.otf,.woff,.woff2,font/*" style={{display:'none'}}
+        onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; onPick(f); }} />
+      <div style={{width: 30, height: 30, borderRadius: 8, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+      <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, color:'#000'}}>Upload your font</div>
+      <div style={{fontSize: 10.5, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>.ttf · .otf · .woff · .woff2</div>
+    </div>
+  );
+};
+
+// Typography section — open-source pairs, custom uploads, and Let AI choose.
+const ATypographySection = () => {
+  const { draft } = useBrandDraft();
+  const { step2, setStep2 } = useStep2();
+  const brandId = draft && draft.id;
+  const customFonts = step2.custom_fonts || [];
+  const [picking, setPicking] = React.useState(false);
+  const [uploadErr, setUploadErr] = React.useState('');
+
+  React.useEffect(() => {
+    OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
+  }, []);
+  React.useEffect(() => {
+    customFonts.forEach((cf) => registerCustomFont(cf.family, cf.dataUrl));
+  }, [customFonts]);
+
+  const pickFont = async () => {
+    if (!brandId || picking) return;
+    setPicking(true);
+    const opts = OPEN_SOURCE_FONT_PAIRS.map((p) => ({ id: p.id, label: p.name, desc: p.mood + ' — ' + p.display.family + ' / ' + p.body.family }));
+    const { result } = await apiAssist(brandId, 'pick_font', opts);
+    if (result && result.choice) setStep2({ font: result.choice });
+    setPicking(false);
+  };
+
+  const onUpload = async (file) => {
+    setUploadErr('');
+    if (!file) return;
+    if (!/\.(ttf|otf|woff2?|woff)$/i.test(file.name)) { setUploadErr('Use a .ttf, .otf, .woff or .woff2 file.'); return; }
+    if (file.size > 3 * 1024 * 1024) { setUploadErr('Font file must be under 3 MB.'); return; }
+    let dataUrl;
+    try { dataUrl = await readFileAsDataURL(file); } catch { setUploadErr('Could not read that file.'); return; }
+    const family = file.name.replace(/\.(ttf|otf|woff2?|woff)$/i, '').replace(/[-_]+/g, ' ').trim() || 'Custom font';
+    const id = 'c' + Date.now();
+    await registerCustomFont(family, dataUrl);
+    setStep2({ custom_fonts: [...customFonts, { id, family, dataUrl }], font: 'custom:' + id });
+  };
+  const removeCustom = (id) => {
+    setStep2({
+      custom_fonts: customFonts.filter((c) => c.id !== id),
+      font: step2.font === 'custom:' + id ? null : step2.font,
+    });
+  };
+
+  return (
+    <div style={{marginBottom: 12}}>
+      <ASectionHead n="03" title="Typography" sub="Open-source pairs previewed live — or upload your own font." ai onAI={pickFont} aiBusy={picking}/>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
+        {OPEN_SOURCE_FONT_PAIRS.map((p) => (
+          <AFontPairOption
+            key={p.id}
+            name={p.name} mood={p.mood}
+            sel={step2.font === p.id}
+            onClick={() => setStep2({ font: step2.font === p.id ? null : p.id })}
+            display={{ font: fontFamilyCss(p.display), name: p.display.family, weight: p.display.weight, sample: 'Aa' }}
+            body={{ font: fontFamilyCss(p.body), name: p.body.family, weight: p.body.weight, sample: 'The quick brown fox jumps over the lazy dog.' }}
+          />
+        ))}
+        {customFonts.map((cf) => (
+          <ACustomFontCard key={cf.id} family={cf.family}
+            sel={step2.font === 'custom:' + cf.id}
+            onClick={() => setStep2({ font: step2.font === 'custom:' + cf.id ? null : 'custom:' + cf.id })}
+            onRemove={() => removeCustom(cf.id)} />
+        ))}
+        <AUploadFontCard onPick={onUpload} />
+      </div>
+      {uploadErr && <div style={{marginTop:10, fontSize:11.5, color:'#A8421F'}}>{uploadErr}</div>}
+    </div>
+  );
+};
+
 const DirA_Step2_Style = () => {
   const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
@@ -1900,14 +2019,6 @@ const DirA_Step2_Style = () => {
     const opts = PALETTE_OPTIONS.map((p) => ({ id: p.name, label: p.name, desc: p.mood }));
     const { result } = await apiAssist(brandId, 'pick_palette', opts);
     if (result && result.choice) setStep2({ palette: result.choice });
-    setPicking('');
-  };
-  const pickFont = async () => {
-    if (!brandId || picking) return;
-    setPicking('font');
-    const opts = OPEN_SOURCE_FONT_PAIRS.map((p) => ({ id: p.id, label: p.name, desc: p.mood + ' — ' + p.display.family + ' / ' + p.body.family }));
-    const { result } = await apiAssist(brandId, 'pick_font', opts);
-    if (result && result.choice) setStep2({ font: result.choice });
     setPicking('');
   };
 
@@ -1985,22 +2096,8 @@ const DirA_Step2_Style = () => {
       </div>
     </div>
 
-    {/* 2c · Typography */}
-    <div style={{marginBottom: 12}}>
-      <ASectionHead n="03" title="Typography" sub="Open-source pairs, previewed in the real fonts, used across the kit." ai onAI={pickFont} aiBusy={picking === 'font'}/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
-        {OPEN_SOURCE_FONT_PAIRS.map((p) => (
-          <AFontPairOption
-            key={p.id}
-            name={p.name} mood={p.mood}
-            sel={step2.font === p.id}
-            onClick={() => setStep2({ font: step2.font === p.id ? null : p.id })}
-            display={{ font: fontFamilyCss(p.display), name: p.display.family, weight: p.display.weight, sample: 'Aa' }}
-            body={{ font: fontFamilyCss(p.body), name: p.body.family, weight: p.body.weight, sample: 'The quick brown fox jumps over the lazy dog.' }}
-          />
-        ))}
-      </div>
-    </div>
+    {/* 2c · Typography — open-source pairs + custom uploads */}
+    <ATypographySection />
   </AWizardLayout>
   );
 };
@@ -5254,6 +5351,30 @@ const FONT_FALLBACK = {
   'display': 'system-ui, sans-serif',
   'monospace': 'ui-monospace, monospace',
 };
+
+// ── Custom (user-uploaded) fonts ──────────────────────────────────────
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+// Register an uploaded font with the browser via the FontFace API so previews
+// render in it. Idempotent per family+source.
+const _registeredFonts = new Set();
+async function registerCustomFont(family, dataUrl) {
+  if (typeof window === 'undefined' || typeof window.FontFace === 'undefined') return;
+  const key = family + '|' + String(dataUrl).slice(0, 48);
+  if (_registeredFonts.has(key)) return;
+  try {
+    const ff = new window.FontFace(family, 'url(' + dataUrl + ')');
+    await ff.load();
+    document.fonts.add(ff);
+    _registeredFonts.add(key);
+  } catch { /* unusable font file — preview just falls back */ }
+}
 
 // Until the name step is wired up, derive a readable brand name from the brief
 // so saved brands don't all read "Untitled brand".
