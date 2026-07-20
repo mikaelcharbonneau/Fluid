@@ -11,9 +11,11 @@ body {
   background: var(--bg);
   color: var(--fg-1);
   overflow-x: hidden;
-  cursor: none;
 }
-@media (pointer: coarse) { body { cursor: auto; } }
+/* Hide the native cursor only once JS has taken over with the custom cursor,
+   so browsers where the custom cursor doesn't run keep a usable pointer. */
+body.custom-cursor { cursor: none; }
+@media (pointer: coarse) { body, body.custom-cursor { cursor: auto; } }
 
 ::selection { background: var(--fluid-coral); color: #fff; }
 
@@ -110,7 +112,7 @@ section { position: relative; }
 /* magnetic button */
 .btn {
   --bg-btn: var(--fg-1); --fg-btn: #fff;
-  appearance: none; border: 0; cursor: none;
+  appearance: none; border: 0; cursor: pointer;
   font-family: var(--font-body); font-weight: 600; font-size: 15px;
   letter-spacing: -0.01em;
   padding: 13px 22px; border-radius: var(--r-pill);
@@ -120,6 +122,7 @@ section { position: relative; }
   will-change: transform;
   transition: transform .25s var(--ease-spring), box-shadow .3s var(--ease-out);
 }
+body.custom-cursor .btn { cursor: none; }
 .btn .btn-label { position: relative; z-index: 1; }
 .btn::before {                       /* gradient sweep on hover */
   content: ""; position: absolute; inset: 0; z-index: 0;

@@ -20,6 +20,9 @@
   var dot = document.querySelector(".cursor-dot");
   var ring = document.querySelector(".cursor-ring");
   if (dot && ring && !coarse && !reduce) {
+    // Only now hide the native cursor — if this branch never runs (or the
+    // script fails earlier), the browser keeps a normal, movable pointer.
+    document.body.classList.add("custom-cursor");
     var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my;
     addEventListener("mousemove", function (e) { mx = e.clientX; my = e.clientY; dot.style.transform = "translate(" + mx + "px," + my + "px) translate(-50%,-50%)"; });
     (function loop() { rx = lerp(rx, mx, 0.18); ry = lerp(ry, my, 0.18); ring.style.transform = "translate(" + rx + "px," + ry + "px) translate(-50%,-50%)"; requestAnimationFrame(loop); })();
@@ -68,6 +71,12 @@
     ents.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
   }, { threshold: 0.18, rootMargin: "0px 0px -8% 0px" });
   document.querySelectorAll("[data-reveal], .jstep, .board, .sec-head").forEach(function (el) { io.observe(el); });
+  // Fail-safe: never leave [data-reveal] content invisible if the observer or
+  // the load-gated reveal doesn't fire (observed on Safari). Scheduled here,
+  // early, so it still runs even if later setup throws.
+  setTimeout(function () {
+    document.querySelectorAll("[data-reveal]").forEach(function (el) { el.classList.add("in"); });
+  }, 1200);
 
   /* -------------------------------------------------- hero canvas — scroll-driven magnetic assembly */
   var heroSection = document.querySelector(".hero");
@@ -488,17 +497,23 @@
   /* -------------------------------------------------- final ribbon */
   var ribbonPath = document.querySelector(".final .ribbon-bg path");
   if (ribbonPath) {
-    var len = ribbonPath.getTotalLength();
-    ribbonPath.style.strokeDasharray = len;
-    ribbonPath.style.strokeDashoffset = len;
-    var fio = new IntersectionObserver(function (e) {
-      if (e[0].isIntersecting && !reduce) {
-        ribbonPath.style.transition = "stroke-dashoffset 2.4s cubic-bezier(0.22,0.61,0.36,1)";
-        ribbonPath.style.strokeDashoffset = "0";
-        fio.disconnect();
-      } else if (e[0].isIntersecting) { ribbonPath.style.strokeDashoffset = "0"; fio.disconnect(); }
-    }, { threshold: 0.3 });
-    fio.observe(document.querySelector(".final"));
+    try {
+      var len = ribbonPath.getTotalLength();
+      ribbonPath.style.strokeDasharray = len;
+      ribbonPath.style.strokeDashoffset = len;
+      var fio = new IntersectionObserver(function (e) {
+        if (e[0].isIntersecting && !reduce) {
+          ribbonPath.style.transition = "stroke-dashoffset 2.4s cubic-bezier(0.22,0.61,0.36,1)";
+          ribbonPath.style.strokeDashoffset = "0";
+          fio.disconnect();
+        } else if (e[0].isIntersecting) { ribbonPath.style.strokeDashoffset = "0"; fio.disconnect(); }
+      }, { threshold: 0.3 });
+      fio.observe(document.querySelector(".final"));
+    } catch (e) {
+      // Safari can throw on getTotalLength() for a not-yet-rendered path.
+      // The ribbon just won't draw-on; everything else keeps working.
+      void e;
+    }
   }
 
   /* -------------------------------------------------- (hero canvas is scroll-driven, see updateHero) */
