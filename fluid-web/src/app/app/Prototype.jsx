@@ -4412,8 +4412,89 @@ const SecNotifications = () => (
 // ---------------------------------------------------------------------
 // Settings shell — sub-nav + active section
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Section: Billing (Stripe)
+// ---------------------------------------------------------------------
+const SecBilling = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [busy, setBusy] = React.useState('');
+  const [error, setError] = React.useState('');
+  const justUpgraded = typeof window !== 'undefined' && /[?&]billing=success/.test(window.location.search);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/billing/status', { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      setStatus(r.ok ? j : null);
+    } catch { setStatus(null); }
+    setLoading(false);
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const go = async (path, which) => {
+    setBusy(which); setError('');
+    try {
+      const r = await fetch(path, { method: 'POST' });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.url) { window.location.assign(j.url); return; }
+      setError(j.error || "Couldn't continue. Please try again.");
+    } catch { setError('Network error. Check your connection and try again.'); }
+    setBusy('');
+  };
+
+  const isPro = status && status.plan === 'pro';
+  const primaryBtn = { padding: '10px 16px', borderRadius: 10, background: '#000', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 0 };
+  const ghostBtn = { padding: '10px 16px', borderRadius: 10, background: 'transparent', color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)', border: 0 };
+  const proPerks = ['Unlimited brands', 'Full AI generation — names, palette, type, logo & guidelines', 'Export every asset & the brand sheet', 'Priority generation'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <SectionHead eyebrow="Settings · Billing" title="Billing." desc="Your plan and payment. Upgrade to Pro to unlock everything Fluid can generate." />
+
+      {justUpgraded && !isPro && (
+        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(68,217,199,.12)', boxShadow: 'inset 0 0 0 1px rgba(68,217,199,.35)', fontSize: 13, color: '#0E6B5E' }}>
+          Thanks! Your payment is processing — your plan will update in a moment. <button onClick={load} style={{ background: 'transparent', border: 0, color: '#0E6B5E', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Refresh</button>
+        </div>
+      )}
+
+      <Card title="Current plan">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, color: '#000' }}>{isPro ? 'Pro' : 'Free'}</span>
+              <Chip tone={isPro ? 'live' : 'neutral'}>{isPro ? 'Active' : 'Current'}</Chip>
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 4 }}>
+              {loading ? 'Loading…' : isPro ? 'You have full access to everything Fluid generates.' : 'You’re on the free plan.'}
+            </div>
+          </div>
+          {isPro ? (
+            <button onClick={() => go('/api/billing/portal', 'portal')} disabled={!!busy} style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }}>{busy === 'portal' ? 'Opening…' : 'Manage subscription'}</button>
+          ) : (
+            <button onClick={() => go('/api/billing/checkout', 'checkout')} disabled={!!busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy === 'checkout' ? 'Starting…' : 'Upgrade to Pro'}</button>
+          )}
+        </div>
+        {error && <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--destructive)' }}>{error}</div>}
+      </Card>
+
+      <Card title="Fluid Pro">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {proPerks.map((p) => (
+            <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--fg-1)' }}>
+              <span style={{ color: '#0E6B5E', fontWeight: 700, flex: '0 0 auto' }}>✓</span> {p}
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 const SETTINGS_NAV = [
   { id: 'account',      label: 'Account',         d: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></> },
+  { id: 'billing',      label: 'Billing',         d: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></> },
   { id: 'workspace',    label: 'Workspace',       d: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></> },
   { id: 'fluid',        label: 'Fluid AI',        d: <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></> },
   // Members and Plan/Billing hidden until those features exist.
@@ -4423,6 +4504,7 @@ const SETTINGS_NAV = [
 
 const SECTIONS = {
   account: SecAccount,
+  billing: SecBilling,
   workspace: SecWorkspace,
   fluid: SecFluid,
   integrations: SecIntegrations,
