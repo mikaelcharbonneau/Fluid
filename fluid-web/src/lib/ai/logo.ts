@@ -21,6 +21,7 @@ export interface LogoBrief {
   name?: string | null;
   style?: string | null;
   primaryColor?: string | null; // hex from the generated palette, if any
+  styleContext?: string | null; // resolved Step 2 choices
 }
 
 const MODEL = "claude-opus-4-8";
@@ -55,11 +56,11 @@ NOTE: <one sentence on the idea and where it works best>
 function buildUserPrompt(input: LogoBrief): string {
   const lines = [`Brand brief: ${input.brief.trim()}`];
   const name = (input.name ?? "").trim();
-  const style = (input.style ?? "").trim();
   const color = (input.primaryColor ?? "").trim();
+  const ctx = (input.styleContext ?? "").trim();
   if (name) lines.push(`Brand name: ${name}`);
-  if (style) lines.push(`Chosen visual direction: ${style}`);
   if (color) lines.push(`Brand primary color: ${color}`);
+  if (ctx) lines.push(`\nThe user's design choices so far:\n${ctx}`);
   lines.push(`\nDesign ${COUNT} logo concepts in the required format.`);
   return lines.join("\n");
 }

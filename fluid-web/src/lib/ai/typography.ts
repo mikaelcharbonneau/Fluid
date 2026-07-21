@@ -23,6 +23,8 @@ export interface TypographyBrief {
   audience?: string | null;
   name?: string | null;
   style?: string | null;
+  styleContext?: string | null; // resolved Step 2 choices
+  chosenFonts?: { heading: string; body: string } | null; // Step 2 font pick
 }
 
 const MODEL = "claude-opus-4-8";
@@ -59,10 +61,17 @@ function buildUserPrompt(input: TypographyBrief): string {
   const lines = [`Brand brief: ${input.brief.trim()}`];
   const name = (input.name ?? "").trim();
   const audience = (input.audience ?? "").trim();
-  const style = (input.style ?? "").trim();
+  const ctx = (input.styleContext ?? "").trim();
   if (name) lines.push(`Brand name: ${name}`);
   if (audience) lines.push(`Target audience: ${audience}`);
-  if (style) lines.push(`Chosen visual direction: ${style}`);
+  if (ctx) lines.push(`\nThe user's design choices so far:\n${ctx}`);
+  if (input.chosenFonts) {
+    lines.push(
+      `\nThe user has ALREADY chosen the fonts: heading = "${input.chosenFonts.heading}", ` +
+        `body = "${input.chosenFonts.body}". Use exactly these families — do not pick different ` +
+        `ones. Fill in the category, weights, usage, and rationale around them.`,
+    );
+  }
   lines.push(`\nRecommend the type pairing as a JSON object.`);
   return lines.join("\n");
 }

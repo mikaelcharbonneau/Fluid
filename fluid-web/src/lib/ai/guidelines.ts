@@ -27,6 +27,7 @@ export interface GuidelinesBrief {
   paletteSummary?: string | null;
   typeSummary?: string | null;
   logoChoice?: string | null;
+  styleContext?: string | null; // resolved Step 2 choices
 }
 
 const MODEL = "claude-opus-4-8";
@@ -63,6 +64,8 @@ function buildUserPrompt(input: GuidelinesBrief): string {
   add("Color palette", input.paletteSummary);
   add("Typography", input.typeSummary);
   add("Chosen logo", input.logoChoice);
+  const ctx = (input.styleContext ?? "").trim();
+  if (ctx) lines.push(`\nThe user's design choices:\n${ctx}`);
   lines.push(`\nWrite the brand guidelines as a JSON object.`);
   return lines.join("\n");
 }

@@ -22,6 +22,8 @@ export interface PaletteBrief {
   audience?: string | null;
   name?: string | null;
   style?: string | null;
+  styleContext?: string | null; // resolved Step 2 choices
+  basisColors?: string[] | null; // exact colors the user picked in Step 2
 }
 
 const MODEL = "claude-opus-4-8";
@@ -57,10 +59,17 @@ function buildUserPrompt(input: PaletteBrief): string {
   const lines = [`Brand brief: ${input.brief.trim()}`];
   const name = (input.name ?? "").trim();
   const audience = (input.audience ?? "").trim();
-  const style = (input.style ?? "").trim();
+  const ctx = (input.styleContext ?? "").trim();
   if (name) lines.push(`Brand name: ${name}`);
   if (audience) lines.push(`Target audience: ${audience}`);
-  if (style) lines.push(`Chosen visual direction: ${style}`);
+  if (ctx) lines.push(`\nThe user's design choices so far:\n${ctx}`);
+  if (input.basisColors && input.basisColors.length) {
+    lines.push(
+      `\nThe user picked these base colors: ${input.basisColors.join(", ")}. ` +
+        `Build the system around them — use them (lightly refined if needed) as the ` +
+        `primary, accent, and neutrals, then assign roles, names, and usage.`,
+    );
+  }
   lines.push(`\nDesign the palette as a JSON object.`);
   return lines.join("\n");
 }
