@@ -144,20 +144,27 @@ body.custom-cursor .btn { cursor: none; }
 /* =========================================================
    Reveal primitives (driven by IntersectionObserver)
    ========================================================= */
-[data-reveal] {
+/* Content is visible by DEFAULT. The pre-reveal (hidden) state only applies
+   once an inline head script confirms JS is running by adding `.js-reveal` to
+   <html>. That inline script also self-reveals after ~1.6s, so if marketing.js
+   or a Next chunk fails to load (observed on Safari) the content still appears
+   — it never depends on the client runtime to become visible. */
+[data-reveal] { opacity: 1; transform: none; }
+.js-reveal [data-reveal] {
   opacity: 0; transform: translateY(26px);
   transition: opacity .8s var(--ease-out), transform .8s var(--ease-out);
   transition-delay: var(--d, 0ms);
 }
-[data-reveal].in { opacity: 1; transform: none; }
+.js-reveal [data-reveal].in { opacity: 1; transform: none; }
 
 /* split line / word reveal */
 .line-mask { display: block; overflow: hidden; padding-bottom: 0.06em; }
 .line-mask > span {
-  display: block; transform: translateY(110%);
+  display: block; transform: none;
   transition: transform 1s var(--ease-out); transition-delay: var(--d, 0ms);
 }
-.in .line-mask > span, [data-reveal].in .line-mask > span { transform: none; }
+.js-reveal .line-mask > span { transform: translateY(110%); }
+.js-reveal .in .line-mask > span, .js-reveal [data-reveal].in .line-mask > span { transform: none; }
 
 /* =========================================================
    HERO
