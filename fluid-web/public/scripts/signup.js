@@ -110,8 +110,27 @@
     });
   }
 
-  /* Social sign-in is not wired up yet — keep the buttons, explain the state. */
+  /* Social sign-in: Google is live; Apple is still coming soon. */
   document.querySelectorAll(".oauth-btn").forEach(function (b) {
-    b.addEventListener("click", function () { toast("Social sign-in is coming soon — use email for now."); });
+    b.addEventListener("click", function () {
+      var provider = b.getAttribute("data-provider");
+      if (provider === "google") {
+        b.disabled = true;
+        fetch("/api/auth/oauth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: "google" }),
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (res.ok && res.d && res.d.url) { window.location.assign(res.d.url); return; }
+            toast((res.d && res.d.error) || "Couldn't start Google sign-in. Try again.");
+            b.disabled = false;
+          })
+          .catch(function () { toast("Network error. Try again."); b.disabled = false; });
+        return;
+      }
+      toast("Apple sign-in is coming soon — use Google or email for now.");
+    });
   });
 })();

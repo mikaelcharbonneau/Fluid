@@ -9,7 +9,9 @@ import { SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/reset-password";
+  // Only allow same-site relative paths as the post-auth destination.
+  const rawNext = url.searchParams.get("next") || "/reset-password";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/reset-password";
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=link", request.url));
