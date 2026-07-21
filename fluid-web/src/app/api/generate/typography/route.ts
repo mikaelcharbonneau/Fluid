@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandTypography } from "@/lib/ai/typography";
+import { styleContext, getStep2, fontChoice } from "@/lib/ai/step2";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
       audience: brand.audience as string | null,
       name: (brand.name_choice || brand.name) as string | null,
       style: brand.style_id as string | null,
+      styleContext: styleContext(brand),
+      chosenFonts: fontChoice(getStep2(brand.data)),
     });
   } catch (err) {
     const message =

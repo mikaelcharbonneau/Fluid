@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandLogos } from "@/lib/ai/logo";
+import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -43,7 +44,9 @@ export async function POST(request: Request) {
 
   const data = (brand.data as Record<string, unknown>) ?? {};
   const palette = data.palette as { colors?: { hex?: string }[] } | undefined;
-  const primaryColor = palette?.colors?.[0]?.hex ?? null;
+  // Prefer the generated palette's primary; fall back to the Step 2 pick.
+  const step2Basis = paletteBasis(getStep2(data));
+  const primaryColor = palette?.colors?.[0]?.hex ?? step2Basis?.[1] ?? step2Basis?.[0] ?? null;
 
   let logos;
   try {
@@ -52,6 +55,7 @@ export async function POST(request: Request) {
       name: (brand.name_choice || brand.name) as string | null,
       style: brand.style_id as string | null,
       primaryColor,
+      styleContext: styleContext(brand),
     });
   } catch (err) {
     const message =

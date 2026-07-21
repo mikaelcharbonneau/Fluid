@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandPalette } from "@/lib/ai/palette";
+import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
       audience: brand.audience as string | null,
       name: (brand.name_choice || brand.name) as string | null,
       style: brand.style_id as string | null,
+      styleContext: styleContext(brand),
+      basisColors: paletteBasis(getStep2(brand.data)),
     });
   } catch (err) {
     const message =

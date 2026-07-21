@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandGuidelines } from "@/lib/ai/guidelines";
+import { styleContext } from "@/lib/ai/step2";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
       paletteSummary: paletteSummary ?? null,
       typeSummary,
       logoChoice: brand.logo_choice as string | null,
+      styleContext: styleContext(brand),
     });
   } catch (err) {
     const message =
