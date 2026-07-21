@@ -771,6 +771,48 @@ body.custom-cursor .btn { cursor: none; }
 .footer .fl-wordmark { filter: brightness(0) invert(1); height: 18px; }
 
 /* =========================================================
+   Pricing
+   ========================================================= */
+.pricing-grid {
+  width: min(880px, 92vw); margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  align-items: stretch;
+}
+.price-card {
+  position: relative; background: var(--bg-elev);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 34px 30px; display: flex; flex-direction: column; gap: 24px;
+}
+.price-card.is-featured {
+  border-color: transparent;
+  box-shadow: 0 0 0 1.5px #0E0F12, 0 26px 60px rgba(0,0,0,0.10);
+}
+.pc-badge {
+  position: absolute; top: -12px; left: 30px;
+  background: var(--fluid-gradient); color: #0E0F12;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 5px 12px; border-radius: var(--r-pill);
+}
+.pc-head { display: flex; flex-direction: column; gap: 10px; }
+.pc-name { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-3); }
+.pc-price { display: flex; align-items: baseline; gap: 8px; }
+.pc-amt { font-family: var(--font-display); font-weight: 800; font-size: 46px; letter-spacing: -0.03em; color: var(--fg-1); line-height: 1; }
+.pc-per { font-size: 14px; color: var(--fg-3); }
+.pc-tag { font-size: 14px; color: var(--fg-2); line-height: 1.5; margin: 0; }
+.pc-feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.pc-feats li { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; color: var(--fg-1); line-height: 1.45; }
+.pc-feats .ck {
+  flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--fluid-gradient); color: #0E0F12;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; margin-top: 1px;
+}
+.btn.btn-block { width: 100%; justify-content: center; }
+@media (max-width: 720px) {
+  .pricing-grid { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
    Reduced motion
    ========================================================= */
 @media (prefers-reduced-motion: reduce) {
