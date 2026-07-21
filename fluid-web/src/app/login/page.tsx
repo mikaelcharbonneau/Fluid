@@ -1,6 +1,6 @@
-import Script from "next/script";
 import type { Metadata } from "next";
 import { fragment } from "@/lib/fragment";
+import { bootstrapScript } from "@/lib/client-script";
 import "../styles/marketing.css";
 import "../styles/auth.css";
 
@@ -13,7 +13,7 @@ export default function LoginPage() {
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: fragment("login") }} />
-      <Script src="/scripts/login.js" strategy="afterInteractive" />
+      <script dangerouslySetInnerHTML={{ __html: bootstrapScript("/scripts/login.js") }} />
     </>
   );
 }
