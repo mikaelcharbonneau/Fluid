@@ -2955,6 +2955,195 @@ const KitGuidelinesSection = ({ draft }) => {
   );
 };
 
+// ══════════════════════════════════════════════════════════════════════
+// Brand-kit export — all client-side, no dependencies. Downloads the logo
+// (SVG/PNG), the palette as CSS variables, and a self-contained brand-sheet
+// HTML file that gathers everything (printable to PDF).
+// ══════════════════════════════════════════════════════════════════════
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function kitSlug(s) {
+  return String(s || 'brand').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'brand';
+}
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+}
+// The user's chosen logo concept's SVG (or the first available).
+function pickLogoSvg(b) {
+  const logos = (b.data && b.data.logos) || [];
+  if (!logos.length) return null;
+  const pick = logos.find((l) => l.name === b.logo_choice) || logos[0];
+  return pick ? pick.svg : null;
+}
+// Rasterize an SVG string to a PNG Blob at `size`px via an offscreen canvas.
+function svgToPngBlob(svg, size) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG export failed'))), 'image/png');
+    };
+    img.onerror = () => reject(new Error('Could not load the logo for PNG export'));
+    img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  });
+}
+function buildPaletteCss(b) {
+  const colors = ((b.data && b.data.palette && b.data.palette.colors) || []);
+  let css = '/* ' + (b.name_choice || b.name || 'Brand') + ' — color palette */\n:root {\n';
+  colors.forEach((c, i) => {
+    const key = kitSlug(c.name) || ('color-' + (i + 1));
+    css += '  --brand-' + key + ': ' + c.hex + ';' + (c.role ? '  /* ' + c.role + ' */' : '') + '\n';
+  });
+  css += '}\n';
+  return css;
+}
+function googleFontsHref(families) {
+  const uniq = Array.from(new Set(families.filter(Boolean)));
+  if (!uniq.length) return '';
+  return 'https://fonts.googleapis.com/css2?' +
+    uniq.map((f) => 'family=' + encodeURIComponent(f).replace(/%20/g, '+')).join('&') + '&display=swap';
+}
+// Compose a single self-contained HTML brand sheet from everything generated.
+function buildBrandSheetHtml(b) {
+  const data = b.data || {};
+  const name = b.name_choice || b.name || 'Your brand';
+  const pal = data.palette || {};
+  const colors = pal.colors || [];
+  const type = data.typography || null;
+  const g = data.guidelines || null;
+  const logoSvg = pickLogoSvg(b);
+  const headFam = type && type.heading && type.heading.family;
+  const bodyFam = type && type.body && type.body.family;
+  const fontsHref = googleFontsHref([headFam, bodyFam]);
+  const ff = (fam, fallback) => fam ? ('"' + fam + '", ' + fallback) : fallback;
+
+  const sec = (title, inner) => inner
+    ? '<section><h2>' + escHtml(title) + '</h2>' + inner + '</section>' : '';
+
+  const briefRows = [
+    ['Brief', b.brief], ['Audience', b.audience], ['Logo direction', b.logo_choice],
+  ].filter((r) => r[1]).map((r) => '<div class="row"><span>' + escHtml(r[0]) + '</span><p>' + escHtml(r[1]) + '</p></div>').join('');
+
+  const paletteHtml = colors.length ? '<div class="swatches">' + colors.map((c) =>
+    '<div class="sw"><div class="chip" style="background:' + escHtml(c.hex) + '"></div>' +
+    '<b>' + escHtml(c.name) + '</b><code>' + escHtml((c.hex || '').toUpperCase()) + '</code>' +
+    '<em>' + escHtml(c.role) + '</em>' + (c.usage ? '<span>' + escHtml(c.usage) + '</span>' : '') + '</div>').join('') +
+    '</div>' + (pal.rationale ? '<p class="note">' + escHtml(pal.rationale) + '</p>' : '') : '';
+
+  const typeHtml = type ? (
+    '<div class="type"><div class="eyebrow">Display · ' + escHtml(headFam) + (type.heading.weights ? ' · ' + escHtml(type.heading.weights) : '') + '</div>' +
+    '<div class="display" style="font-family:' + ff(headFam, 'serif') + '">' + escHtml(name) + '</div>' +
+    '<div class="eyebrow">Body · ' + escHtml(bodyFam) + (type.body.weights ? ' · ' + escHtml(type.body.weights) : '') + '</div>' +
+    '<p class="body" style="font-family:' + ff(bodyFam, 'sans-serif') + '">The quick brown fox jumps over the lazy dog. 0123456789</p>' +
+    (type.rationale ? '<p class="note">' + escHtml(type.rationale) + '</p>' : '') + '</div>'
+  ) : '';
+
+  const guidelinesHtml = g ? (
+    (g.positioning ? '<h3>Positioning</h3><p>' + escHtml(g.positioning) + '</p>' : '') +
+    (g.messaging && g.messaging.tagline ? '<h3>Tagline</h3><p class="tag">' + escHtml(g.messaging.tagline) + '</p>' : '') +
+    (g.voice && (g.voice.traits || []).length ? '<h3>Voice &amp; tone</h3><p>' + (g.voice.traits || []).map(escHtml).join(' · ') + '</p>' + (g.voice.description ? '<p>' + escHtml(g.voice.description) + '</p>' : '') : '') +
+    (g.messaging && (g.messaging.pillars || []).length ? '<h3>Key messages</h3><ul>' + g.messaging.pillars.map((p) => '<li><b>' + escHtml(p.title) + '</b> — ' + escHtml(p.body) + '</li>').join('') + '</ul>' : '') +
+    ((g.dos || []).length ? '<h3>Do</h3><ul>' + g.dos.map((d) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
+    ((g.donts || []).length ? '<h3>Don’t</h3><ul>' + g.donts.map((d) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
+    (g.usage ? '<h3>Asset usage</h3>' + ['logo', 'color', 'type'].filter((k) => g.usage[k]).map((k) => '<p><b>' + k[0].toUpperCase() + k.slice(1) + '</b> — ' + escHtml(g.usage[k]) + '</p>').join('') : '')
+  ) : '';
+
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<title>' + escHtml(name) + ' — Brand kit</title>' +
+    (fontsHref ? '<link rel="stylesheet" href="' + escHtml(fontsHref) + '">' : '') +
+    '<style>' +
+    ':root{color-scheme:light}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#141414;background:#fff;line-height:1.5}' +
+    '.wrap{max-width:820px;margin:0 auto;padding:64px 32px}' +
+    'header{border-bottom:1px solid #eee;padding-bottom:28px;margin-bottom:40px}' +
+    'h1{font-size:44px;letter-spacing:-.03em;margin:0}.sub{color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px}' +
+    'section{margin:40px 0}h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#999;margin:0 0 16px}' +
+    'h3{font-size:14px;margin:22px 0 6px}p{margin:0 0 10px}.note{color:#777;font-size:13px}' +
+    '.row{display:flex;gap:16px;margin:8px 0}.row span{flex:0 0 130px;color:#999;font-size:13px}.row p{margin:0}' +
+    '.logo{border:1px solid #eee;border-radius:16px;padding:40px;display:flex;justify-content:center;background:#fff}' +
+    '.swatches{display:flex;flex-wrap:wrap;gap:16px}.sw{width:130px}.sw .chip{height:72px;border-radius:10px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}' +
+    '.sw b{display:block;font-size:13px;margin-top:8px}.sw code{display:block;font-size:11px;color:#888}.sw em{display:block;font-size:11px;color:#aaa;font-style:normal}.sw span{display:block;font-size:11px;color:#aaa}' +
+    '.display{font-size:52px;letter-spacing:-.02em;margin:6px 0 20px}.body{font-size:16px}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#aaa;margin-top:14px}' +
+    '.tag{font-size:22px;font-weight:700}ul{margin:6px 0;padding-left:20px}li{margin:4px 0}' +
+    '@media print{.wrap{padding:24px}}' +
+    '</style></head><body><div class="wrap">' +
+    '<header><div class="sub">Brand kit</div><h1>' + escHtml(name) + '</h1></header>' +
+    (briefRows ? '<section><h2>Overview</h2>' + briefRows + '</section>' : '') +
+    (logoSvg ? sec('Logo', '<div class="logo">' + logoSvg + '</div>') : '') +
+    sec('Color', paletteHtml) +
+    sec('Typography', typeHtml) +
+    sec('Guidelines', guidelinesHtml) +
+    '<section class="note">Generated with Fluid.</section>' +
+    '</div></body></html>';
+}
+
+const KitExport = ({ b }) => {
+  const [open, setOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const data = b.data || {};
+  const hasLogo = !!pickLogoSvg(b);
+  const hasPalette = !!(data.palette && (data.palette.colors || []).length);
+  const slug = kitSlug(b.name_choice || b.name || 'brand');
+
+  const dlSheet = () => { downloadBlob(slug + '-brand-kit.html', new Blob([buildBrandSheetHtml(b)], { type: 'text/html' })); setOpen(false); };
+  const dlSvg = () => { const s = pickLogoSvg(b); if (s) downloadBlob(slug + '-logo.svg', new Blob([s], { type: 'image/svg+xml' })); setOpen(false); };
+  const dlPng = async () => {
+    const s = pickLogoSvg(b); if (!s) return;
+    setBusy(true);
+    try { downloadBlob(slug + '-logo.png', await svgToPngBlob(s, 512)); } catch { /* ignore */ }
+    setBusy(false); setOpen(false);
+  };
+  const dlCss = () => { downloadBlob(slug + '-palette.css', new Blob([buildPaletteCss(b)], { type: 'text/css' })); setOpen(false); };
+
+  const item = (label, onClick, enabled) => (
+    <button onClick={enabled ? onClick : undefined} disabled={!enabled} style={{
+      display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
+      background: 'transparent', border: 0, cursor: enabled ? 'pointer' : 'default',
+      fontSize: 13, fontWeight: 500, color: enabled ? 'var(--fg-1)' : 'var(--fg-4)', fontFamily: 'inherit',
+    }}>{label}</button>
+  );
+
+  return (
+    <div style={{ position: 'relative', flex: '0 0 auto' }}>
+      <button onClick={() => setOpen((o) => !o)} style={{
+        padding: '11px 16px', borderRadius: 12, background: '#000', color: '#fff',
+        fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 0,
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+      }}>
+        {busy ? 'Exporting…' : 'Export'}
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41, minWidth: 210,
+            background: 'var(--bg-elev)', borderRadius: 12, padding: 6,
+            boxShadow: '0 12px 30px rgba(0,0,0,.16), inset 0 0 0 1px var(--line)',
+          }}>
+            {item('Brand sheet (.html)', dlSheet, true)}
+            {item('Logo (SVG)', dlSvg, hasLogo)}
+            {item('Logo (PNG)', dlPng, hasLogo)}
+            {item('Palette (.css)', dlCss, hasPalette)}
+            <div style={{ padding: '6px 14px 2px', fontSize: 10.5, color: 'var(--fg-4)', lineHeight: 1.4 }}>
+              The brand sheet gathers everything — open it and print to PDF.
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const DirA_KitSummary = () => {
   const { draft } = useBrandDraft();
   const { navigate } = useRouter();
@@ -2976,7 +3165,10 @@ const DirA_KitSummary = () => {
               <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Brand kit · {b.status === 'live' ? 'Live' : 'Draft'}</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 48, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>{b.name || 'Your brand'}</h1>
             </div>
-            <button onClick={() => navigate('step4')} style={{ padding: '11px 16px', borderRadius: 12, background: 'var(--bg-elev)', color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line)', flex: '0 0 auto' }}>Iterate</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
+              <button onClick={() => navigate('step4')} style={{ padding: '11px 16px', borderRadius: 12, background: 'var(--bg-elev)', color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line)' }}>Iterate</button>
+              <KitExport b={b} />
+            </div>
           </div>
 
           <div style={{ background: 'var(--bg-elev)', borderRadius: 18, boxShadow: 'inset 0 0 0 1px var(--line)', padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
