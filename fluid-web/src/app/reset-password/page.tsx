@@ -1,7 +1,7 @@
-import Script from "next/script";
 import type { Metadata } from "next";
 import { fragment } from "@/lib/fragment";
 import { createClient } from "@/lib/supabase/server";
+import { bootstrapScript } from "@/lib/client-script";
 import "../styles/marketing.css";
 import "../styles/auth.css";
 
@@ -22,7 +22,7 @@ export default async function ResetPasswordPage() {
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: fragment(frag) }} />
-      <Script src="/scripts/reset-password.js" strategy="afterInteractive" />
+      <script dangerouslySetInnerHTML={{ __html: bootstrapScript("/scripts/reset-password.js") }} />
     </>
   );
 }
