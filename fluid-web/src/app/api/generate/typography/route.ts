@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandTypography } from "@/lib/ai/typography";
 import { styleContext, getStep2, fontChoice } from "@/lib/ai/step2";
+import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,6 +43,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!(await hasTokens(user.id, TOKEN_COST.asset))) {
+    return NextResponse.json(
+      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+      { status: 402 },
+    );
+  }
+
   let typography;
   try {
     typography = await generateBrandTypography({
@@ -57,6 +65,7 @@ export async function POST(request: Request) {
       err instanceof Error ? err.message : "Typography generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  await spendTokens(user.id, TOKEN_COST.asset);
 
   const nextData = { ...(brand.data as Record<string, unknown>), typography };
   const { error: saveError } = await supabase

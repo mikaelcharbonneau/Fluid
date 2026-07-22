@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandLogos } from "@/lib/ai/logo";
 import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
+import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -48,6 +49,13 @@ export async function POST(request: Request) {
   const step2Basis = paletteBasis(getStep2(data));
   const primaryColor = palette?.colors?.[0]?.hex ?? step2Basis?.[1] ?? step2Basis?.[0] ?? null;
 
+  if (!(await hasTokens(user.id, TOKEN_COST.asset))) {
+    return NextResponse.json(
+      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+      { status: 402 },
+    );
+  }
+
   let logos;
   try {
     logos = await generateBrandLogos({
@@ -62,6 +70,7 @@ export async function POST(request: Request) {
       err instanceof Error ? err.message : "Logo generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  await spendTokens(user.id, TOKEN_COST.asset);
 
   const nextData = { ...data, logos };
   const { error: saveError } = await supabase

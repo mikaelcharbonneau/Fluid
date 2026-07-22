@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe, STRIPE_PRICE_PRO } from "@/lib/stripe";
+import { getStripe, TIERS, type Tier } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
-// POST /api/billing/checkout — start a Stripe Checkout for the Pro plan.
+// POST /api/billing/checkout — start a Stripe subscription checkout for a tier.
+// Body: { tier: "starter" | "pro" }.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -14,8 +15,12 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
-  if (!STRIPE_PRICE_PRO) {
-    return NextResponse.json({ error: "Billing isn't set up yet." }, { status: 503 });
+
+  const body = (await request.json().catch(() => ({}))) as { tier?: unknown };
+  const tier = body.tier as Exclude<Tier, "free">;
+  const priceId = tier === "starter" || tier === "pro" ? TIERS[tier].price : "";
+  if (!priceId) {
+    return NextResponse.json({ error: "That plan isn't available yet." }, { status: 503 });
   }
 
   let stripe, admin;
@@ -49,7 +54,7 @@ export async function POST(request: Request) {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: STRIPE_PRICE_PRO, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     allow_promotion_codes: true,
     success_url: `${origin}/app?billing=success#account`,
     cancel_url: `${origin}/app#account`,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandNames } from "@/lib/ai/names";
+import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 
 // Claude runs server-side and extended thinking can take a while, so give the
 // function room beyond the short default and pin it to the Node runtime.
@@ -46,6 +47,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!(await hasTokens(user.id, TOKEN_COST.asset))) {
+    return NextResponse.json(
+      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+      { status: 402 },
+    );
+  }
+
   let names;
   try {
     names = await generateBrandNames({
@@ -58,6 +66,7 @@ export async function POST(request: Request) {
       err instanceof Error ? err.message : "Name generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  await spendTokens(user.id, TOKEN_COST.asset);
 
   // Cache onto the brand so resuming the wizard shows the same set.
   const nextData = { ...(brand.data as Record<string, unknown>), names };
