@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fluid — web app
 
-## Getting Started
+Next.js application for Fluid, an AI brand agent that takes a one-sentence
+brief and drafts a full brand identity: name, logo, color palette,
+typography, and written guidelines. See the [repo root README](../README.md)
+for the product overview.
 
-First, run the development server:
+> **Note for coding agents:** read [`AGENTS.md`](AGENTS.md) before making
+> changes — this project runs a Next.js version with breaking changes from
+> what's in most models' training data.
+
+## Stack
+
+- Next.js (App Router), React, TypeScript
+- Supabase — auth + Postgres (brands, subscriptions/token balance)
+- Anthropic API (`@anthropic-ai/sdk`) — all AI generation
+- Stripe — billing and token refills
+
+## Getting started
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Pull environment variables from Vercel (this project's Supabase, Anthropic,
+and Stripe secrets already live there):
+
+```bash
+npx vercel link
+npx vercel env pull .env.local
+```
+
+Alternatively, copy `.env.example` to `.env.local` and fill in each value by
+hand — see that file for where each key comes from (Supabase dashboard,
+Anthropic console, Stripe dashboard).
+
+Run the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/app/
+  page.tsx              marketing site (HTML fragment injected from _fragments/)
+  login/ signup/ ...     auth pages
+  app/Prototype.jsx      the wizard + dashboard UI — single-file, all screens
+                          in one module scope (ported from the original
+                          Claude Design export; see AGENTS.md)
+  api/
+    generate/            one route per AI generation: names, logo, palette,
+                          typography, guidelines, inline assist
+    brands/               CRUD for brand drafts (autosaved as the wizard is filled in)
+    billing/ stripe/       Stripe checkout, portal, and webhook
+    auth/                 Supabase auth endpoints
 
-## Learn More
+src/lib/
+  ai/                    one module per generation type — prompt + Claude
+                          call + response parsing for each (logo.ts, names.ts,
+                          palette.ts, typography.ts, guidelines.ts, assist.ts)
+  supabase/              server / admin Supabase clients
+  credits.ts             token balance: cost table, spend/grant/check
+  stripe.ts              Stripe client + plan config
+```
 
-To learn more about Next.js, take a look at the following resources:
+Each `api/generate/*` route follows the same shape: load the brand record,
+check token balance, call the matching `lib/ai/*` generator with whatever
+prior-step context it needs (brief, chosen name, style, palette), spend
+tokens on success, cache the result on the brand's `data` column, return it.
+The wizard auto-triggers generation when a step is opened with no cached
+result yet, and every generated asset is regenerable on demand.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev      # start the dev server
+npm run build    # production build (also runs the TypeScript check)
+npm run lint     # eslint
+```
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Hosted on Vercel. Every push gets a preview deployment; merging to `main`
+deploys to production. CI (`.github/workflows/ci.yml`) runs lint and build on
+every push and PR.
