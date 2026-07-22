@@ -4415,6 +4415,13 @@ const SecNotifications = () => (
 // ---------------------------------------------------------------------
 // Section: Billing (Stripe)
 // ---------------------------------------------------------------------
+// Subscription tiers — kept in sync with src/lib/stripe.ts (TIERS).
+const BILLING_TIERS = [
+  { id: 'starter', name: 'Starter', tokens: 150, price: '$12', period: '/mo', blurb: 'For getting a brand off the ground.' },
+  { id: 'pro', name: 'Pro', tokens: 500, price: '$36', period: '/mo', blurb: 'For agencies and frequent builders.', featured: true },
+];
+const TIER_LABEL = { free: 'Free', starter: 'Starter', pro: 'Pro' };
+
 const SecBilling = () => {
   const [status, setStatus] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -4433,10 +4440,15 @@ const SecBilling = () => {
   }, []);
   React.useEffect(() => { load(); }, [load]);
 
-  const go = async (path, which) => {
+  // POST a JSON body (checkout needs a tier); portal needs none.
+  const go = async (path, which, body) => {
     setBusy(which); setError('');
     try {
-      const r = await fetch(path, { method: 'POST' });
+      const r = await fetch(path, {
+        method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.url) { window.location.assign(j.url); return; }
       setError(j.error || "Couldn't continue. Please try again.");
@@ -4444,50 +4456,76 @@ const SecBilling = () => {
     setBusy('');
   };
 
-  const isPro = status && status.plan === 'pro';
+  const tier = (status && status.tier) || 'free';
+  const isSubscriber = tier === 'starter' || tier === 'pro';
+  const balance = (status && typeof status.balance === 'number') ? status.balance : 0;
+  const monthly = (status && status.monthlyTokens) || 0;
+
   const primaryBtn = { padding: '10px 16px', borderRadius: 10, background: '#000', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 0 };
   const ghostBtn = { padding: '10px 16px', borderRadius: 10, background: 'transparent', color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)', border: 0 };
-  const proPerks = ['Unlimited brands', 'Full AI generation — names, palette, type, logo & guidelines', 'Export every asset & the brand sheet', 'Priority generation'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <SectionHead eyebrow="Settings · Billing" title="Billing." desc="Your plan and payment. Upgrade to Pro to unlock everything Fluid can generate." />
+      <SectionHead eyebrow="Settings · Billing" title="Billing." desc="Tokens power everything Fluid generates. Subscribe for a monthly refill." />
 
-      {justUpgraded && !isPro && (
+      {justUpgraded && (
         <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(68,217,199,.12)', boxShadow: 'inset 0 0 0 1px rgba(68,217,199,.35)', fontSize: 13, color: '#0E6B5E' }}>
-          Thanks! Your payment is processing — your plan will update in a moment. <button onClick={load} style={{ background: 'transparent', border: 0, color: '#0E6B5E', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Refresh</button>
+          Thanks! Your payment is processing — your tokens and plan will update in a moment. <button onClick={load} style={{ background: 'transparent', border: 0, color: '#0E6B5E', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Refresh</button>
         </div>
       )}
 
-      <Card title="Current plan">
+      <Card title="Token balance">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, color: '#000' }}>{isPro ? 'Pro' : 'Free'}</span>
-              <Chip tone={isPro ? 'live' : 'neutral'}>{isPro ? 'Active' : 'Current'}</Chip>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 34, color: '#000', lineHeight: 1 }}>{loading ? '—' : balance}</span>
+              <span style={{ fontSize: 13, color: 'var(--fg-3)' }}>tokens left</span>
+              <Chip tone={isSubscriber ? 'live' : 'neutral'}>{TIER_LABEL[tier] || 'Free'}</Chip>
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 4 }}>
-              {loading ? 'Loading…' : isPro ? 'You have full access to everything Fluid generates.' : 'You’re on the free plan.'}
+            <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 6 }}>
+              {loading ? 'Loading…'
+                : isSubscriber ? `Refills to ${monthly} tokens each billing month.`
+                : 'Asset generation costs 3 tokens; smaller AI helpers cost 1. Subscribe for a monthly refill.'}
             </div>
           </div>
-          {isPro ? (
+          {isSubscriber && (
             <button onClick={() => go('/api/billing/portal', 'portal')} disabled={!!busy} style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }}>{busy === 'portal' ? 'Opening…' : 'Manage subscription'}</button>
-          ) : (
-            <button onClick={() => go('/api/billing/checkout', 'checkout')} disabled={!!busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy === 'checkout' ? 'Starting…' : 'Upgrade to Pro'}</button>
           )}
         </div>
         {error && <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--destructive)' }}>{error}</div>}
       </Card>
 
-      <Card title="Fluid Pro">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {proPerks.map((p) => (
-            <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--fg-1)' }}>
-              <span style={{ color: '#0E6B5E', fontWeight: 700, flex: '0 0 auto' }}>✓</span> {p}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {BILLING_TIERS.map((t) => {
+          const current = tier === t.id;
+          return (
+            <div key={t.id} style={{ padding: 22, borderRadius: 16, background: 'var(--surface-1)', boxShadow: t.featured ? 'inset 0 0 0 1.5px #000' : 'inset 0 0 0 1px var(--line)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: '#000' }}>{t.name}</span>
+                {t.featured && <Chip tone="live">Popular</Chip>}
+                {current && <Chip tone="neutral">Current</Chip>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 28, color: '#000' }}>{t.price}</span>
+                <span style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t.period}</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--fg-1)', fontWeight: 600 }}>{t.tokens} tokens / month</div>
+              <div style={{ fontSize: 12.5, color: 'var(--fg-3)', flex: 1 }}>{t.blurb}</div>
+              <button
+                onClick={() => go('/api/billing/checkout', 'checkout-' + t.id, { tier: t.id })}
+                disabled={!!busy || current}
+                style={{ ...(t.featured ? primaryBtn : ghostBtn), opacity: (busy || current) ? 0.6 : 1, cursor: current ? 'default' : 'pointer' }}
+              >
+                {current ? 'Current plan' : busy === 'checkout-' + t.id ? 'Starting…' : isSubscriber ? 'Switch to ' + t.name : 'Subscribe'}
+              </button>
             </div>
-          ))}
-        </div>
-      </Card>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>
+        Every account starts with 20 free tokens. Unused tokens don’t roll over — each billing month resets to your plan’s allowance.
+      </div>
     </div>
   );
 };

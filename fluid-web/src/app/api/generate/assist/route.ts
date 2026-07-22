@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runAssist, type AssistTask, type AssistOption } from "@/lib/ai/assist";
+import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -57,6 +58,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!(await hasTokens(user.id, TOKEN_COST.small))) {
+    return NextResponse.json(
+      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+      { status: 402 },
+    );
+  }
+
   try {
     const result = await runAssist({
       task,
@@ -65,6 +73,7 @@ export async function POST(request: Request) {
       competitors: brand.competitors as string | null,
       options,
     });
+    await spendTokens(user.id, TOKEN_COST.small);
     return NextResponse.json({ result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Assist failed.";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandGuidelines } from "@/lib/ai/guidelines";
 import { styleContext } from "@/lib/ai/step2";
+import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
       ? `${type?.heading?.family ?? "—"} for headings, ${type?.body?.family ?? "—"} for body`
       : null;
 
+  if (!(await hasTokens(user.id, TOKEN_COST.asset))) {
+    return NextResponse.json(
+      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+      { status: 402 },
+    );
+  }
+
   let guidelines;
   try {
     guidelines = await generateBrandGuidelines({
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
       err instanceof Error ? err.message : "Guidelines generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  await spendTokens(user.id, TOKEN_COST.asset);
 
   const nextData = { ...data, guidelines };
   const { error: saveError } = await supabase
