@@ -781,8 +781,8 @@ body.custom-cursor .btn { cursor: none; }
    Pricing
    ========================================================= */
 .pricing-grid {
-  width: min(880px, 92vw); margin: 0 auto;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  width: min(1080px, 94vw); margin: 0 auto;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
   align-items: stretch;
 }
 .price-card {
@@ -803,7 +803,8 @@ body.custom-cursor .btn { cursor: none; }
 .pc-head { display: flex; flex-direction: column; gap: 10px; }
 .pc-name { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-3); }
 .pc-price { display: flex; align-items: baseline; gap: 8px; }
-.pc-amt { font-family: var(--font-display); font-weight: 800; font-size: 46px; letter-spacing: -0.03em; color: var(--fg-1); line-height: 1; }
+.pc-amt { font-family: var(--font-display); font-weight: 800; font-size: 40px; letter-spacing: -0.03em; color: var(--fg-1); line-height: 1; }
+.pc-tokens { font-size: 13px; font-weight: 600; color: var(--fg-1); }
 .pc-per { font-size: 14px; color: var(--fg-3); }
 .pc-tag { font-size: 14px; color: var(--fg-2); line-height: 1.5; margin: 0; }
 .pc-feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; flex: 1; }
@@ -815,8 +816,8 @@ body.custom-cursor .btn { cursor: none; }
   font-size: 10px; font-weight: 800; margin-top: 1px;
 }
 .btn.btn-block { width: 100%; justify-content: center; }
-@media (max-width: 720px) {
-  .pricing-grid { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .pricing-grid { grid-template-columns: 1fr; width: min(440px, 92vw); }
 }
 
 /* =========================================================
