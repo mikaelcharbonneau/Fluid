@@ -3449,7 +3449,6 @@ const AEmptyState = ({ title, body, ctaLabel, onCta }) => (
     padding: '56px 40px', display: 'flex', flexDirection: 'column',
     alignItems: 'center', textAlign: 'center', gap: 12, background: 'var(--bg-elev)',
   }}>
-    <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--fluid-gradient)', marginBottom: 4 }} />
     <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', margin: 0, color: '#000' }}>{title}</h3>
     <p style={{ fontSize: 14.5, color: 'var(--fg-2)', maxWidth: 420, lineHeight: 1.5, margin: 0 }}>{body}</p>
     {ctaLabel && (
@@ -3526,7 +3525,80 @@ function relTime(iso) {
   return Math.floor(s / 86400) + 'd ago';
 }
 
-// Card for a real, user-saved brand (no mock Hero art — a gradient tile).
+// A brand only "has a name" once one is explicitly chosen on the name step
+// (name_choice). Before that, b.name holds a brief-derived placeholder
+// (deriveBrandName takes the first few words of the brief), which isn't a
+// real brand name — so those read a clean "Untitled" until the user picks one.
+function brandDisplayName(b) {
+  const chosen = ((b && b.name_choice) || '').trim();
+  if (chosen && chosen.toLowerCase() !== 'untitled brand') return chosen;
+  return 'Untitled';
+}
+
+// #rrggbb / #rgb → "rgba(r,g,b,a)". Falls back to a neutral ink tint.
+function hexToRgba(hex, a) {
+  let h = String(hex || '').trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return 'rgba(20,20,20,' + a + ')';
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const bl = parseInt(h.slice(4, 6), 16);
+  return 'rgba(' + r + ',' + g + ',' + bl + ',' + a + ')';
+}
+
+// The card's top visual, driven entirely by what the brand actually has:
+//   • logo  → the chosen mark on a light tile (marks are drawn for light bg)
+//   • palette, no logo → the real brand colors as the backdrop
+//   • palette present → a thin swatch strip so colors always show
+//   • neither → a neutral surface (never the Fluid gradient — that's Fluid's
+//     mark, not the user's brand)
+const BA_CardVisual = ({ brand, height = 132 }) => {
+  const svg = pickLogoSvg(brand);
+  const colors = (((brand.data || {}).palette || {}).colors) || [];
+  const hasColors = colors.length > 0;
+  const initial = brandDisplayName(brand).charAt(0).toUpperCase();
+  // Scale the mark tile and initial with the header height so the same visual
+  // works on both the Brands library (132) and the smaller Home cards (96).
+  const tile = Math.round(height * 0.56);
+  const initialSize = Math.round(height * 0.30);
+  const stripH = height < 110 ? 5 : 6;
+
+  let background;
+  if (svg) {
+    background = hasColors ? hexToRgba(colors[0].hex, 0.14) : 'var(--bg-sunken)';
+  } else if (hasColors) {
+    const stops = colors.slice(0, 3).map((c) => c.hex);
+    background = stops.length >= 2 ? 'linear-gradient(135deg, ' + stops.join(', ') + ')' : stops[0];
+  } else {
+    background = 'var(--bg-sunken)';
+  }
+
+  return (
+    <div style={{ position: 'relative', height, background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {svg ? (
+        <div style={{ width: tile, height: tile, borderRadius: Math.round(tile * 0.22), background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <SvgMark svg={svg} size={Math.round(tile * 0.7)} />
+        </div>
+      ) : (
+        <span style={{
+          fontFamily: 'var(--font-display)', fontSize: initialSize, fontWeight: 700, letterSpacing: '-0.03em',
+          color: hasColors ? '#fff' : 'var(--fg-3)',
+          textShadow: hasColors ? '0 1px 6px rgba(0,0,0,.28)' : 'none',
+        }}>{initial}</span>
+      )}
+      {svg && hasColors && (
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', height: stripH }}>
+          {colors.slice(0, 6).map((c, i) => (
+            <div key={i} style={{ flex: 1, background: c.hex }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Card for a real, user-saved brand. The top visual reflects the brand's own
+// generated identity (logo / palette) rather than a generic tile.
 const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
   <div
     onClick={onOpen}
@@ -3538,7 +3610,7 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
   >
     <button
       onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}
-      aria-label={'Delete ' + (brand.name || 'brand')}
+      aria-label={'Delete ' + brandDisplayName(brand)}
       title="Delete brand"
       style={{
         position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 8,
@@ -3548,15 +3620,11 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>
-    <div style={{ height: 132, background: 'var(--fluid-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: '#fff', letterSpacing: '-0.03em' }}>
-        {(brand.name || 'U').trim().charAt(0).toUpperCase()}
-      </span>
-    </div>
+    <BA_CardVisual brand={brand} />
     <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {brand.name || 'Untitled brand'}
+          {brandDisplayName(brand)}
         </span>
         <BA_StatusPill status={brand.status} />
       </div>
@@ -3577,10 +3645,20 @@ const DirA_BrandsActive = () => {
   const { brands, loadBrand, refresh } = useBrandDraft();
   const { navigate } = useRouter();
   const [filter, setFilter] = useBAState('all');
-  const deleteBrand = async (b) => {
-    if (typeof window !== 'undefined' &&
-        !window.confirm('Delete "' + (b.name || 'this brand') + '"? This can\'t be undone.')) return;
-    if (await apiDeleteBrand(b.id)) refresh();
+  // In-app confirm dialog, not window.confirm(): native dialogs are blocked
+  // or auto-dismissed in several real embedding contexts (sandboxed iframes,
+  // some in-app webviews, automated/preview browsers), which made this
+  // button silently do nothing — confirm() returns false and the delete
+  // never fires.
+  const [pendingDelete, setPendingDelete] = useBAState(null);
+  const [deleting, setDeleting] = useBAState(false);
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const ok = await apiDeleteBrand(pendingDelete.id);
+    setDeleting(false);
+    setPendingDelete(null);
+    if (ok) refresh();
   };
   const filters = [
     { key: 'all', label: 'All', count: brands.length },
@@ -3649,7 +3727,7 @@ const DirA_BrandsActive = () => {
                     const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
                     navigate(step);
                   }}
-                  onDelete={() => deleteBrand(b)}
+                  onDelete={() => setPendingDelete(b)}
                 />
               ))}
             </div>
@@ -3681,9 +3759,76 @@ const DirA_BrandsActive = () => {
           </div>
         </div>
       </div>
+
+      {pendingDelete && (
+        <BA_DeleteConfirmDialog
+          name={brandDisplayName(pendingDelete)}
+          busy={deleting}
+          onCancel={() => !deleting && setPendingDelete(null)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </AShell>
   );
 };
+
+// Destructive-action confirmation, styled like the rest of the app rather
+// than a native window.confirm() — which several real embedding contexts
+// (sandboxed iframes, in-app webviews, automated browsers) suppress and
+// auto-resolve to `false`, silently breaking delete.
+const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }) => (
+  <div
+    onClick={onCancel}
+    style={{
+      position: 'fixed', inset: 0, zIndex: 80,
+      background: 'rgba(14,15,18,.45)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18,
+        boxShadow: '0 24px 60px rgba(0,0,0,.28), inset 0 0 0 1px var(--line)',
+        padding: 24, display: 'flex', flexDirection: 'column', gap: 16,
+      }}
+    >
+      <div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', color: '#000' }}>
+          Delete &ldquo;{name}&rdquo;?
+        </div>
+        <div style={{ fontSize: 13.5, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
+          This permanently removes the brand and everything generated for it — logo, palette, type, guidelines. This can&rsquo;t be undone.
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onCancel}
+          disabled={busy}
+          style={{
+            padding: '10px 16px', borderRadius: 11, background: 'transparent', color: 'var(--fg-1)',
+            fontSize: 13.5, fontWeight: 600, boxShadow: 'inset 0 0 0 1px var(--line-strong)',
+            border: 0, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={busy}
+          style={{
+            padding: '10px 16px', borderRadius: 11, background: '#A8421F', color: '#fff',
+            fontSize: 13.5, fontWeight: 600, border: 0, cursor: busy ? 'default' : 'pointer',
+            opacity: busy ? 0.7 : 1, display: 'inline-flex', alignItems: 'center', gap: 8,
+          }}
+        >
+          {busy ? <Thinking /> : null} {busy ? 'Deleting…' : 'Delete brand'}
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 // ---- Styles (injected once) ------------------------------------------
 if (typeof document !== 'undefined' && !document.getElementById('brands-active-css')) {
@@ -3973,11 +4118,9 @@ const DirA_Home = () => {
             <div key={b.id}
               onClick={() => { loadBrand(b.id); navigate('step' + (b.step || 1)); }}
               style={{ borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
-              <div style={{ height: 96, background: 'var(--fluid-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: '#fff' }}>{(b.name || 'U').trim().charAt(0).toUpperCase()}</span>
-              </div>
+              <BA_CardVisual brand={b} height={96} />
               <div style={{ padding: '13px 15px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || 'Untitled brand'}</span>
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brandDisplayName(b)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>Step {b.step || 1} of 5</span>
               </div>
             </div>
