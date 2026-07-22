@@ -2368,219 +2368,157 @@ const DirA_Step3_Name = () => {
 };
 
 // =====================================================================
-// A5 · Step 4 · Logo Concept Selection Screen
-// Four logo concepts as large cards. Each card shows the primary
-// mark in a generous canvas, three variations underneath (different
-// scales/contexts), the concept name, and a designer-style note.
-// Selected card gets the accent ring; the right panel shows refine
-// controls for the chosen concept.
+// A5 · Step 4 · Logo Generation Screen
+// The mark is generated here, live, from everything the user has given us
+// in Steps 1–3: the brief, the chosen name, the Step 2 style, and (if it
+// exists yet) the palette's primary color. The server route reads all of
+// that from the brand record — this screen just triggers it, renders the
+// returned SVG marks, and lets the user pick one and regenerate. The pick
+// and the marks are cached onto the draft so Step 5 reuses them instead of
+// paying to regenerate.
 // =====================================================================
-const ALogoMark = ({ shape, size = 88 }) => {
-  if (shape === 'ribbon') {
-    return (
-      <div style={{position:'relative', width:size, height:size*0.6}}>
-        <svg viewBox="0 0 120 70" width={size} height={size*0.58} xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#44D9C7"/>
-              <stop offset="0.55" stopColor="#FDBA50"/>
-              <stop offset="1" stopColor="#FD7947"/>
-            </linearGradient>
-          </defs>
-          <path d="M5 38 C 25 8, 55 8, 75 32 C 90 50, 110 50, 115 30" stroke="url(#rg)" strokeWidth="14" fill="none" strokeLinecap="round"/>
-        </svg>
-      </div>
-    );
-  }
-  if (shape === 'monogram') {
-    return (
-      <div style={{
-        width:size, height:size, borderRadius: size*0.18,
-        background:'#000', color:'#fff',
-        display:'inline-flex',alignItems:'center',justifyContent:'center',
-        fontFamily:'var(--font-display)', fontWeight:900,
-        fontSize: size*0.52, letterSpacing:'-0.06em',
-      }}>C<span style={{color:'#FD7947'}}>.</span></div>
-    );
-  }
-  if (shape === 'wordmark') {
-    return (
-      <div style={{
-        fontFamily:'var(--font-display)', fontWeight:800,
-        fontSize: size*0.42, letterSpacing:'-0.04em', color:'#000',
-        lineHeight: 1, padding:'0 4px',
-      }}>cadence<span style={{color:'#FD7947'}}>.</span></div>
-    );
-  }
-  if (shape === 'circle') {
-    return (
-      <div style={{position:'relative', width:size, height:size}}>
-        <div style={{position:'absolute',inset:0,borderRadius:'50%',border: `${Math.max(2,size*0.04)}px solid #000`}}/>
-        <div style={{position:'absolute', top:'50%', left:'50%', width: size*0.22, height: size*0.22, borderRadius:'50%', background:'#FD7947', transform:'translate(-50%,-50%)'}}/>
-        <div style={{position:'absolute', top: size*0.10, left:'50%', width: 1.5, height: size*0.40, background:'#000', transform:'translateX(-50%)'}}/>
-      </div>
-    );
-  }
-  return null;
-};
 
-const ALogoConceptCard = ({ n, name, descriptor, shape, sel, status, onClick }) => {
-  return (
-    <div onClick={onClick} style={{
-      background:'var(--bg-elev)', borderRadius: 18, padding: 16,
-      boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:12, cursor:'pointer',
-      position:'relative',
-    }}>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-        <span style={{fontSize:10.5, color:'var(--fg-3)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em'}}>0{n} · CONCEPT</span>
-        {status === 'streaming' && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:600,color:'#0E6B5E'}}>
-          <span style={{width:5,height:5,borderRadius:99,background:'#44D9C7',boxShadow:'0 0 4px #44D9C7'}}/> drafting
-        </span>}
-        {sel && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:700,color:'#fff',background:'#000',padding:'3px 8px',borderRadius:99,letterSpacing:'0.04em'}}>SELECTED</span>}
-      </div>
-      {/* Hero mark */}
-      <div style={{
-        background: 'var(--bg)', borderRadius: 12,
-        height: 132,
-        display:'flex', alignItems:'center', justifyContent:'center',
-        boxShadow:'inset 0 0 0 1px var(--line)',
-      }}>
-        {status === 'streaming' ? <Thinking/> : <ALogoMark shape={shape}/>}
-      </div>
-      {/* 3 variations */}
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, opacity: status === 'streaming' ? 0.4 : 1}}>
-        <div style={{height:48, background:'#0F1115', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center'}}>
-          {shape === 'ribbon' && <ALogoMark shape="ribbon" size={36}/>}
-          {shape === 'monogram' && <div style={{width:24,height:24,borderRadius:5,background:'#FD7947',color:'#000',display:'inline-flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--font-display)',fontWeight:900,fontSize:14}}>C</div>}
-          {shape === 'wordmark' && <div style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:14, color:'#fff', letterSpacing:'-0.04em'}}>cadence<span style={{color:'#FD7947'}}>.</span></div>}
-          {shape === 'circle' && <div style={{width:24,height:24,borderRadius:99,border:'1.5px solid #fff',position:'relative'}}><div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:6,height:6,borderRadius:99,background:'#FD7947'}}/></div>}
-        </div>
-        <div style={{height:48, background:'var(--bg)', borderRadius:8, boxShadow:'inset 0 0 0 1px var(--line)', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
-          {shape === 'ribbon' && <ALogoMark shape="ribbon" size={28}/>}
-          {shape === 'monogram' && <div style={{width:18,height:18,borderRadius:4,background:'#000',color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--font-display)',fontWeight:900,fontSize:11}}>C</div>}
-          {shape === 'wordmark' && <div style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:13, color:'#000', letterSpacing:'-0.04em'}}>cadence<span style={{color:'#FD7947'}}>.</span></div>}
-          {shape === 'circle' && <ALogoMark shape="circle" size={24}/>}
-          <span style={{fontFamily:'var(--font-display)', fontSize:12, fontWeight:700, color:'var(--fg-1)', letterSpacing:'-0.02em'}}>cadence</span>
-        </div>
-        <div style={{height:48, background:'var(--bg-sunken)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', position:'relative'}}>
-          <div style={{
-            width:18, height:18, borderRadius:4, background:'#fff',
-            boxShadow:'0 1px 4px rgba(0,0,0,.18)',
-            display:'inline-flex',alignItems:'center',justifyContent:'center',
-          }}>
-            {shape === 'ribbon' && <div style={{width:10,height:5,borderRadius:99,background:'linear-gradient(135deg,#44D9C7,#FD7947)'}}/>}
-            {shape === 'monogram' && <span style={{fontFamily:'var(--font-display)',fontWeight:900,fontSize:9,letterSpacing:'-0.04em'}}>C</span>}
-            {shape === 'wordmark' && <span style={{fontFamily:'var(--font-display)',fontWeight:900,fontSize:9,letterSpacing:'-0.04em'}}>c<span style={{color:'#FD7947'}}>.</span></span>}
-            {shape === 'circle' && <div style={{width:8,height:8,borderRadius:99,border:'1px solid #000'}}/>}
-          </div>
-        </div>
-      </div>
-      <div>
-        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, letterSpacing:'-0.018em', color:'#000'}}>{name}</div>
-        <div style={{fontSize:11.5, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{descriptor}</div>
-      </div>
+// One generated mark, rendered as a real (sanitized) SVG on a neutral card.
+const AGeneratedLogoCard = ({ concept, sel, onClick }) => (
+  <div onClick={onClick} style={{
+    background:'var(--bg-elev)', borderRadius: 18, padding: 16, cursor:'pointer',
+    boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    display:'flex', flexDirection:'column', gap:12,
+  }}>
+    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+      <span style={{fontSize:10.5, color:'var(--fg-3)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>Concept</span>
+      {sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
     </div>
-  );
-};
-
-const LOGO_CONCEPTS = [
-  { n:1, name:'Ribbon mark', descriptor:"A single fluid line — cadence as movement. Best at large scale; works mono and gradient.", shape:'ribbon' },
-  { n:2, name:'Monogram', descriptor:"Confident, square. The dot signals the period — a beat. Strongest at app-icon scale.", shape:'monogram' },
-  { n:3, name:'Wordmark', descriptor:"The full name. The full stop carries the cadence — quiet, decisive. Editorial-leaning.", shape:'wordmark' },
-  { n:4, name:'Sundial', descriptor:"A circle with a marker — time, ritual, return. Slowest to read; best as small mnemonic.", shape:'circle' },
-];
+    {/* Hero mark — the model draws for a light background, so render on white. */}
+    <div style={{background:'#fff', borderRadius: 12, height: 160, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 1px var(--line)'}}>
+      <SvgMark svg={concept.svg} size={130} />
+    </div>
+    <div>
+      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, letterSpacing:'-0.018em', color:'#000'}}>{concept.name}</div>
+      {concept.descriptor && <div style={{fontSize:11.5, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{concept.descriptor}</div>}
+    </div>
+  </div>
+);
 
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
+  const brandId = draft && draft.id;
+  const data = (draft && draft.data) || {};
+  const brief = String((draft && draft.brief) || '').trim();
+  const hasBrief = !!brief;
+  const name = (draft && (draft.name_choice || draft.name)) || '';
+  const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
+
+  const cached = data.logos || [];
   const chosen = (draft && draft.logo_choice) || null;
+  const [logos, setLogos] = React.useState(cached);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const requestedFor = React.useRef(null);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // DECISION POINT — when may Step 4 auto-spend tokens to draft marks?
+  //
+  // The mark is stronger when it's built around the name the user actually
+  // chose, not the placeholder we derive from the brief. But requiring an
+  // explicit name-step pick means some users hit Step 4 and see nothing
+  // generate until they go back. Current default: a brief is enough (the
+  // server always has *a* name via name_choice || name).
+  //
+  // Consider gating on an explicit `draft.name_choice` instead, so the logo
+  // always reflects a deliberate name. Trade-off: fewer wasted generations
+  // vs. an extra empty state to explain. Adjust `canGenerate` to taste.
+  // ─────────────────────────────────────────────────────────────────────
+  const canGenerate = hasBrief;
+
+  const generate = React.useCallback(async () => {
+    if (!brandId) return;
+    setLoading(true); setError('');
+    const res = await apiGenerateLogos(brandId);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setLogos(res.logos);
+      // Cache onto the draft so Step 5 reuses these marks (no double spend).
+      setField('data', { ...((draft && draft.data) || {}), logos: res.logos });
+    }
+    setLoading(false);
+  }, [brandId, draft, setField]);
+
+  // Auto-generate once when the screen opens with nothing cached yet.
+  React.useEffect(() => {
+    if (!brandId || !canGenerate || logos.length) return;
+    if (requestedFor.current === brandId) return;
+    requestedFor.current = brandId;
+    generate();
+  }, [brandId, canGenerate, logos.length, generate]);
+
   return (
   <AWizardLayout
     step={4}
-    title="Pick a logo direction."
-    subtitle="Four concepts, each with primary mark and three application contexts. Refine after."
+    title="Design the mark."
+    subtitle="Fluid draws logo concepts from your brief, name, and style — pick your favorite, or regenerate for a fresh set."
     status="Draft"
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
     onNext={() => {}}
-    isThinking={false}
+    isThinking={loading}
   >
     <div style={{display:'grid', gridTemplateColumns:'2.4fr 1fr', gap:18, alignItems:'start'}}>
-      {/* 4 concept cards in a 2 × 2 grid */}
-      <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14}}>
-        {LOGO_CONCEPTS.map((c) => (
-          <ALogoConceptCard key={c.n} n={c.n} name={c.name} descriptor={c.descriptor} shape={c.shape}
-            status={c.status} sel={chosen === c.name} onClick={() => setField('logo_choice', c.name)} />
-        ))}
+      {/* Left — the generated marks */}
+      <div>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14}}>
+          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Generated marks</div>
+          <button onClick={() => !loading && canGenerate && generate()} disabled={loading || !canGenerate} style={{
+            padding:'8px 12px', borderRadius:10, background:'#000', color:'#fff',
+            fontSize:12, fontWeight:600, border:0,
+            display:'inline-flex', alignItems:'center', gap:6,
+            cursor: loading || !canGenerate ? 'default' : 'pointer', opacity: loading || !canGenerate ? 0.6 : 1,
+          }}>
+            <Sparkle size={12} color="#fff"/> {logos.length ? 'Regenerate' : 'Generate marks'}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{marginBottom:14, padding:'12px 14px', borderRadius:12, background:'rgba(253,121,71,.10)', boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)', fontSize:12.5, color:'#A8421F', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+            <span>{error}</span>
+            <button onClick={() => generate()} style={{padding:'5px 10px', borderRadius:8, background:'#000', color:'#fff', fontSize:11.5, fontWeight:600, border:0, cursor:'pointer'}}>Try again</button>
+          </div>
+        )}
+
+        {/* Can't generate yet — send them back for a brief. */}
+        {!canGenerate && !logos.length && (
+          <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5, background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)'}}>
+            Add a brief in Step 1 and Fluid will design logo marks here.
+          </div>
+        )}
+
+        {/* First-run loading skeletons. */}
+        {canGenerate && !logos.length && (
+          <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14}}>
+            {Array.from({length:3}).map((_, i) => (
+              <div key={i} style={{background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:236, display:'flex', alignItems:'center', justifyContent:'center'}}>{loading && i === 0 ? <Thinking/> : null}</div>
+            ))}
+          </div>
+        )}
+
+        {/* The marks. */}
+        {logos.length > 0 && (
+          <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, opacity: loading ? 0.5 : 1}}>
+            {logos.map((c) => (
+              <AGeneratedLogoCard key={c.name} concept={c} sel={chosen === c.name}
+                onClick={() => setField('logo_choice', c.name)} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Refinement panel for selected concept */}
-      <div style={{
-        background:'var(--bg-elev)', borderRadius: 18,
-        boxShadow:'var(--shadow-sm), inset 0 0 0 1px var(--line)',
-        padding: 20, display:'flex', flexDirection:'column', gap: 16,
-      }}>
-        <div>
-          <div className="eyebrow" style={{color:'var(--fg-3)', fontSize:10, marginBottom:6}}>Refining · 01 Ribbon mark</div>
-          <h3 style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:16, margin:0, color:'#000', letterSpacing:'-0.018em'}}>Tune the chosen mark</h3>
+      {/* Right — what the marks were drawn from (Steps 1–3). */}
+      <div style={{display:'flex', flexDirection:'column', gap:14}}>
+        <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
+        <div style={{background:'var(--bg-elev)', borderRadius:16, padding:16, boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)', fontSize:12, color:'var(--fg-3)', lineHeight:1.5}}>
+          <Sparkle size={11}/> These marks are generated live from your brief, name, and style. Regenerate for a new set, then pick the one to carry into your Brand Kit.
         </div>
-
-        {/* Color treatment */}
-        <div>
-          <div style={{fontSize:11, fontWeight:600, color:'var(--fg-3)', marginBottom:8, letterSpacing:'0.06em', textTransform:'uppercase'}}>Color treatment</div>
-          <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6}}>
-            {[
-              {sel:true, bg:'linear-gradient(135deg,#44D9C7,#FDBA50,#FD7947)', label:'Gradient'},
-              {sel:false, bg:'#FD7947', label:'Coral'},
-              {sel:false, bg:'#000', label:'Mono'},
-            ].map((s,i)=>(
-              <div key={i} style={{
-                borderRadius:10, padding:8, display:'flex', flexDirection:'column', alignItems:'center', gap:6,
-                background: s.sel ? 'var(--bg-sunken)' : 'transparent',
-                boxShadow: s.sel ? 'inset 0 0 0 1.5px #000' : 'inset 0 0 0 1px var(--line)',
-                cursor:'pointer',
-              }}>
-                <div style={{width:28, height:14, borderRadius:99, background:s.bg}}/>
-                <span style={{fontSize:10.5, fontWeight:600, color:'var(--fg-2)'}}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <ASlider left="Tight" right="Generous" value={64} />
-        <ASlider left="Geometric" right="Organic" value={48} />
-
-        {/* Lockup options */}
-        <div>
-          <div style={{fontSize:11, fontWeight:600, color:'var(--fg-3)', marginBottom:8, letterSpacing:'0.06em', textTransform:'uppercase'}}>Lockup</div>
-          <div style={{display:'flex', flexDirection:'column', gap:6}}>
-            {[
-              {sel:true, label:'Mark only'},
-              {sel:false, label:'Mark + wordmark · horizontal'},
-              {sel:false, label:'Mark + wordmark · stacked'},
-            ].map((s,i)=>(
-              <div key={i} style={{
-                padding:'8px 10px', borderRadius:8,
-                background: s.sel ? 'var(--bg-sunken)' : 'transparent',
-                boxShadow: s.sel ? 'inset 0 0 0 1.5px #000' : 'inset 0 0 0 1px var(--line)',
-                fontSize:12, fontWeight:600, color:'var(--fg-1)',
-                display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer',
-              }}>
-                {s.label}
-                {s.sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button style={{
-          marginTop:'auto', padding:'10px 14px', borderRadius:10,
-          background:'transparent', color:'var(--fg-2)', fontSize:12, fontWeight:600,
-          boxShadow:'inset 0 0 0 1px var(--line)', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6,
-          border:0, cursor:'pointer',
-        }}>
-          <Sparkle size={11}/> Draft 4 more concepts
-        </button>
       </div>
     </div>
   </AWizardLayout>
