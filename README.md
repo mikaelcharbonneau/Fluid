@@ -1,25 +1,54 @@
-# CODING AGENTS: READ THIS FIRST
+# Fluid
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+**From idea to identity — instantly.** Fluid is an AI brand agent: describe a
+business in one sentence, and it drafts a full brand — name, logo, color
+palette, typography, and written guidelines — in about 60 seconds. Each step
+can be refined, regenerated, or overridden by hand.
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+The product is a five-step wizard:
 
-## What you should do — IMPORTANT
+1. **Brief** — describe the brand, audience, and competitors (with inline AI
+   assist for each field).
+2. **Style** — pick a visual direction from AI-suggested options.
+3. **Name** — Fluid drafts ~50 candidate names; like, pick, or type your own.
+4. **Logo** — Fluid generates SVG logo marks live from the brief, chosen name,
+   and style.
+5. **Brand kit** — the assembled result: logo, color palette, type pairing,
+   and a written brand guidelines document, all AI-generated and individually
+   regenerable.
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+Generation is metered by a token balance tied to a subscription plan
+(Starter / Pro), billed via Stripe.
 
-**Read `project/uploads/Fluid Web App (Standalone).html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+## Repo layout
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+```
+fluid-web/   the actual Next.js application — see fluid-web/README.md
+chats/       original design-handoff conversation transcript (historical)
+project/     original HTML/CSS/JS design prototype this was built from (historical)
+.github/     CI (lint + typecheck + build on every push/PR to main)
+```
 
-## About the design files
+`chats/` and `project/` are the artifacts from the initial Claude Design →
+Claude Code handoff that kicked off this project. They're kept for reference
+but are no longer the source of truth — `fluid-web/` is the real,
+production application.
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+## Stack
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+- **Next.js** (App Router) + React, TypeScript
+- **Supabase** — auth and Postgres persistence (brands, subscriptions/tokens)
+- **Anthropic API** — all AI generation (names, logo SVGs, palette,
+  typography, guidelines, inline assists)
+- **Stripe** — subscription billing and the token-refill webhook
+- **Vercel** — hosting; every push gets a preview deployment, `main` deploys
+  to production
 
-## Bundle contents
+## Working on this repo
 
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `New design feedback` project files (HTML prototypes, assets, components)
+The app lives entirely in [`fluid-web/`](fluid-web/README.md) — that's where
+you'll find setup instructions, environment variables, and the dev server.
+
+Changes ship through PRs (see `.github/workflows/ci.yml` for what runs on
+every push): open a branch, push, let Vercel build a preview, then merge to
+`main` for production.
