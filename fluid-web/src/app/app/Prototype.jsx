@@ -3951,9 +3951,11 @@ const ActivityItem = ({ icon, accent, lead, body, when }) =>
 
 
 const DirA_Home = () => {
-  const { user, brands, loadBrand } = useBrandDraft();
+  const { user, brands, loadBrand, billing } = useBrandDraft();
   const { navigate } = useRouter();
   const drafts = brands.filter((b) => b.status === 'draft');
+  const firstRun = brands.length === 0;
+  const startBalance = (billing && typeof billing.balance === 'number') ? billing.balance : 20;
   const firstName = user && user.name ? user.name.trim().split(/\s+/)[0] : 'there';
   const hour = new Date().getHours();
   const partOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
@@ -3976,10 +3978,48 @@ const DirA_Home = () => {
           fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000'
         }}>Good {partOfDay}, {firstName}.</h1>
           <p style={{ fontSize: 16, color: 'var(--fg-2)', marginTop: 14, maxWidth: 520, lineHeight: 1.5 }}>
-            {progressLine}
+            {firstRun ? "Welcome to Fluid. Let's turn your first idea into a brand — it takes about a minute." : progressLine}
           </p>
         </div>
       </div>
+
+      {/* ════ FIRST-RUN ONBOARDING — only until the first brand exists ══ */}
+      {firstRun && (
+      <section style={{
+        position: 'relative', background: '#0E0F12', color: '#fff',
+        borderRadius: 24, padding: '34px 40px', overflow: 'hidden',
+        boxShadow: 'var(--shadow-sm)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 11px', borderRadius: 99, background: 'rgba(255,255,255,.1)' }}>
+            <span style={{ width: 12, height: 12, borderRadius: 99, background: 'var(--fluid-gradient)' }} />
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.85)' }}>Getting started</span>
+          </span>
+          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,.7)' }}>
+            You have <strong style={{ color: '#fff' }}>{startBalance} free tokens</strong> — enough for your first full brand.
+          </span>
+        </div>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 20px', maxWidth: 560 }}>
+          Three steps from a sentence to a brand.
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginBottom: 26 }}>
+          {[
+            { n: '1', t: 'Describe your idea', d: 'One sentence is all Fluid needs to get going.' },
+            { n: '2', t: 'Generate the identity', d: 'Names, palette, type and a logo — drafted in seconds. Each asset costs 3 tokens.' },
+            { n: '3', t: 'Refine & export', d: 'Tweak anything, export the assets, or subscribe for a monthly token refill.' },
+          ].map((s) => (
+            <div key={s.n} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ width: 26, height: 26, borderRadius: 99, background: 'rgba(255,255,255,.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{s.n}</span>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, letterSpacing: '-0.015em' }}>{s.t}</div>
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.66)', lineHeight: 1.45 }}>{s.d}</div>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => navigate('step1')} style={{ padding: '12px 22px', borderRadius: 12, background: '#fff', color: '#0E0F12', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          Create your first brand <ArrowRight size={14} />
+        </button>
+      </section>
+      )}
 
       {/* ════ YOUR BRANDS — pick up where you left off ════════════════ */}
       {drafts.length > 0 && (
@@ -4033,10 +4073,10 @@ const DirA_Home = () => {
             Tell Fluid about your idea. We'll draft a strategy, name, logo, palette and type — in about 60&nbsp;seconds.
           </p>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate('step1')} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               Start a new brand <ArrowRight size={14} />
             </button>
-            <button style={{ padding: '12px 18px', borderRadius: 12, background: 'transparent', color: 'var(--fg-1)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)' }}>
+            <button onClick={() => navigate('brands')} style={{ padding: '12px 18px', borderRadius: 12, background: 'transparent', color: 'var(--fg-1)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)' }}>
               Browse templates
             </button>
           </div>
@@ -5823,6 +5863,25 @@ function BrandDraftProvider({ children }) {
     window.addEventListener('fluid:balance-changed', onChanged);
     return () => window.removeEventListener('fluid:balance-changed', onChanged);
   }, [refreshBalance]);
+
+  // If the user arrived from a paid plan CTA on the marketing site, signup
+  // stashed the tier — send them straight to Stripe checkout for it, once.
+  React.useEffect(() => {
+    let plan;
+    try { plan = localStorage.getItem('fluid_intended_plan'); } catch { plan = null; }
+    if (plan !== 'starter' && plan !== 'pro') return;
+    try { localStorage.removeItem('fluid_intended_plan'); } catch { /* ignore */ }
+    (async () => {
+      try {
+        const r = await fetch('/api/billing/checkout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier: plan }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j.url) window.location.assign(j.url);
+      } catch { /* stay in the app; they can subscribe from Settings → Billing */ }
+    })();
+  }, []);
 
   // A request refused for lack of tokens raises a single "top up" banner.
   const [noTokens, setNoTokens] = React.useState(false);

@@ -1,5 +1,16 @@
 (function () {
   "use strict";
+
+  /* If the visitor came from a paid plan CTA (/signup?plan=starter|pro),
+     remember it so the app can start checkout right after signup — works for
+     both email and Google sign-up, which return through different paths. */
+  try {
+    var planParam = new URLSearchParams(window.location.search).get("plan");
+    if (planParam === "starter" || planParam === "pro") {
+      localStorage.setItem("fluid_intended_plan", planParam);
+    }
+  } catch (_e) { void _e; /* private mode / storage disabled — just skip the upsell */ }
+
   var coarse = window.matchMedia("(pointer: coarse)").matches;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var lerp = function (a, b, t) { return a + (b - a) * t; };
