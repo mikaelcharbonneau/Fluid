@@ -196,8 +196,68 @@ const ARailIcon = ({ d, active, label }) => (
   </div>
 );
 
+// Token balance pill in the top bar. Colors shift as the balance runs low,
+// and clicking it jumps straight to Settings → Billing to top up.
+const TokenPill = ({ billing }) => {
+  const { navigate } = useRouter();
+  if (!billing) return null;
+  const balance = typeof billing.balance === 'number' ? billing.balance : 0;
+  const low = balance <= 3;      // not enough for another asset generation
+  const empty = balance <= 0;
+  const tone = empty
+    ? { bg: 'rgba(230,70,70,.12)', line: 'rgba(230,70,70,.4)', fg: '#B42318' }
+    : low
+    ? { bg: 'rgba(214,140,20,.12)', line: 'rgba(214,140,20,.4)', fg: '#9A6400' }
+    : { bg: 'var(--bg-elev)', line: 'var(--line)', fg: 'var(--fg-2)' };
+  const goBilling = () => {
+    if (typeof window !== 'undefined') window.__fluidSettingsTab = 'billing';
+    navigate('settings');
+  };
+  return (
+    <button
+      onClick={goBilling}
+      title={empty ? 'Out of tokens — top up' : balance + ' tokens left · click to manage billing'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 7,
+        padding: '6px 12px', borderRadius: 999,
+        background: tone.bg, boxShadow: 'inset 0 0 0 1px ' + tone.line,
+        fontSize: 12, fontWeight: 600, color: tone.fg, cursor: 'pointer', border: 0,
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 13px' }}>
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5a2.5 2 0 0 1 5 0c0 1.5-2 1.8-2 2.5M9 14.5a2.5 2 0 0 0 5 0"/>
+      </svg>
+      {empty ? 'Out of tokens' : balance}
+    </button>
+  );
+};
+
+// Raised when a generation is refused for lack of tokens. A single fixed
+// banner (rather than five per-step error variants) with a direct path to top up.
+const NoTokensBanner = ({ onClose }) => {
+  const { navigate } = useRouter();
+  const goBilling = () => {
+    if (typeof window !== 'undefined') window.__fluidSettingsTab = 'billing';
+    onClose();
+    navigate('settings');
+  };
+  return (
+    <div style={{
+      position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+      zIndex: 9999, display: 'flex', alignItems: 'center', gap: 16,
+      padding: '12px 14px 12px 18px', borderRadius: 14,
+      background: '#111', color: '#fff', boxShadow: '0 12px 40px rgba(0,0,0,.28)',
+      fontSize: 13, maxWidth: 'calc(100vw - 32px)',
+    }}>
+      <span>You’re out of tokens. Subscribe for a monthly refill to keep generating.</span>
+      <button onClick={goBilling} style={{ padding: '8px 14px', borderRadius: 9, background: '#fff', color: '#111', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 0, whiteSpace: 'nowrap' }}>Manage billing</button>
+      <button onClick={onClose} aria-label="Dismiss" style={{ background: 'transparent', border: 0, color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>×</button>
+    </div>
+  );
+};
+
 const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
-  const { user } = useBrandDraft();
+  const { user, billing } = useBrandDraft();
   return (
   <div className="ab" style={{display:'flex',flexDirection:'column'}}>
     {/* Top dock */}
@@ -231,6 +291,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
         <SearchIcon size={12}/> Search brands, assets…
         <span style={{marginLeft:18,padding:'2px 6px',borderRadius:5,background:'var(--bg-sunken)',fontSize:10,fontFamily:'var(--font-mono)',color:'var(--fg-3)'}}>⌘K</span>
       </button>
+      <TokenPill billing={billing}/>
       <div title={(user && (user.name || user.email)) || ''} style={{width: 26, height: 26, borderRadius: 999, background: '#000', color:'#fff', fontSize: 11, fontWeight: 700, display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{(user && user.initial) || '·'}</div>
     </header>
 
@@ -4437,6 +4498,8 @@ const SecBilling = () => {
       setStatus(r.ok ? j : null);
     } catch { setStatus(null); }
     setLoading(false);
+    // Keep the top-bar token pill in sync with what this page shows.
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('fluid:balance-changed'));
   }, []);
   React.useEffect(() => { load(); }, [load]);
 
@@ -4550,7 +4613,11 @@ const SECTIONS = {
 };
 
 const DirA_Settings = () => {
-  const [active, setActive] = useSetState('fluid');
+  // The top-bar token pill can request a specific tab (e.g. Billing) before
+  // navigating here; honor it once, then clear the flag.
+  const initialTab = (typeof window !== 'undefined' && window.__fluidSettingsTab) || 'fluid';
+  const [active, setActive] = useSetState(SECTIONS[initialTab] ? initialTab : 'fluid');
+  React.useEffect(() => { if (typeof window !== 'undefined') delete window.__fluidSettingsTab; }, []);
   const ActiveSection = SECTIONS[active];
   return (
     <AShell activeNav="settings" breadcrumb={['Settings']}>
@@ -5560,8 +5627,18 @@ async function apiDeleteBrand(id) {
     return r.ok;
   } catch { return false; }
 }
+// Any token-spending request may have changed the balance (spent on success,
+// or hit zero on a 402). Nudge the provider to re-read it for the top-bar pill,
+// and raise a distinct signal when the request was refused for lack of tokens
+// so the app can surface a single actionable "top up" banner.
+function signalBalanceChanged(code) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('fluid:balance-changed'));
+  if (code === 'no_tokens') window.dispatchEvent(new Event('fluid:no-tokens'));
+}
+
 // Phase 3 — inline AI assists (rewrite brief, suggest audience/competitors,
-// pick a Step 2 option). Returns { result } or { error }.
+// pick a Step 2 option). Returns { result } or { error, code }.
 async function apiAssist(brandId, task, options) {
   try {
     const r = await fetch('/api/generate/assist', {
@@ -5569,7 +5646,8 @@ async function apiAssist(brandId, task, options) {
       body: JSON.stringify({ brandId, task, options }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Assist failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Assist failed.', code: j.code };
     return { result: j.result || {} };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5582,7 +5660,8 @@ async function apiGenerateNames(brandId) {
       body: JSON.stringify({ brandId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { names: j.names || [] };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5594,7 +5673,8 @@ async function apiGeneratePalette(brandId) {
       body: JSON.stringify({ brandId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { palette: j.palette || null };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5606,7 +5686,8 @@ async function apiGenerateTypography(brandId) {
       body: JSON.stringify({ brandId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { typography: j.typography || null };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5618,7 +5699,8 @@ async function apiGenerateLogos(brandId) {
       body: JSON.stringify({ brandId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { logos: j.logos || [] };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5630,7 +5712,8 @@ async function apiGenerateGuidelines(brandId) {
       body: JSON.stringify({ brandId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || 'Generation failed.' };
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { guidelines: j.guidelines || null };
   } catch { return { error: 'Network error.' }; }
 }
@@ -5715,6 +5798,7 @@ function BrandDraftProvider({ children }) {
   const [brands, setBrands] = React.useState([]);
   const [draft, setDraft] = React.useState(null);
   const [user, setUser] = React.useState(null);
+  const [billing, setBilling] = React.useState(null); // { tier, balance, monthlyTokens }
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
   const saveTimer = React.useRef(null);
@@ -5724,6 +5808,29 @@ function BrandDraftProvider({ children }) {
   }, []);
   React.useEffect(() => { refresh(); }, [refresh]);
   React.useEffect(() => { apiGetMe().then(setUser); }, []);
+
+  // Token balance — shown in the top bar and refreshed after every generation.
+  const refreshBalance = React.useCallback(async () => {
+    try {
+      const r = await fetch('/api/billing/status', { cache: 'no-store' });
+      if (r.ok) setBilling(await r.json());
+    } catch { /* keep the last known balance */ }
+  }, []);
+  React.useEffect(() => { refreshBalance(); }, [refreshBalance]);
+  // Generation wrappers dispatch this after any token-spending request.
+  React.useEffect(() => {
+    const onChanged = () => refreshBalance();
+    window.addEventListener('fluid:balance-changed', onChanged);
+    return () => window.removeEventListener('fluid:balance-changed', onChanged);
+  }, [refreshBalance]);
+
+  // A request refused for lack of tokens raises a single "top up" banner.
+  const [noTokens, setNoTokens] = React.useState(false);
+  React.useEffect(() => {
+    const onNoTokens = () => setNoTokens(true);
+    window.addEventListener('fluid:no-tokens', onNoTokens);
+    return () => window.removeEventListener('fluid:no-tokens', onNoTokens);
+  }, []);
 
   // Debounced field autosave.
   const setField = React.useCallback((key, value) => {
@@ -5774,8 +5881,13 @@ function BrandDraftProvider({ children }) {
     apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
   }, [route]);
 
-  const value = { brands, draft, user, setField, startNew, loadBrand, refresh };
-  return <BrandDraftCtx.Provider value={value}>{children}</BrandDraftCtx.Provider>;
+  const value = { brands, draft, user, billing, refreshBalance, setField, startNew, loadBrand, refresh };
+  return (
+    <BrandDraftCtx.Provider value={value}>
+      {children}
+      {noTokens && <NoTokensBanner onClose={() => setNoTokens(false)} />}
+    </BrandDraftCtx.Provider>
+  );
 }
 window.BrandDraftProvider = BrandDraftProvider;
 
