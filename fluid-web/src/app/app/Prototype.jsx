@@ -269,7 +269,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
       background: 'var(--bg)',
       position: 'relative', zIndex: 2,
     }}>
-      <FluidWordmark height={38}/>
+      <FluidWordmark height={22}/>
       <div style={{width:1, height:28, background:'var(--line)'}}/>
       <nav style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--fg-3)'}}>
         {breadcrumb.map((b,i) => (
@@ -5462,7 +5462,7 @@ Object.assign(window, {
 // Default brand accent + prototype tweaks (persisted by useTweaks).
 const PROTO_DEFAULTS = /*EDITMODE-BEGIN*/{
   "brand": "Signature",
-  "showQuickJump": true
+  "showQuickJump": false
 }/*EDITMODE-END*/;
 
 const BRAND_TO_ATTR = { Signature: '', Rare: 'rare', Solid: 'solid' };
