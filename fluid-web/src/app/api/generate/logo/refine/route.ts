@@ -5,6 +5,7 @@ import { getPlatform } from "@/lib/ai/platform";
 import type { LogoSketch } from "@/lib/ai/sketches";
 import { generateLogoFinalists } from "@/lib/ai/refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
   try {
     const finalists = await generateLogoFinalists({
       brief: String(brand.brief),
-      name: (brand.name_choice || brand.name) as string | null,
+      name: chosenBrandName(brand),
       platform,
       liked,
       styleContext: styleContext(brand),

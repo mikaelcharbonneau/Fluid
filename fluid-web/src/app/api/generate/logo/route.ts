@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateBrandLogos } from "@/lib/ai/logo";
 import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
   try {
     logos = await generateBrandLogos({
       brief: String(brand.brief),
-      name: (brand.name_choice || brand.name) as string | null,
+      name: chosenBrandName(brand),
       style: brand.style_id as string | null,
       primaryColor,
       styleContext: styleContext(brand),

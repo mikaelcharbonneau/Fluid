@@ -2,6 +2,21 @@
 
 export type BrandStatus = "draft" | "live";
 
+// The brand's real, chosen name — or null if the user hasn't picked one yet.
+//
+// `brand.name` is NOT a name field in the usual sense: the client's
+// setField('brief', ...) handler derives it from the first few words of the
+// brief (deriveBrandName in Prototype.jsx) as a placeholder so the brands
+// list doesn't read "Untitled brand" everywhere. Every AI generator must use
+// this helper instead of `brand.name_choice || brand.name` — that fallback
+// silently hands the model a brief fragment as if it were the brand name.
+export function chosenBrandName(brand: {
+  name_choice?: string | null;
+}): string | null {
+  const chosen = (brand.name_choice ?? "").trim();
+  return chosen || null;
+}
+
 export interface Brand {
   id: string;
   name: string;

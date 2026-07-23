@@ -4,6 +4,7 @@ import { styleContext } from "@/lib/ai/step2";
 import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
   const data = (brand.data as Record<string, unknown>) ?? {};
   const ctx = styleContext(brand);
-  const brandName = (brand.name_choice || brand.name) as string | null;
+  const brandName = chosenBrandName(brand);
 
   try {
     // Phase 0 — the creative platform, generated once and reused by every

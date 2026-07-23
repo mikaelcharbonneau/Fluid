@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateBrandPalette } from "@/lib/ai/palette";
 import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     palette = await generateBrandPalette({
       brief: String(brand.brief),
       audience: brand.audience as string | null,
-      name: (brand.name_choice || brand.name) as string | null,
+      name: chosenBrandName(brand),
       style: brand.style_id as string | null,
       styleContext: styleContext(brand),
       basisColors: paletteBasis(getStep2(brand.data)),
