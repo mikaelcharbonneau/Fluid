@@ -261,7 +261,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
   return (
   <div className="ab" style={{display:'flex',flexDirection:'column'}}>
     {/* Top dock */}
-    <header style={{
+    <header className="ash-header" style={{
       height: 60, flex: '0 0 60px',
       display: 'flex', alignItems: 'center', gap: 20,
       padding: '0 24px',
@@ -270,8 +270,8 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
       position: 'relative', zIndex: 2,
     }}>
       <FluidWordmark height={22}/>
-      <div style={{width:1, height:28, background:'var(--line)'}}/>
-      <nav style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--fg-3)'}}>
+      <div className="ash-divider" style={{width:1, height:28, background:'var(--line)'}}/>
+      <nav className="ash-breadcrumb" style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--fg-3)', minWidth:0, overflow:'hidden', whiteSpace:'nowrap'}}>
         {breadcrumb.map((b,i) => (
           <React.Fragment key={i}>
             {i>0 && <ChevronRight size={12}/>}
@@ -280,19 +280,20 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
         ))}
       </nav>
 
-      <div style={{flex:1}}/>
+      <div style={{flex:1, minWidth: 12}}/>
 
-      <button style={{
+      <button className="ash-search" style={{
         display:'inline-flex',alignItems:'center',gap:8,
         padding:'6px 12px',borderRadius:999,
         background:'var(--bg-elev)',boxShadow:'inset 0 0 0 1px var(--line)',
-        fontSize:12,fontWeight:500,color:'var(--fg-2)'
+        fontSize:12,fontWeight:500,color:'var(--fg-2)',
+        flex:'0 1 auto', minWidth:0, whiteSpace:'nowrap', overflow:'hidden',
       }}>
-        <SearchIcon size={12}/> Search brands, assets…
-        <span style={{marginLeft:18,padding:'2px 6px',borderRadius:5,background:'var(--bg-sunken)',fontSize:10,fontFamily:'var(--font-mono)',color:'var(--fg-3)'}}>⌘K</span>
+        <SearchIcon size={12}/> <span className="ash-search-label">Search brands, assets…</span>
+        <span className="ash-search-kbd" style={{marginLeft:18,padding:'2px 6px',borderRadius:5,background:'var(--bg-sunken)',fontSize:10,fontFamily:'var(--font-mono)',color:'var(--fg-3)'}}>⌘K</span>
       </button>
       <TokenPill billing={billing}/>
-      <div title={(user && (user.name || user.email)) || ''} style={{width: 26, height: 26, borderRadius: 999, background: '#000', color:'#fff', fontSize: 11, fontWeight: 700, display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{(user && user.initial) || '·'}</div>
+      <div title={(user && (user.name || user.email)) || ''} style={{flex:'0 0 26px', width: 26, height: 26, borderRadius: 999, background: '#000', color:'#fff', fontSize: 11, fontWeight: 700, display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{(user && user.initial) || '·'}</div>
     </header>
 
     {/* Body: rail + main */}
@@ -3158,7 +3159,7 @@ const DirA_KitSummary = () => {
   return (
     <AShell activeNav="brands" breadcrumb={['Brands', b.name || 'Brand kit']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div style={{ padding: '44px 56px 64px', maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 30 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 30 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
             <div>
               <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Brand kit · {b.status === 'live' ? 'Live' : 'Draft'}</div>
@@ -3475,7 +3476,7 @@ const DirA_AssetsScreen = () => {
   return (
     <AShell activeNav="assets" breadcrumb={['Assets']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Assets</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Your assets.</h1>
@@ -3497,7 +3498,7 @@ const DirA_GuidesScreen = () => {
   return (
     <AShell activeNav="guides" breadcrumb={['Guides']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Guides</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Brand guidelines.</h1>
@@ -3670,11 +3671,11 @@ const DirA_BrandsActive = () => {
   return (
     <AShell activeNav="brands" breadcrumb={['Brands']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
           {/* ── Header ─────────────────────────────────────────────── */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
-            <div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
               <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Library · {brands.length} {brands.length === 1 ? 'brand' : 'brands'}</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>
                 Your brands.
@@ -4050,7 +4051,7 @@ const DirA_Home = () => {
       : "You have " + drafts.length + " brands in progress. Pick one up, or start something new.";
   return (
 <AShell activeNav="home" breadcrumb={['Home']}>
-    <div style={{ padding: '48px 56px 64px', maxWidth: 1240, display: 'flex', flexDirection: 'column', gap: 40 }}>
+    <div className="main-pad" style={{ padding: '48px 56px 64px', maxWidth: 1240, display: 'flex', flexDirection: 'column', gap: 40 }}>
 
       {/* ── Greeting ───────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
@@ -4085,7 +4086,7 @@ const DirA_Home = () => {
         <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 20px', maxWidth: 560 }}>
           Three steps from a sentence to a brand.
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginBottom: 26 }}>
+        <div className="home-grid-3" style={{ display: 'grid', gap: 18, marginBottom: 26 }}>
           {[
             { n: '1', t: 'Describe your idea', d: 'One sentence is all Fluid needs to get going.' },
             { n: '2', t: 'Generate the identity', d: 'Names, palette, type and a logo — drafted in seconds. Each asset costs 3 tokens.' },
@@ -4113,7 +4114,7 @@ const DirA_Home = () => {
             All brands <ArrowRight size={11} />
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           {drafts.slice(0, 4).map((b) => (
             <div key={b.id}
               onClick={() => { loadBrand(b.id); navigate('step' + (b.step || 1)); }}
@@ -4136,13 +4137,13 @@ const DirA_Home = () => {
       <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Or, start a new brand</div>
       {/* Hero CTA — white card (matches the Brands hero) */}
-      <div style={{
+      <div className="home-hero" style={{
         position: 'relative', background: 'var(--bg-elev)',
         borderRadius: 24, padding: '36px 40px', overflow: 'hidden',
         display: 'flex', alignItems: 'center', gap: 48,
         boxShadow: 'var(--shadow-sm)'
       }}>
-        <div style={{ flex: 1, position: 'relative', zIndex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 11px', borderRadius: 99, background: 'var(--bg-sunken)', marginBottom: 16 }}>
             <span style={{ width: 13, height: 13, borderRadius: 99, background: 'var(--fl-accent)' }} />
             <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-2)' }}>AI brand agent</span>
@@ -4153,18 +4154,20 @@ const DirA_Home = () => {
           <p style={{ fontSize: 15.5, color: 'var(--fg-2)', margin: '0 0 24px', maxWidth: 490, lineHeight: 1.5 }}>
             Tell Fluid about your idea. We'll draft a strategy, name, logo, palette and type — in about 60&nbsp;seconds.
           </p>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button onClick={() => navigate('step1')} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => navigate('step1')} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
               Start a new brand <ArrowRight size={14} />
             </button>
-            <button onClick={() => navigate('brands')} style={{ padding: '12px 18px', borderRadius: 12, background: 'transparent', color: 'var(--fg-1)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)' }}>
+            <button onClick={() => navigate('brands')} style={{ padding: '12px 18px', borderRadius: 12, background: 'transparent', color: 'var(--fg-1)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)', whiteSpace: 'nowrap' }}>
               Browse templates
             </button>
           </div>
         </div>
 
-        {/* dynamic vertical-scrolling collage of brand work */}
-        <BrandCollage />
+        {/* dynamic vertical-scrolling collage of brand work — decorative, hidden below the tablet breakpoint (home-hero) rather than squeezed */}
+        <div className="home-hero-collage">
+          <BrandCollage />
+        </div>
       </div>
 
       {/* ── Focus on one thing — quick paths (part of the same section) ── */}
@@ -4173,7 +4176,7 @@ const DirA_Home = () => {
           <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Or, focus on one thing</div>
           <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>4 quick paths</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           <QuickPath
             title="Rebranding"
             sub="Refresh an existing brand. Keep what works, update the rest."
