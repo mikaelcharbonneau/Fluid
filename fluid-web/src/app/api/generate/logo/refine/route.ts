@@ -6,6 +6,7 @@ import type { LogoSketch } from "@/lib/ai/sketches";
 import { generateLogoFinalists } from "@/lib/ai/refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import { getLogoConfig } from "@/lib/logo-styles";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
       platform,
       liked,
       styleContext: styleContext(brand),
+      config: getLogoConfig(data),
       paletteColors,
     });
 

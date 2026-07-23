@@ -2,15 +2,25 @@
 //
 // Real variety comes from fan-out, not from asking one call for 9 concepts
 // (which mode-collapses into near-duplicates). We run 3 parallel "designer"
-// calls, each assigned a strategic territory from the creative platform and a
-// family of mark types, each producing 3 concepts. Every concept carries
-// structured metadata (territory, mark type, formal attributes, rationale) —
-// the metadata is what lets the user's likes actually orient Phase 2, rather
-// than just pointing at pictures.
+// calls, each producing 3 concepts. Every concept carries structured metadata
+// (territory, mark type, formal attributes, rationale) — the metadata is what
+// lets the user's likes actually orient Phase 2, rather than just pointing at
+// pictures.
+//
+// What each call explores depends on the client's Step 4 brief:
+//   • Mark type chosen → all 9 are that type; the calls fan out across the
+//     platform's strategic TERRITORIES instead.
+//   • No mark type → the calls fan out across mark-type families, so the board
+//     spreads across the taxonomy.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { sanitizeSvg } from "./logo";
 import type { CreativePlatform } from "./platform";
+import {
+  type LogoConfig,
+  logoConfigContext,
+  markTypeById,
+} from "../logo-styles";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -35,6 +45,7 @@ export interface SketchBrief {
   name?: string | null;
   platform: CreativePlatform;
   styleContext?: string | null;
+  config?: LogoConfig | null; // the client's Step 4 brief
   likedSketches?: LogoSketch[] | null; // bias regeneration toward these
   avoidNames?: string[] | null; // previously shown concepts — don't repeat
 }
@@ -79,11 +90,10 @@ IDEA: <one sentence: the concept and why it expresses the territory>
 
 function buildUserPrompt(
   input: SketchBrief,
-  territoryIdx: number,
-  group: (typeof TYPE_GROUPS)[number],
+  territory: { name: string; description: string },
+  group: (typeof TYPE_GROUPS)[number] | null,
 ): string {
   const p = input.platform;
-  const territory = p.territories[territoryIdx % p.territories.length];
   const lines = [
     `Brand brief: ${input.brief.trim()}`,
     input.name?.trim() ? `Brand name: ${input.name.trim()}` : "",
@@ -92,12 +102,30 @@ function buildUserPrompt(
     `- Brand idea: ${p.brand_idea}`,
     p.personality.length ? `- Personality: ${p.personality.join(", ")}` : "",
     p.design_notes ? `- Design notes: ${p.design_notes}` : "",
-    ``,
-    `YOUR ASSIGNMENT for this board section:`,
-    `- Territory to express: "${territory.name}" — ${territory.description}`,
-    `- Mark-type focus: ${group.types}. All 3 concepts from this family, but`,
-    `  each must be a different approach within it.`,
   ];
+
+  // The client's Step 4 brief outranks everything else — it's an explicit
+  // instruction, not a suggestion.
+  const configCtx = logoConfigContext(input.config ?? {});
+  if (configCtx) {
+    lines.push(``, `THE CLIENT'S BRIEF — these choices are mandatory:`, configCtx);
+  }
+
+  lines.push(``, `YOUR ASSIGNMENT for this board section:`);
+  lines.push(`- Territory to express: "${territory.name}" — ${territory.description}`);
+  if (group) {
+    lines.push(
+      `- Mark-type focus: ${group.types}. All 3 concepts from this family, but`,
+      `  each must be a different approach within it.`,
+    );
+  } else {
+    lines.push(
+      `- All 3 concepts use the client's chosen mark type. Differentiate them by`,
+      `  IDEA and construction — three distinct answers to this territory, not`,
+      `  three weights of one answer.`,
+    );
+  }
+
   const ctx = (input.styleContext ?? "").trim();
   if (ctx) lines.push(``, `The user's design choices so far:`, ctx);
   const liked = input.likedSketches ?? [];
@@ -126,6 +154,7 @@ function buildUserPrompt(
 function extractSketches(
   text: string,
   territory: { key: string; name: string },
+  fixedType: string | null,
 ): Omit<LogoSketch, "id">[] {
   const raw = text.replace(/```[a-z]*\n?|```/gi, "").trim();
   let segments = raw.split(/===\s*CONCEPT\s*===/i).map((s) => s.trim()).filter(Boolean);
@@ -147,7 +176,9 @@ function extractSketches(
       name: name || "Concept",
       territory: territory.key,
       territory_name: territory.name,
-      mark_type: type,
+      // When the client fixed the mark type, trust the brief over whatever the
+      // model labelled the concept — the metadata drives Phase 2's targeting.
+      mark_type: fixedType ?? type,
       attributes: attrs,
       idea,
       svg,
@@ -164,23 +195,37 @@ export async function generateLogoSketches(
   }
   const client = new Anthropic();
 
-  // 3 parallel designers: territory rotates through the platform's territories,
-  // mark-type family differs per call.
-  const jobs = TYPE_GROUPS.map(async (group, i) => {
-    const territory =
-      input.platform.territories[i % input.platform.territories.length];
+  // How the 3 parallel designers divide the work depends on the brief. With a
+  // mark type fixed by the client, spreading across mark-type families would
+  // violate it — so we fan out across strategic territories instead, which is
+  // the remaining axis of genuine variety.
+  const territories = input.platform.territories;
+  const fixedType = markTypeById(input.config?.mark_type);
+  const assignments = fixedType
+    ? Array.from({ length: 3 }, (_, i) => ({
+        territory: territories[i % territories.length],
+        group: null,
+      }))
+    : TYPE_GROUPS.map((group, i) => ({
+        territory: territories[i % territories.length],
+        group,
+      }));
+
+  const jobs = assignments.map(async ({ territory, group }) => {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 8000,
       thinking: { type: "adaptive" },
       system: SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(input, i, group) }],
+      messages: [
+        { role: "user", content: buildUserPrompt(input, territory, group) },
+      ],
     });
     const text = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("\n");
-    return extractSketches(text, territory);
+    return extractSketches(text, territory, fixedType?.id ?? null);
   });
 
   const settled = await Promise.allSettled(jobs);

@@ -5,6 +5,11 @@ import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import {
+  type LogoConfig,
+  markTypeById,
+  designStyleById,
+} from "@/lib/logo-styles";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,6 +30,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     brandId?: unknown;
     likedIds?: unknown;
+    config?: unknown;
   };
   const brandId = typeof body.brandId === "string" ? body.brandId : "";
   const likedIds = Array.isArray(body.likedIds)
@@ -32,6 +38,21 @@ export async function POST(request: Request) {
     : [];
   if (!brandId) {
     return NextResponse.json({ error: "Missing brandId." }, { status: 400 });
+  }
+
+  // The Step 4 brief: mark type, visual language, and free-text direction.
+  const rawConfig = (body.config ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const config: LogoConfig = {
+    mark_type: markTypeById(str(rawConfig.mark_type))?.id ?? null,
+    design_style: designStyleById(str(rawConfig.design_style))?.id ?? null,
+    instructions: str(rawConfig.instructions).slice(0, 1000) || null,
+  };
+  if (!config.mark_type) {
+    return NextResponse.json(
+      { error: "Choose a logo type before sketching concepts." },
+      { status: 400 },
+    );
   }
 
   const { data: brand, error: loadError } = await supabase
@@ -88,16 +109,19 @@ export async function POST(request: Request) {
       name: brandName,
       platform,
       styleContext: ctx,
+      config,
       likedSketches: liked.length ? liked : null,
       avoidNames: prior.map((s) => s.name),
     });
 
     await spendTokens(user.id, TOKEN_COST.asset);
 
-    // A fresh board starts with a clean slate of likes.
+    // A fresh board starts with a clean slate of likes. The brief is stored so
+    // Phase 2 refines under the same constraints.
     const nextData = {
       ...data,
       creative_platform: platform,
+      logo_config: config,
       logo_sketches: sketches,
       logo_sketch_likes: [],
     };

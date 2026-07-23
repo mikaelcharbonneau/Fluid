@@ -17,20 +17,51 @@ export const MARK_TYPES = `Mark types (use these exact keys in TYPE fields):
 - dynamic: a system with a consistent skeleton and variable expression (MIT Media Lab).`;
 
 // Core craft rules — what separates a designed mark from a generated shape.
+//
+// The numeric constraints below are the difference between "consistent stroke
+// weight" (which a model cannot act on) and a value it can actually hit. They
+// are calibrated for our 120×120 viewBox.
 export const DESIGN_PRINCIPLES = `Identity design principles (non-negotiable):
+
+MEASURABLE CONSTRAINTS — all coordinates in a 120×120 viewBox:
+- Element count: 1–2 core elements. Not 5, not 15. A mark with many parts has
+  no focal point and dies at small sizes.
+- Stroke width: 3–5 units for primary elements, 2–3 for secondary. Below 2.5
+  reads weak and fragile; above 6 reads clumsy.
+- Dot / point radius: 3–9 units.
+- Spacing: at least 10–14 units between distinct elements.
+- Padding: keep all artwork at least 12–18 units from the canvas edge.
+- Negative space: 40–50% of the canvas must remain empty. Empty space is a
+  designed element, not leftover room.
+- Structural stability: two or three thin lines floating in space read as
+  fragile and unfinished. Give the mark visual mass — a solid form, a thick
+  stroke, or a dense repetition of 6+ lines.
+- Rounded subtraction: when cutting into a shape (counters, notches, gaps),
+  round the openings. Sharp interior corners read as accidental damage.
+
+COMPOSITION:
 - One idea per mark. A strong logo expresses a single thought clearly; two ideas
   in one mark means neither reads. State the idea before drawing it.
+- Single focal point: the eye must know instantly where to look. Avoid several
+  elements of equal visual weight competing.
+- Asymmetric tension beats dead symmetry. Perfect mirror symmetry is inert;
+  deliberate imbalance creates energy. (Wordmarks and emblems may be symmetric
+  where the type demands it.)
 - Construction: build on simple geometric relationships (halves, thirds,
-  consistent radii, a consistent stroke weight). Curves meet lines tangentially.
-  Nothing placed "about there" — everything placed on purpose.
+  consistent radii). Curves meet lines tangentially. Nothing placed "about
+  there" — everything placed on purpose.
 - Optical correction: mathematically equal is not optically equal. Circles and
   points overshoot the baseline slightly; horizontal strokes are slightly
   thinner than vertical; optical centering beats geometric centering.
 - Negative space is a material. The best marks make the space between shapes do
   work (FedEx arrow). Prefer removing a shape over adding one.
+
+STANDARDS:
 - The reduction test: the mark must survive at 16px, in a single flat color, and
-  reversed out of a dark background. Fine detail, thin hairlines, and gradients
-  fail this test. If it dies small, it's not a logo.
+  reversed out of a dark background. Fine detail, thin hairlines, and low
+  contrast internal shapes fail this test. If it dies small, it is not a logo.
+- Restraint: every element must justify its existence. No gradient, shadow, or
+  extra colour "because we can".
 - Distinctiveness over decoration: a plain circle with the name in Helvetica is
   a placeholder, not an identity. Every mark needs one memorable, ownable move.
 - Longevity: design for a decade, not a feed. Trend-driven moves (current
@@ -70,15 +101,22 @@ Be harsh. A polite 75 for everything helps no one; use the full range.`;
 export const CROQUIS_STYLE = `Croquis rendering rules (Phase 1 sketches):
 - Self-contained SVG, viewBox="0 0 120 120", width="120", height="120",
   xmlns="http://www.w3.org/2000/svg".
-- Ink-on-paper only: strokes in #1C1C1E, fill="none" (tiny solid dots allowed).
-  NO color, NO gradients, no defs.
-- stroke-width between 2 and 3.5, stroke-linecap="round", stroke-linejoin="round".
-- Hand-drawn quality: prefer <path> with slightly irregular, confident lines over
-  perfect primitives; small gaps where strokes meet are good; a light
-  construction tick or guide line here and there is welcome.
-- Keep it a THUMBNAIL of an idea: 3–8 strokes of real content. If the concept is
-  a wordmark, sketch 2–4 loose letterforms suggesting the type's character —
-  do not attempt finished lettering.`;
+- Ink-on-paper only: strokes and fills in #1C1C1E. NO colour, NO gradients.
+- stroke-linecap="round", stroke-linejoin="round".
+- GEOMETRY MUST BE PRECISE. This is a low-fidelity sketch in PRESENTATION only
+  (monochrome ink, no colour, reduced detail) — never in construction. Do NOT
+  wobble lines, do NOT leave gaps where strokes should meet, do NOT add
+  construction ticks or guide lines. Every path closes where it should and every
+  coordinate is deliberate. A rough-looking mark here is a broken mark, not a
+  sketch.
+- Reduced detail is the ONLY thing lowered: state the idea with the fewest
+  possible shapes, and skip refinement work (exact optical corrections, colour,
+  fine internal detail) that belongs to the finished mark.
+- For a wordmark, lettermark, combination, or emblem: draw the actual
+  letterforms as clean geometry (paths or rects), spelled correctly. Do not
+  scribble a placeholder squiggle in place of type.
+- All measurable constraints above (stroke width, spacing, padding, negative
+  space, element count) apply here exactly as they do to a finished mark.`;
 
 // Rendering rules for Phase 2 finished marks.
 export const HIFI_STYLE = `Finished-mark rendering rules (Phase 2):
@@ -87,6 +125,9 @@ export const HIFI_STYLE = `Finished-mark rendering rules (Phase 2):
 - Self-contained only: no <script>, <foreignObject>, <image>, external hrefs, or
   CSS @import. Inline shapes, paths, and (sparingly) gradients only.
 - Clean vector craft: deliberate geometry, consistent stroke weights, optical
-  corrections applied. Use the brand's colors purposefully — most strong marks
-  use one or two colors, not five.
-- Assume a light background; the mark must also read as a silhouette.`;
+  corrections applied. Every measurable constraint above is enforced here.
+- Colour: one or two brand colours, used purposefully. A third is rarely
+  justified. Flat fills unless the chosen visual language explicitly calls for a
+  gradient.
+- Group related elements with <g>; use <defs> for anything reused.
+- Assume a light background; the mark must also read as a flat silhouette.`;

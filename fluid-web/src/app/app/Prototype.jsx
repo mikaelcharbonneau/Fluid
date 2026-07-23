@@ -8,6 +8,7 @@
 // Imported with { ssr: false } so top-level window writes run client-only.
 // =====================================================================
 import React from "react";
+import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
 
 // Two source files declare the bare `const { useState } = React` (and the
 // bootstrap adds useEffect); in a single shared scope those collide, so we
@@ -2482,6 +2483,133 @@ const APlatformPanel = ({ platform }) => {
   );
 };
 
+// ── Step 4 brief · preview illustrations ─────────────────────────────
+// Small hand-authored SVGs showing what each choice produces. These are
+// illustrative samples, not generated output — their job is to make an
+// abstract taxonomy legible at a glance.
+const INK = '#1C1C1E';
+
+const MARK_TYPE_PREVIEW = {
+  wordmark: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <text x="60" y="38" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="26" letterSpacing="-1.2" fill={INK}>FORMA</text>
+    </svg>
+  ),
+  lettermark: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="42" y="8" width="36" height="44" rx="8" fill={INK}/>
+      <text x="60" y="40" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="24" fill="#fff">F</text>
+    </svg>
+  ),
+  pictorial: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M44 46 L60 14 L76 46 Z" fill="none" stroke={INK} strokeWidth="4" strokeLinejoin="round"/>
+      <circle cx="60" cy="34" r="4" fill={INK}/>
+    </svg>
+  ),
+  abstract: (
+    // Two offset rounded squares — layered, geometric, and (unlike a circle
+    // beside a stem) impossible to misread as a letterform.
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="40" y="9" width="30" height="30" rx="9" fill="none" stroke={INK} strokeWidth="4"/>
+      <rect x="53" y="22" width="30" height="30" rx="9" fill={INK}/>
+    </svg>
+  ),
+  combination: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="20" r="11" fill="none" stroke={INK} strokeWidth="4"/>
+      <circle cx="60" cy="20" r="3.5" fill={INK}/>
+      <text x="60" y="50" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="700" fontSize="15" letterSpacing="-0.5" fill={INK}>FORMA</text>
+    </svg>
+  ),
+  emblem: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="30" r="25" fill="none" stroke={INK} strokeWidth="3.5"/>
+      <text x="60" y="34" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="700" fontSize="9" letterSpacing="0.2" fill={INK}>FORMA</text>
+    </svg>
+  ),
+};
+
+const DESIGN_STYLE_PREVIEW = {
+  studio: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M60 14 L64.5 26 L76 30 L64.5 34 L60 46 L55.5 34 L44 30 L55.5 26 Z" fill={INK}/>
+    </svg>
+  ),
+  longlegs: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M46 8 L46 52 M60 8 L60 52 M74 8 L74 40 Q74 52 86 52" stroke={INK} strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+      <path d="M34 52 L46 52" stroke={INK} strokeWidth="4.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  sprinklers: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M60 10 C68 24 72 28 72 34 A12 12 0 0 1 48 34 C48 28 52 24 60 10 Z" fill={INK}/>
+      <path d="M40 30 C44 37 46 39 46 42 A6 6 0 0 1 34 42 C34 39 36 37 40 30 Z" fill={INK} opacity="0.65"/>
+      <path d="M84 34 C87 39 88 40 88 42 A4.5 4.5 0 0 1 79 42 C79 40 81 39 84 34 Z" fill={INK} opacity="0.45"/>
+    </svg>
+  ),
+  blurtails: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bt-prev" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor={INK} stopOpacity="0.55"/>
+          <stop offset="1" stopColor={INK} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect x="24" y="22" width="44" height="16" rx="8" fill="url(#bt-prev)"/>
+      <circle cx="74" cy="30" r="14" fill={INK}/>
+    </svg>
+  ),
+  typemelts: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M38 46 L38 16 A9 9 0 0 1 56 16 L56 26 Q60 30 64 26 L64 16 A9 9 0 0 1 82 16 L82 46" stroke={INK} strokeWidth="10" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  polygrids: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <g fill={INK}>
+        <circle cx="44" cy="16" r="4.5"/>
+        <rect x="55.5" y="11.5" width="9" height="9"/>
+        <path d="M76 11 L80.5 20 L71.5 20 Z"/>
+        <path d="M39.5 32 L48.5 32 M44 27.5 L44 36.5" stroke={INK} strokeWidth="3.5"/>
+        <circle cx="60" cy="32" r="4.5"/>
+        <rect x="71.5" y="27.5" width="9" height="9" rx="4.5"/>
+        <rect x="39.5" y="43.5" width="9" height="9"/>
+        <path d="M60 43 L64.5 52 L55.5 52 Z"/>
+        <circle cx="76" cy="48" r="4.5"/>
+      </g>
+    </svg>
+  ),
+};
+
+// A selectable choice card with an illustrative preview.
+const AChoiceCard = ({ option, preview, sel, onClick }) => (
+  <button onClick={onClick} type="button" style={{
+    background: 'var(--bg-elev)', borderRadius: 14, padding: 12, cursor: 'pointer',
+    border: 0, textAlign: 'left', width: '100%',
+    boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    display: 'flex', flexDirection: 'column', gap: 10,
+  }}>
+    <div style={{
+      background: '#FBFAF6', borderRadius: 9, height: 62,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)', padding: '0 8px',
+    }}>
+      {preview}
+    </div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, letterSpacing: '-0.015em', color: '#000' }}>{option.name}</span>
+        {sel && <span style={{ width: 15, height: 15, borderRadius: 99, background: '#000', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 15px' }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.35, marginTop: 3 }}>{option.blurb}</div>
+    </div>
+  </button>
+);
+
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
   const brandId = draft && draft.id;
@@ -2492,40 +2620,53 @@ const DirA_Step4_Logo = () => {
   const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
   const chosen = (draft && draft.logo_choice) || null;
 
+  const savedConfig = data.logo_config || {};
   const [platform, setPlatform] = React.useState(data.creative_platform || null);
   const [sketches, setSketches] = React.useState(data.logo_sketches || []);
   const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
   const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
-  const [phase, setPhase] = React.useState((data.logo_finalists || []).length ? 'final' : 'sketch');
+  // The Step 4 brief — the studio doesn't draw a line until the client has
+  // specified what kind of mark they're commissioning.
+  const [markType, setMarkType] = React.useState(savedConfig.mark_type || null);
+  const [designStyle, setDesignStyle] = React.useState(savedConfig.design_style || 'studio');
+  const [instructions, setInstructions] = React.useState(savedConfig.instructions || '');
+  const [phase, setPhase] = React.useState(
+    (data.logo_finalists || []).length ? 'final'
+      : (data.logo_sketches || []).length ? 'sketch'
+      : 'brief',
+  );
   const [loadingSketches, setLoadingSketches] = React.useState(false);
   const [loadingRefine, setLoadingRefine] = React.useState(false);
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
 
   const loading = loadingSketches || loadingRefine;
 
   // Phase 1 — generate (or regenerate) the 9-up sketch board. Likes so far
   // bias the new spread; a fresh board starts with a clean slate of likes.
   const generateSketches = React.useCallback(async (likedIds) => {
-    if (!brandId) return;
+    if (!brandId || !markType) return;
     setLoadingSketches(true); setError('');
-    const res = await apiGenerateLogoSketches(brandId, likedIds || []);
+    setPhase('sketch');
+    const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
+      mark_type: markType, design_style: designStyle, instructions,
+    });
     if (res.error) {
       setError(res.error);
+      if (!sketches.length) setPhase('brief');
     } else {
       setPlatform(res.platform);
       setSketches(res.sketches);
       setLikes([]);
-      setPhase('sketch');
       setField('data', {
         ...((draft && draft.data) || {}),
         creative_platform: res.platform,
+        logo_config: { mark_type: markType, design_style: designStyle, instructions },
         logo_sketches: res.sketches,
         logo_sketch_likes: [],
       });
     }
     setLoadingSketches(false);
-  }, [brandId, draft, setField]);
+  }, [brandId, draft, setField, markType, designStyle, instructions, sketches.length]);
 
   // Phase 2 — refine the liked directions into 9 critiqued finalists.
   const refine = React.useCallback(async () => {
@@ -2553,27 +2694,30 @@ const DirA_Step4_Logo = () => {
     setField('data', { ...((draft && draft.data) || {}), logo_sketch_likes: next });
   };
 
-  // Auto-generate the first board when the step opens with a brief and no
-  // sketches yet.
-  React.useEffect(() => {
-    if (!brandId || !hasBrief || sketches.length) return;
-    if (requestedFor.current === brandId) return;
-    requestedFor.current = brandId;
-    generateSketches([]);
-  }, [brandId, hasBrief, sketches.length, generateSketches]);
+  // No auto-generation: the studio waits for the client's brief. Nothing is
+  // drawn (and no tokens spent) until a mark type is chosen.
 
   const toolBtn = {
     padding:'8px 12px', borderRadius:10, fontSize:12, fontWeight:600, border:0,
     display:'inline-flex', alignItems:'center', gap:6,
   };
 
+  const TITLES = {
+    brief: 'Brief the studio.',
+    sketch: 'Pick the directions you like.',
+    final: 'Choose the mark.',
+  };
+  const SUBTITLES = {
+    brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
+    sketch: 'The studio sketched nine concepts across the brand’s strategic territories. Like the ones that feel right — your picks steer the finished designs.',
+    final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
+  };
+
   return (
   <AWizardLayout
     step={4}
-    title={phase === 'final' ? 'Choose the mark.' : 'Pick the directions you like.'}
-    subtitle={phase === 'final'
-      ? 'Nine finished marks, developed from your picks and ranked by the studio’s critique.'
-      : 'The studio sketched nine rough concepts across the brand’s strategic territories. Like the ones that feel right — your picks steer the finished designs.'}
+    title={TITLES[phase]}
+    subtitle={SUBTITLES[phase]}
     status="Draft"
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
@@ -2584,12 +2728,28 @@ const DirA_Step4_Logo = () => {
       <div>
         {/* ── Toolbar ─────────────────────────────────────────────── */}
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:14, flexWrap:'wrap'}}>
-          {phase === 'sketch' ? (
+          {phase === 'brief' ? (
+            <>
+              <div className="eyebrow" style={{color:'var(--fg-3)'}}>The brief</div>
+              {sketches.length > 0 && (
+                <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
+                  Back to sketches
+                </button>
+              )}
+            </>
+          ) : phase === 'sketch' ? (
             <>
               <div className="eyebrow" style={{color:'var(--fg-3)'}}>
                 Concept sketches{likes.length ? ' · ' + likes.length + ' liked' : ''}
               </div>
               <div style={{display:'flex', gap:8}}>
+                <button onClick={() => !loading && setPhase('brief')} disabled={loading} style={{
+                  ...toolBtn, background:'transparent', color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line)',
+                  cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1,
+                }}>
+                  Edit brief
+                </button>
                 <button onClick={() => !loading && hasBrief && generateSketches(likes)} disabled={loading || !hasBrief} style={{
                   ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
                   boxShadow:'inset 0 0 0 1px var(--line)',
@@ -2630,6 +2790,70 @@ const DirA_Step4_Logo = () => {
         {!hasBrief && !sketches.length && (
           <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5, background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)'}}>
             Add a brief in Step 1 and the studio will sketch logo concepts here.
+          </div>
+        )}
+
+        {/* ── Phase 0 · the brief ─────────────────────────────────── */}
+        {phase === 'brief' && hasBrief && (
+          <div style={{display:'flex', flexDirection:'column', gap:22}}>
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>What kind of mark?</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Required</span>
+              </div>
+              <div className="home-grid-3" style={{display:'grid', gap:10}}>
+                {MARK_TYPE_OPTIONS.map((o) => (
+                  <AChoiceCard key={o.id} option={o} preview={MARK_TYPE_PREVIEW[o.id]}
+                    sel={markType === o.id} onClick={() => setMarkType(o.id)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Visual language</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Current logo-design trends</span>
+              </div>
+              <div className="home-grid-3" style={{display:'grid', gap:10}}>
+                {DESIGN_STYLE_OPTIONS.map((o) => (
+                  <AChoiceCard key={o.id} option={o} preview={DESIGN_STYLE_PREVIEW[o.id]}
+                    sel={designStyle === o.id} onClick={() => setDesignStyle(o.id)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Anything else?</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Optional</span>
+              </div>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value.slice(0, 1000))}
+                placeholder="e.g. avoid anything circular · reference our origami packaging · must work embroidered on a cap"
+                rows={3}
+                style={{
+                  width:'100%', resize:'vertical', padding:'12px 14px', borderRadius:12,
+                  background:'var(--bg-elev)', border:0, outline:'none',
+                  boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+                  fontSize:13, lineHeight:1.5, color:'var(--fg-1)', fontFamily:'inherit',
+                }}
+              />
+              <div style={{fontSize:11, color:'var(--fg-4)', marginTop:5, textAlign:'right'}}>{instructions.length}/1000</div>
+            </div>
+
+            <div style={{display:'flex', alignItems:'center', gap:12, flexWrap:'wrap'}}>
+              <button onClick={() => !loading && markType && generateSketches([])} disabled={loading || !markType} style={{
+                ...toolBtn, padding:'11px 18px', fontSize:13.5, background:'#000', color:'#fff',
+                cursor: loading || !markType ? 'default' : 'pointer', opacity: loading || !markType ? 0.5 : 1,
+              }}>
+                <Sparkle size={12} color="#fff"/> Sketch nine concepts <ArrowRight size={12}/>
+              </button>
+              {!markType && <span style={{fontSize:12, color:'var(--fg-4)'}}>Choose a mark type to continue.</span>}
+              {sketches.length > 0 && markType && (
+                <span style={{fontSize:12, color:'var(--fg-4)'}}>This replaces your current board.</span>
+              )}
+            </div>
           </div>
         )}
 
@@ -5998,11 +6222,11 @@ async function apiGenerateLogos(brandId) {
 }
 // Logo studio · Phase 1 — creative platform + 9 low-fi concept sketches.
 // likedIds bias a regeneration toward the client's demonstrated taste.
-async function apiGenerateLogoSketches(brandId, likedIds) {
+async function apiGenerateLogoSketches(brandId, likedIds, config) {
   try {
     const r = await fetch('/api/generate/logo/sketches', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
+      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {} }),
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);

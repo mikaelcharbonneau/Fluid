@@ -17,6 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { sanitizeSvg } from "./logo";
 import type { CreativePlatform } from "./platform";
 import type { LogoSketch } from "./sketches";
+import { type LogoConfig, logoConfigContext } from "../logo-styles";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -43,6 +44,7 @@ export interface RefineBrief {
   platform: CreativePlatform;
   liked: LogoSketch[]; // ≥1
   styleContext?: string | null;
+  config?: LogoConfig | null; // the client's Step 4 brief
   paletteColors?: string[] | null; // brand hexes for the finished marks
 }
 
@@ -92,6 +94,12 @@ function commonContext(input: RefineBrief): string[] {
     ``,
     ...platformLines(input.platform),
   ];
+  // The client's Step 4 brief is mandatory — it constrains the finished marks
+  // exactly as it constrained the sketches.
+  const configCtx = logoConfigContext(input.config ?? {});
+  if (configCtx) {
+    lines.push(``, `THE CLIENT'S BRIEF — these choices are mandatory:`, configCtx);
+  }
   const palette = (input.paletteColors ?? []).filter(Boolean);
   if (palette.length) {
     lines.push(``, `Brand colors (use purposefully — 1 or 2 per mark): ${palette.join(", ")}`);
