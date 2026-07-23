@@ -2369,37 +2369,118 @@ const DirA_Step3_Name = () => {
 };
 
 // =====================================================================
-// A5 · Step 4 · Logo Generation Screen
-// The mark is generated here, live, from everything the user has given us
-// in Steps 1–3: the brief, the chosen name, the Step 2 style, and (if it
-// exists yet) the palette's primary color. The server route reads all of
-// that from the brand record — this screen just triggers it, renders the
-// returned SVG marks, and lets the user pick one and regenerate. The pick
-// and the marks are cached onto the draft so Step 5 reuses them instead of
-// paying to regenerate.
+// A5 · Step 4 · The Logo Studio — a two-phase agency process.
+//
+// Phase 1 · Divergence: the server generates a creative platform (the
+// strategy behind the brand) and a 9-up board of low-fidelity concept
+// sketches (croquis), fanned out across strategic territories and mark
+// types. The user likes the directions that resonate — those likes carry
+// structured metadata (territory, mark type, formal attributes), so they
+// genuinely orient the next phase. The board can be regenerated, biased
+// by any likes so far.
+//
+// Phase 2 · Convergence: the liked sketches are developed into finished
+// vector marks, the pool is expanded with new concepts extending the
+// user's taste, and a creative-director critique pass culls to the best
+// 9 — each with a verdict note. The pick lands in logo_choice, and the
+// finalists mirror into data.logos so Step 5 / export work unchanged.
 // =====================================================================
 
-// One generated mark, rendered as a real (sanitized) SVG on a neutral card.
-const AGeneratedLogoCard = ({ concept, sel, onClick }) => (
+// A low-fi croquis card: ink sketch on paper, with a like control. The
+// idea is the star — rough rendering keeps the focus on direction.
+const ASketchCard = ({ sketch, liked, onLike }) => (
+  <div style={{
+    background:'var(--bg-elev)', borderRadius: 16, padding: 12,
+    boxShadow: liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    display:'flex', flexDirection:'column', gap:10, position:'relative',
+  }}>
+    {/* Paper canvas */}
+    <div style={{
+      background:'#FBFAF6', borderRadius: 10, height: 120,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
+    }}>
+      <SvgMark svg={sketch.svg} size={92} />
+    </div>
+    <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
+      <div style={{minWidth:0}}>
+        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{sketch.name}</div>
+        <div style={{display:'flex', alignItems:'center', gap:6, marginTop:4, flexWrap:'wrap'}}>
+          <span style={{fontSize:9.5, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'2px 7px', borderRadius:99}}>{sketch.territory_name || sketch.territory}</span>
+          <span style={{fontSize:9.5, fontFamily:'var(--font-mono)', letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-4)'}}>{sketch.mark_type}</span>
+        </div>
+      </div>
+      <button onClick={onLike} aria-label={(liked ? 'Unlike ' : 'Like ') + sketch.name} style={{
+        flex:'0 0 30px', width:30, height:30, borderRadius:99, border:0, cursor:'pointer',
+        background: liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',
+        display:'inline-flex', alignItems:'center', justifyContent:'center',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </button>
+    </div>
+    {sketch.idea && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4}}>{sketch.idea}</div>}
+  </div>
+);
+
+// A high-fidelity finalist card: the finished mark plus the designer's
+// rationale and the creative director's verdict from the critique pass.
+const AFinalistCard = ({ f, sel, onClick }) => (
   <div onClick={onClick} style={{
-    background:'var(--bg-elev)', borderRadius: 18, padding: 16, cursor:'pointer',
+    background:'var(--bg-elev)', borderRadius: 16, padding: 12, cursor:'pointer',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-    display:'flex', flexDirection:'column', gap:12,
+    display:'flex', flexDirection:'column', gap:10,
   }}>
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-      <span style={{fontSize:10.5, color:'var(--fg-3)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>Concept</span>
+      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
+        {f.refines ? 'From your pick' : 'New direction'}
+      </span>
       {sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
     </div>
-    {/* Hero mark — the model draws for a light background, so render on white. */}
-    <div style={{background:'#fff', borderRadius: 12, height: 160, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 1px var(--line)'}}>
-      <SvgMark svg={concept.svg} size={130} />
+    <div style={{background:'#fff', borderRadius: 10, height: 130, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 1px var(--line)'}}>
+      <SvgMark svg={f.svg} size={104} />
     </div>
     <div>
-      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, letterSpacing:'-0.018em', color:'#000'}}>{concept.name}</div>
-      {concept.descriptor && <div style={{fontSize:11.5, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{concept.descriptor}</div>}
+      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000'}}>{f.name}</div>
+      {f.idea && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{f.idea}</div>}
+      {f.critique && <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.4, marginTop:6, paddingTop:6, borderTop:'1px solid var(--line)', fontStyle:'italic'}}>Studio note — {f.critique}</div>}
     </div>
   </div>
 );
+
+// Right-rail panel showing the creative platform the board was designed
+// from — the strategy is part of the deliverable, not hidden plumbing.
+const APlatformPanel = ({ platform }) => {
+  if (!platform) return null;
+  return (
+    <div style={{
+      background:'var(--bg-elev)', borderRadius:16, padding:16,
+      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+      display:'flex', flexDirection:'column', gap:12,
+    }}>
+      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>Creative platform</div>
+      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, lineHeight:1.35, letterSpacing:'-0.015em', color:'#000'}}>
+        “{platform.brand_idea}”
+      </div>
+      {(platform.personality || []).length > 0 && (
+        <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
+          {platform.personality.map((p) => (
+            <span key={p} style={{fontSize:10.5, fontWeight:600, color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'3px 9px', borderRadius:99}}>{p}</span>
+          ))}
+        </div>
+      )}
+      {(platform.territories || []).length > 0 && (
+        <div style={{display:'flex', flexDirection:'column', gap:8}}>
+          {platform.territories.map((t) => (
+            <div key={t.key}>
+              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{t.name}</div>
+              <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4}}>{t.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
@@ -2409,117 +2490,204 @@ const DirA_Step4_Logo = () => {
   const hasBrief = !!brief;
   const name = (draft && (draft.name_choice || draft.name)) || '';
   const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
-
-  const cached = data.logos || [];
   const chosen = (draft && draft.logo_choice) || null;
-  const [logos, setLogos] = React.useState(cached);
-  const [loading, setLoading] = React.useState(false);
+
+  const [platform, setPlatform] = React.useState(data.creative_platform || null);
+  const [sketches, setSketches] = React.useState(data.logo_sketches || []);
+  const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
+  const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
+  const [phase, setPhase] = React.useState((data.logo_finalists || []).length ? 'final' : 'sketch');
+  const [loadingSketches, setLoadingSketches] = React.useState(false);
+  const [loadingRefine, setLoadingRefine] = React.useState(false);
   const [error, setError] = React.useState('');
   const requestedFor = React.useRef(null);
 
-  // ─────────────────────────────────────────────────────────────────────
-  // DECISION POINT — when may Step 4 auto-spend tokens to draft marks?
-  //
-  // The mark is stronger when it's built around the name the user actually
-  // chose, not the placeholder we derive from the brief. But requiring an
-  // explicit name-step pick means some users hit Step 4 and see nothing
-  // generate until they go back. Current default: a brief is enough (the
-  // server always has *a* name via name_choice || name).
-  //
-  // Consider gating on an explicit `draft.name_choice` instead, so the logo
-  // always reflects a deliberate name. Trade-off: fewer wasted generations
-  // vs. an extra empty state to explain. Adjust `canGenerate` to taste.
-  // ─────────────────────────────────────────────────────────────────────
-  const canGenerate = hasBrief;
+  const loading = loadingSketches || loadingRefine;
 
-  const generate = React.useCallback(async () => {
+  // Phase 1 — generate (or regenerate) the 9-up sketch board. Likes so far
+  // bias the new spread; a fresh board starts with a clean slate of likes.
+  const generateSketches = React.useCallback(async (likedIds) => {
     if (!brandId) return;
-    setLoading(true); setError('');
-    const res = await apiGenerateLogos(brandId);
+    setLoadingSketches(true); setError('');
+    const res = await apiGenerateLogoSketches(brandId, likedIds || []);
     if (res.error) {
       setError(res.error);
     } else {
-      setLogos(res.logos);
-      // Cache onto the draft so Step 5 reuses these marks (no double spend).
-      setField('data', { ...((draft && draft.data) || {}), logos: res.logos });
+      setPlatform(res.platform);
+      setSketches(res.sketches);
+      setLikes([]);
+      setPhase('sketch');
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        creative_platform: res.platform,
+        logo_sketches: res.sketches,
+        logo_sketch_likes: [],
+      });
     }
-    setLoading(false);
+    setLoadingSketches(false);
   }, [brandId, draft, setField]);
 
-  // Auto-generate once when the screen opens with nothing cached yet.
+  // Phase 2 — refine the liked directions into 9 critiqued finalists.
+  const refine = React.useCallback(async () => {
+    if (!brandId || likes.length === 0) return;
+    setLoadingRefine(true); setError('');
+    const res = await apiRefineLogoSketches(brandId, likes);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setFinalists(res.finalists);
+      setPhase('final');
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        logo_finalists: res.finalists,
+        logo_sketch_likes: likes,
+        logos: res.finalists.map((f) => ({ name: f.name, descriptor: f.idea, svg: f.svg })),
+      });
+    }
+    setLoadingRefine(false);
+  }, [brandId, likes, draft, setField]);
+
+  const toggleLike = (id) => {
+    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
+    setLikes(next);
+    setField('data', { ...((draft && draft.data) || {}), logo_sketch_likes: next });
+  };
+
+  // Auto-generate the first board when the step opens with a brief and no
+  // sketches yet.
   React.useEffect(() => {
-    if (!brandId || !canGenerate || logos.length) return;
+    if (!brandId || !hasBrief || sketches.length) return;
     if (requestedFor.current === brandId) return;
     requestedFor.current = brandId;
-    generate();
-  }, [brandId, canGenerate, logos.length, generate]);
+    generateSketches([]);
+  }, [brandId, hasBrief, sketches.length, generateSketches]);
+
+  const toolBtn = {
+    padding:'8px 12px', borderRadius:10, fontSize:12, fontWeight:600, border:0,
+    display:'inline-flex', alignItems:'center', gap:6,
+  };
 
   return (
   <AWizardLayout
     step={4}
-    title="Design the mark."
-    subtitle="Fluid draws logo concepts from your brief, name, and style — pick your favorite, or regenerate for a fresh set."
+    title={phase === 'final' ? 'Choose the mark.' : 'Pick the directions you like.'}
+    subtitle={phase === 'final'
+      ? 'Nine finished marks, developed from your picks and ranked by the studio’s critique.'
+      : 'The studio sketched nine rough concepts across the brand’s strategic territories. Like the ones that feel right — your picks steer the finished designs.'}
     status="Draft"
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
     onNext={() => {}}
     isThinking={loading}
   >
-    <div style={{display:'grid', gridTemplateColumns:'2.4fr 1fr', gap:18, alignItems:'start'}}>
-      {/* Left — the generated marks */}
+    <div style={{display:'grid', gridTemplateColumns:'2.6fr 1fr', gap:18, alignItems:'start'}}>
       <div>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14}}>
-          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Generated marks</div>
-          <button onClick={() => !loading && canGenerate && generate()} disabled={loading || !canGenerate} style={{
-            padding:'8px 12px', borderRadius:10, background:'#000', color:'#fff',
-            fontSize:12, fontWeight:600, border:0,
-            display:'inline-flex', alignItems:'center', gap:6,
-            cursor: loading || !canGenerate ? 'default' : 'pointer', opacity: loading || !canGenerate ? 0.6 : 1,
-          }}>
-            <Sparkle size={12} color="#fff"/> {logos.length ? 'Regenerate' : 'Generate marks'}
-          </button>
+        {/* ── Toolbar ─────────────────────────────────────────────── */}
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:14, flexWrap:'wrap'}}>
+          {phase === 'sketch' ? (
+            <>
+              <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+                Concept sketches{likes.length ? ' · ' + likes.length + ' liked' : ''}
+              </div>
+              <div style={{display:'flex', gap:8}}>
+                <button onClick={() => !loading && hasBrief && generateSketches(likes)} disabled={loading || !hasBrief} style={{
+                  ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
+                  boxShadow:'inset 0 0 0 1px var(--line)',
+                  cursor: loading || !hasBrief ? 'default' : 'pointer', opacity: loading || !hasBrief ? 0.6 : 1,
+                }}>
+                  <Sparkle size={11}/> {sketches.length ? 'Regenerate sketches' : 'Generate sketches'}
+                </button>
+                <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
+                  ...toolBtn, background:'#000', color:'#fff',
+                  cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.5 : 1,
+                }}>
+                  Create high-fidelity logos {likes.length ? '(' + likes.length + ')' : ''} <ArrowRight size={11}/>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
+                ← Concept sketches
+              </button>
+              <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
+                ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)', boxShadow:'inset 0 0 0 1px var(--line)',
+                cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.6 : 1,
+              }}>
+                <Sparkle size={11}/> Re-run the studio
+              </button>
+            </>
+          )}
         </div>
 
         {error && (
           <div style={{marginBottom:14, padding:'12px 14px', borderRadius:12, background:'rgba(253,121,71,.10)', boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)', fontSize:12.5, color:'#A8421F', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
             <span>{error}</span>
-            <button onClick={() => generate()} style={{padding:'5px 10px', borderRadius:8, background:'#000', color:'#fff', fontSize:11.5, fontWeight:600, border:0, cursor:'pointer'}}>Try again</button>
+            <button onClick={() => phase === 'final' || finalists.length ? refine() : generateSketches(likes)} style={{padding:'5px 10px', borderRadius:8, background:'#000', color:'#fff', fontSize:11.5, fontWeight:600, border:0, cursor:'pointer'}}>Try again</button>
           </div>
         )}
 
-        {/* Can't generate yet — send them back for a brief. */}
-        {!canGenerate && !logos.length && (
+        {!hasBrief && !sketches.length && (
           <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5, background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)'}}>
-            Add a brief in Step 1 and Fluid will design logo marks here.
+            Add a brief in Step 1 and the studio will sketch logo concepts here.
           </div>
         )}
 
-        {/* First-run loading skeletons. */}
-        {canGenerate && !logos.length && (
-          <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14}}>
-            {Array.from({length:3}).map((_, i) => (
-              <div key={i} style={{background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:236, display:'flex', alignItems:'center', justifyContent:'center'}}>{loading && i === 0 ? <Thinking/> : null}</div>
+        {/* ── Phase 1 · the sketch board ──────────────────────────── */}
+        {phase === 'sketch' && hasBrief && sketches.length === 0 && (
+          <div className="home-grid-3" style={{display:'grid', gap:12}}>
+            {Array.from({length:9}).map((_, i) => (
+              <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                {loadingSketches && i === 4 ? <Thinking/> : null}
+              </div>
             ))}
           </div>
         )}
+        {phase === 'sketch' && sketches.length > 0 && (
+          <>
+            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
+              {sketches.map((s) => (
+                <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
+              ))}
+            </div>
+            {loadingRefine && (
+              <div style={{marginTop:14, padding:'12px 16px', borderRadius:12, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', fontSize:12.5, color:'var(--fg-2)', display:'flex', alignItems:'center', gap:10}}>
+                <Thinking/> The studio is refining your directions into finished marks — this takes a minute…
+              </div>
+            )}
+            {!loadingRefine && likes.length === 0 && (
+              <div style={{marginTop:14, fontSize:12, color:'var(--fg-4)', textAlign:'center'}}>
+                Like at least one sketch to unlock high-fidelity design.
+              </div>
+            )}
+          </>
+        )}
 
-        {/* The marks. */}
-        {logos.length > 0 && (
-          <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, opacity: loading ? 0.5 : 1}}>
-            {logos.map((c) => (
-              <AGeneratedLogoCard key={c.name} concept={c} sel={chosen === c.name}
-                onClick={() => setField('logo_choice', c.name)} />
-            ))}
-          </div>
+        {/* ── Phase 2 · the finalists ─────────────────────────────── */}
+        {phase === 'final' && (
+          finalists.length > 0 ? (
+            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
+              {finalists.map((f) => (
+                <AFinalistCard key={f.id || f.name} f={f} sel={chosen === f.name}
+                  onClick={() => setField('logo_choice', f.name)} />
+              ))}
+            </div>
+          ) : (
+            <div className="home-grid-3" style={{display:'grid', gap:12}}>
+              {Array.from({length:9}).map((_, i) => (
+                <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:220, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  {loadingRefine && i === 4 ? <Thinking/> : null}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
-      {/* Right — what the marks were drawn from (Steps 1–3). */}
+      {/* ── Right rail: strategy + context ───────────────────────── */}
       <div style={{display:'flex', flexDirection:'column', gap:14}}>
+        <APlatformPanel platform={platform} />
         <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
-        <div style={{background:'var(--bg-elev)', borderRadius:16, padding:16, boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)', fontSize:12, color:'var(--fg-3)', lineHeight:1.5}}>
-          <Sparkle size={11}/> These marks are generated live from your brief, name, and style. Regenerate for a new set, then pick the one to carry into your Brand Kit.
-        </div>
       </div>
     </div>
   </AWizardLayout>
@@ -5826,6 +5994,33 @@ async function apiGenerateLogos(brandId) {
     signalBalanceChanged(j.code);
     if (!r.ok) return { error: j.error || 'Generation failed.', code: j.code };
     return { logos: j.logos || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Logo studio · Phase 1 — creative platform + 9 low-fi concept sketches.
+// likedIds bias a regeneration toward the client's demonstrated taste.
+async function apiGenerateLogoSketches(brandId, likedIds) {
+  try {
+    const r = await fetch('/api/generate/logo/sketches', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
+    });
+    const j = await r.json().catch(() => ({}));
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Sketch generation failed.', code: j.code };
+    return { platform: j.platform || null, sketches: j.sketches || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.
+async function apiRefineLogoSketches(brandId, likedIds) {
+  try {
+    const r = await fetch('/api/generate/logo/refine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
+    });
+    const j = await r.json().catch(() => ({}));
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Refinement failed.', code: j.code };
+    return { finalists: j.finalists || [] };
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask Claude to synthesize written brand guidelines.
