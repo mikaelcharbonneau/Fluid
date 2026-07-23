@@ -1,17 +1,23 @@
 import Stripe from "stripe";
 
+// Read an env var, trimming surrounding whitespace. Values pasted into a
+// dashboard (e.g. Vercel) often pick up a trailing newline; an unnoticed "\n"
+// on a Stripe id or key makes Stripe reject it with a confusing
+// "No such price" / "Invalid API key", so we strip it defensively at the edge.
+const env = (name: string) => (process.env[name] ?? "").trim();
+
 // Server-only Stripe config. All values come from env; never expose the secret
 // key or webhook secret to the browser.
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
-export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+export const STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY");
+export const STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET");
 
 // Subscription tiers. Each maps a Stripe recurring price (set via env) to the
 // number of tokens it grants each billing month. Prices are created in Stripe.
 export type Tier = "free" | "starter" | "pro";
 
 export const TIERS: Record<Exclude<Tier, "free">, { price: string; tokens: number; label: string }> = {
-  starter: { price: process.env.STRIPE_PRICE_STARTER || "", tokens: 150, label: "Starter" },
-  pro: { price: process.env.STRIPE_PRICE_PRO || "", tokens: 500, label: "Pro" },
+  starter: { price: env("STRIPE_PRICE_STARTER"), tokens: 150, label: "Starter" },
+  pro: { price: env("STRIPE_PRICE_PRO"), tokens: 500, label: "Pro" },
 };
 
 export const FREE_TOKENS = 20;
