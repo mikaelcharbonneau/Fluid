@@ -6,6 +6,8 @@
 // (Prototype.jsx: VISUAL_STYLE_OPTIONS / PALETTE_OPTIONS / OPEN_SOURCE_FONT_PAIRS).
 // Keep them in sync if those lists change.
 
+import { platformContext } from "./platform";
+
 export interface CustomFont {
   id: string;
   family: string;
@@ -111,6 +113,12 @@ export function styleContext(brand: {
   if (fonts) {
     lines.push(`Chosen typography: ${fonts.heading} for headings, ${fonts.body} for body.`);
   }
+
+  // When a creative platform has been generated (Phase 0 of the logo studio),
+  // every asset generator designs from the same strategy — this is what keeps
+  // logo, palette, type, and guidelines expressing one idea.
+  const platform = platformContext(brand.data);
+  if (platform) lines.push("", platform);
 
   return lines.join("\n");
 }
