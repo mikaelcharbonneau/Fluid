@@ -129,3 +129,60 @@
     animation: shimmer 1.8s linear infinite;
     border-radius: 6px;
   }
+
+  /* ------------------------------------------------------------------
+     Responsiveness. The screens were built for a single 1440px artboard
+     (see the file header note) with no breakpoints at all, so anything
+     narrower — a laptop split-screen, a tablet, a phone — breaks in ways
+     the inline styles can't self-correct. These rules patch the worst
+     breaks in the shared app chrome (AShell's header) and the Home
+     dashboard's fixed-column grids/hero, the same way `.bacard-grid`
+     already patches the Brands library grid above. `!important` is
+     required to win over the ported inline styles (author `!important`
+     outranks a plain inline declaration in the cascade, regardless of
+     selector specificity).
+     ------------------------------------------------------------------ */
+
+  /* Header search: without this, squeezing the button below its content's
+     natural width doesn't shrink the button — the label text wraps
+     internally instead, which grows the button past the header's fixed
+     60px height and shoves the token pill / avatar off-screen. Collapse
+     to icon-only before that point is reached. */
+  @media (max-width: 820px) {
+    .ash-header { padding-left: 16px !important; padding-right: 16px !important; gap: 12px !important; }
+    .ash-search-label, .ash-search-kbd { display: none !important; }
+    .ash-search { padding: 8px !important; }
+  }
+  @media (max-width: 520px) {
+    .ash-breadcrumb { display: none !important; }
+  }
+
+  /* Screen content padding: 56px a side is fine on desktop, but eats a
+     third of a phone's width. */
+  @media (max-width: 700px) {
+    .main-pad { padding-left: 20px !important; padding-right: 20px !important; }
+  }
+
+  /* Home dashboard grids: fixed column counts (repeat(4,1fr) / repeat(3,1fr))
+     just compress every card into an unreadable sliver on a narrow
+     viewport instead of reflowing. Step them down instead. */
+  .home-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .home-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px) {
+    .home-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media (max-width: 560px) {
+    .home-grid-4, .home-grid-3 { grid-template-columns: 1fr !important; }
+  }
+
+  /* Home hero: text column vs. a decorative, fixed 432px-wide scrolling
+     collage. Below tablet width the collage has nowhere to go — drop it
+     rather than let it force an overflow or crush the text column (which
+     is what made the CTA buttons' labels wrap mid-word). */
+  @media (max-width: 900px) {
+    .home-hero { flex-direction: column !important; align-items: stretch !important; }
+    .home-hero-collage { display: none !important; }
+  }
+  @media (max-width: 700px) {
+    .home-hero { padding: 24px !important; }
+  }
