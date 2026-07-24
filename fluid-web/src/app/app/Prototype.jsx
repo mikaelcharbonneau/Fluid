@@ -1104,21 +1104,45 @@ const DirA_Step1_Brief = () => {
 //      sliders within the chosen register.
 // =====================================================================
 
-// Sparkle button — section-level "Let AI choose" affordance
-const ALetAI = ({ onClick, busy }) => (
-  <button onClick={onClick} disabled={busy} style={{
+// Sparkle button — section-level "Let AI choose" affordance. Toggles the
+// delegation on and off; `active` means the studio owns this decision.
+const ALetAI = ({ onClick, active }) => (
+  <button onClick={onClick} style={{
     display:'inline-flex', alignItems:'center', gap:6,
     padding:'6px 12px', borderRadius: 99,
-    background:'#0E0F12', color:'#fff',
-    fontSize: 11.5, fontWeight: 600, border:0, cursor: busy ? 'default' : 'pointer',
-    boxShadow:'0 1px 4px rgba(0,0,0,.18)', opacity: busy ? 0.7 : 1,
+    background: active ? 'rgba(253,186,80,.16)' : '#0E0F12',
+    color: active ? '#8A5A12' : '#fff',
+    boxShadow: active ? 'inset 0 0 0 1px rgba(253,186,80,.55)' : '0 1px 4px rgba(0,0,0,.18)',
+    fontSize: 11.5, fontWeight: 600, border:0, cursor:'pointer',
   }}>
-    <Sparkle size={11} color="#FDBA50"/> {busy ? 'Choosing…' : 'Let AI choose'}
+    <Sparkle size={11} color={active ? '#C77D14' : '#FDBA50'}/>
+    {active ? 'Fluid decides' : 'Let AI choose'}
   </button>
 );
 
+// Shown under a section the client delegated. States plainly that the choice
+// is deferred to the research step — not silently left blank.
+const ADelegatedNote = ({ what, onClear }) => (
+  <div style={{
+    display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+    padding:'10px 14px', borderRadius:12, marginBottom:12,
+    background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.35)',
+    fontSize:12.5, color:'#8A5A12', lineHeight:1.45,
+  }}>
+    <span style={{flex:1, minWidth:200}}>
+      Fluid will choose the {what} while researching your category — it won’t be
+      limited to the options below.
+    </span>
+    <button onClick={onClear} style={{
+      padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
+      background:'transparent', color:'#8A5A12', fontSize:11.5, fontWeight:700,
+      boxShadow:'inset 0 0 0 1px rgba(253,186,80,.55)',
+    }}>Pick it myself</button>
+  </div>
+);
+
 // Section heading: number badge + title + meta + AI button
-const ASectionHead = ({ n, title, sub, count, ai, onAI, aiBusy }) => (
+const ASectionHead = ({ n, title, sub, count, ai, onAI, aiActive }) => (
   <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:14}}>
     <div style={{display:'flex', alignItems:'center', gap:12, minWidth:0}}>
       {n && (
@@ -1138,7 +1162,7 @@ const ASectionHead = ({ n, title, sub, count, ai, onAI, aiBusy }) => (
     </div>
     <div style={{display:'flex', alignItems:'center', gap:10}}>
       {count && <span style={{fontSize:11, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>{count}</span>}
-      {ai && <ALetAI onClick={onAI} busy={aiBusy}/>}
+      {ai && <ALetAI onClick={onAI} active={aiActive}/>}
     </div>
   </div>
 );
@@ -1635,6 +1659,12 @@ const visualStyleImage = (id) => {
   return paths[id];
 };
 
+// "Let AI choose" writes this sentinel instead of resolving to one of the
+// curated options below. It means "the studio decides this during research,
+// unconstrained by these lists" — deliberately distinct from an unset field,
+// which just means the user hasn't decided. Mirrors DELEGATED in lib/ai/step2.
+const AI_CHOICE = '__ai__';
+
 const VISUAL_STYLE_OPTIONS = [
   {
     id: 'modern-minimal',
@@ -1764,18 +1794,16 @@ const AVisualStyleSection = () => {
   const { step2, setStep2 } = useStep2();
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState((draft && draft.style_id) || null);
+  const delegated = selectedId === AI_CHOICE;
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
   const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
-  const brandId = draft && draft.id;
-  const [picking, setPicking] = useState(false);
-  const letAIChoose = async () => {
-    if (!brandId || picking) return;
-    setPicking(true);
-    const opts = VISUAL_STYLE_OPTIONS.map((o) => ({ id: o.id, label: o.name, desc: o.descriptor }));
-    const { result } = await apiAssist(brandId, 'pick_style', opts);
-    if (result && result.choice) { setSelectedId(result.choice); setField('style_id', result.choice); }
-    setPicking(false);
+  // Delegating is instant and free — no model call. The decision is made later,
+  // by the research agent, with the category evidence in hand.
+  const letAIChoose = () => {
+    const next = delegated ? null : AI_CHOICE;
+    setSelectedId(next);
+    setField('style_id', next);
   };
 
   return (
@@ -1784,9 +1812,10 @@ const AVisualStyleSection = () => {
         n="01"
         title="Visual style"
         sub="Each card is a full preview of that visual direction."
-        ai onAI={letAIChoose} aiBusy={picking}
+        ai onAI={letAIChoose} aiActive={delegated}
       />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      {delegated && <ADelegatedNote what="visual direction" onClear={letAIChoose} />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, opacity: delegated ? 0.45 : 1 }}>
         {VISUAL_STYLE_OPTIONS.map((opt) => (
           <AVisualStyleCard
             key={opt.id}
@@ -1824,7 +1853,7 @@ const AVisualStyleSection = () => {
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Refine within {selected.name}
+              {delegated ? 'Tune the register' : 'Refine within ' + selected.name}
             </span>
             <div style={{ flex: 1, height: 1, background: 'var(--line)' }}/>
             <span style={{ fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>3 attributes</span>
@@ -1997,11 +2026,8 @@ const AUploadFontCard = ({ onPick }) => {
 
 // Typography section — open-source pairs, custom uploads, and Let AI choose.
 const ATypographySection = () => {
-  const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
-  const brandId = draft && draft.id;
   const customFonts = step2.custom_fonts || [];
-  const [picking, setPicking] = React.useState(false);
   const [uploadErr, setUploadErr] = React.useState('');
 
   React.useEffect(() => {
@@ -2011,14 +2037,9 @@ const ATypographySection = () => {
     customFonts.forEach((cf) => registerCustomFont(cf.family, cf.dataUrl));
   }, [customFonts]);
 
-  const pickFont = async () => {
-    if (!brandId || picking) return;
-    setPicking(true);
-    const opts = OPEN_SOURCE_FONT_PAIRS.map((p) => ({ id: p.id, label: p.name, desc: p.mood + ' — ' + p.display.family + ' / ' + p.body.family }));
-    const { result } = await apiAssist(brandId, 'pick_font', opts);
-    if (result && result.choice) setStep2({ font: result.choice });
-    setPicking(false);
-  };
+  // Defer to the studio rather than picking from the list (see AI_CHOICE).
+  const fontDelegated = step2.font === AI_CHOICE;
+  const pickFont = () => setStep2({ font: fontDelegated ? null : AI_CHOICE });
 
   const onUpload = async (file) => {
     setUploadErr('');
@@ -2041,8 +2062,9 @@ const ATypographySection = () => {
 
   return (
     <div style={{marginBottom: 12}}>
-      <ASectionHead n="03" title="Typography" sub="Open-source pairs previewed live — or upload your own font." ai onAI={pickFont} aiBusy={picking}/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
+      <ASectionHead n="03" title="Typography" sub="Open-source pairs previewed live — or upload your own font." ai onAI={pickFont} aiActive={fontDelegated}/>
+      {fontDelegated && <ADelegatedNote what="typography" onClear={pickFont} />}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10, opacity: fontDelegated ? 0.45 : 1}}>
         {OPEN_SOURCE_FONT_PAIRS.map((p) => (
           <AFontPairOption
             key={p.id}
@@ -2067,24 +2089,16 @@ const ATypographySection = () => {
 };
 
 const DirA_Step2_Style = () => {
-  const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
-  const brandId = draft && draft.id;
-  const [picking, setPicking] = React.useState('');
 
   // Load all preview fonts once when the step opens.
   React.useEffect(() => {
     OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
   }, []);
 
-  const pickPalette = async () => {
-    if (!brandId || picking) return;
-    setPicking('palette');
-    const opts = PALETTE_OPTIONS.map((p) => ({ id: p.name, label: p.name, desc: p.mood }));
-    const { result } = await apiAssist(brandId, 'pick_palette', opts);
-    if (result && result.choice) setStep2({ palette: result.choice });
-    setPicking('');
-  };
+  // Defer to the studio rather than picking from the list (see AI_CHOICE).
+  const paletteDelegated = step2.palette === AI_CHOICE;
+  const pickPalette = () => setStep2({ palette: paletteDelegated ? null : AI_CHOICE });
 
   return (
   <AWizardLayout
@@ -2149,8 +2163,9 @@ const DirA_Step2_Style = () => {
 
     {/* 2b · Color palette */}
     <div style={{marginBottom: 24}}>
-      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai onAI={pickPalette} aiBusy={picking === 'palette'}/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10}}>
+      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai onAI={pickPalette} aiActive={paletteDelegated}/>
+      {paletteDelegated && <ADelegatedNote what="colour palette" onClear={pickPalette} />}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10, opacity: paletteDelegated ? 0.45 : 1}}>
         {PALETTE_OPTIONS.map((p) => (
           <APaletteOption key={p.name} name={p.name} mood={p.mood} palette={p.palette}
             sel={step2.palette === p.name}
