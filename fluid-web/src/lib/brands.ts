@@ -2,6 +2,17 @@
 
 export type BrandStatus = "draft" | "live";
 
+// Mirrors deriveBrandName() in Prototype.jsx — the placeholder the client
+// writes into `name` from the opening words of the brief. Duplicated here on
+// purpose: it is the only way to tell a real chosen name from a brief
+// fragment, and the two must stay in step.
+function briefPlaceholderName(brief: string): string {
+  const words = brief.trim().split(/\s+/).filter(Boolean).slice(0, 4);
+  if (words.length === 0) return "Untitled brand";
+  const s = words.join(" ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 // The brand's real, chosen name — or null if the user hasn't picked one yet.
 //
 // `brand.name` is NOT a name field in the usual sense: the client's
@@ -10,11 +21,23 @@ export type BrandStatus = "draft" | "live";
 // list doesn't read "Untitled brand" everywhere. Every AI generator must use
 // this helper instead of `brand.name_choice || brand.name` — that fallback
 // silently hands the model a brief fragment as if it were the brand name.
+//
+// `name_choice` is the field of record, but choosing a name writes it to both
+// fields, so `name` is a valid second source whenever it differs from the
+// brief placeholder. That distinction is what recovers brands saved while a
+// debounce race was dropping name_choice — for those, `name` holds the only
+// surviving copy — without ever resurrecting the brief-fragment bug.
 export function chosenBrandName(brand: {
+  name?: string | null;
   name_choice?: string | null;
+  brief?: string | null;
 }): string | null {
   const chosen = (brand.name_choice ?? "").trim();
-  return chosen || null;
+  if (chosen) return chosen;
+
+  const name = (brand.name ?? "").trim();
+  if (!name || name.toLowerCase() === "untitled brand") return null;
+  return name === briefPlaceholderName(String(brand.brief ?? "")) ? null : name;
 }
 
 export interface Brand {

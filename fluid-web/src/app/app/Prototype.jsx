@@ -2216,7 +2216,10 @@ const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
 const DirA_Step3_Name = () => {
   const { draft, setField } = useBrandDraft();
-  const chosen = (draft && draft.name_choice) || null;
+  // Resolved, not raw name_choice: a brand whose chosen name only survived in
+  // `name` should still show that name selected here rather than looking as
+  // though nothing was ever picked.
+  const chosen = resolveBrandName(draft);
   const chooseName = (name) => { setField('name_choice', name); setField('name', name); };
 
   const brandId = draft && draft.id;
@@ -4119,10 +4122,26 @@ function relTime(iso) {
 // (name_choice). Before that, b.name holds a brief-derived placeholder
 // (deriveBrandName takes the first few words of the brief), which isn't a
 // real brand name — so those read a clean "Untitled" until the user picks one.
-function brandDisplayName(b) {
+// The brand's real, user-chosen name, or null if none has been chosen yet.
+//
+// `name_choice` is the field of record. `name` is ambiguous: chooseName()
+// writes the chosen name into both, but until one is chosen `name` holds a
+// placeholder derived from the first words of the brief — so it can't be
+// trusted blindly, or a brief fragment ends up presented as the brand's name.
+//
+// It can be trusted when it *differs* from that placeholder, which is what
+// rescues brands saved while a debounce race was dropping name_choice: for
+// those, `name` is the only surviving copy of the chosen name.
+function resolveBrandName(b) {
   const chosen = ((b && b.name_choice) || '').trim();
   if (chosen && chosen.toLowerCase() !== 'untitled brand') return chosen;
-  return 'Untitled';
+  const name = ((b && b.name) || '').trim();
+  if (!name || name.toLowerCase() === 'untitled brand') return null;
+  return name === deriveBrandName((b && b.brief) || '') ? null : name;
+}
+
+function brandDisplayName(b) {
+  return resolveBrandName(b) || 'Untitled';
 }
 
 // #rrggbb / #rgb → "rgba(r,g,b,a)". Falls back to a neutral ink tint.
@@ -6647,8 +6666,13 @@ function BrandDraftProvider({ children }) {
   // silently dropped every key but the last one: the field still looked
   // chosen locally (setDraft merges), but only the final key was ever saved.
   const setField = React.useCallback((key, value) => {
-    // Editing the brief also refreshes the derived brand name.
-    const patch = key === 'brief'
+    // Editing the brief refreshes the derived brand name — but only while that
+    // name is still the derived placeholder. Once a real name exists, the brief
+    // must not overwrite it: for brands whose name_choice went missing, `name`
+    // is the only copy left, and re-deriving would destroy it for good.
+    const cur = draftRef.current || {};
+    const nameIsPlaceholder = resolveBrandName(cur) === null;
+    const patch = (key === 'brief' && nameIsPlaceholder)
       ? { brief: value, name: deriveBrandName(value) }
       : { [key]: value };
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
