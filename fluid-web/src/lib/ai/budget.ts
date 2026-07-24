@@ -20,7 +20,7 @@ export interface Clock {
 export class OutOfTimeError extends Error {
   constructor(step: string) {
     super(
-      `The studio ran out of time before it could ${step}. Everything finished so far has been saved — try again and it will pick up from there.`,
+      `The studio ran out of time before it could ${step}. Anything it had already finished is saved, so trying again will resume from there rather than starting over.`,
     );
     this.name = "OutOfTimeError";
   }
