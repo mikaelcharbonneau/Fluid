@@ -1,17 +1,20 @@
-// Phase 1 · Divergence — 9 low-fidelity concept sketches (croquis).
+// Phase 1 · Divergence — one low-fidelity concept sketch (croquis) at a time.
 //
-// Real variety comes from fan-out, not from asking one call for 9 concepts
-// (which mode-collapses into near-duplicates). We run 3 parallel "designer"
-// calls, each producing 3 concepts. Every concept carries structured metadata
-// (territory, mark type, formal attributes, rationale) — the metadata is what
-// lets the user's likes actually orient Phase 2, rather than just pointing at
-// pictures.
+// One call, one concept, one render. The client reviews it and either likes it
+// or asks for another — each additional call draws one more concept and adds
+// it to the board rather than replacing it, so the collection grows exactly
+// as fast as the client wants to look. Every concept carries structured
+// metadata (territory, mark type, formal attributes, rationale) — the
+// metadata is what lets the user's likes actually orient Phase 2, rather than
+// just pointing at pictures.
 //
-// What each call explores depends on the client's Step 4 brief:
-//   • Mark type chosen → all 9 are that type; the calls fan out across the
-//     platform's strategic TERRITORIES instead.
-//   • No mark type → the calls fan out across mark-type families, so the board
-//     spreads across the taxonomy.
+// What a given call explores depends on the client's Step 4 brief and on how
+// many concepts have been shown already (so repeated regeneration still walks
+// across the taxonomy over time instead of circling one territory):
+//   • Mark type chosen → the concept is that type; successive calls rotate
+//     across the platform's strategic TERRITORIES instead.
+//   • No mark type → successive calls rotate across mark-type families too,
+//     so a run of regenerations still spreads across the taxonomy.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
@@ -55,8 +58,9 @@ export interface SketchBrief {
 
 const MODEL = "claude-opus-4-8";
 
-// Each parallel call explores one family of mark types, so the 9-up board
-// spreads across the taxonomy instead of clustering on abstract symbols.
+// Successive single-concept calls rotate through mark-type families (when the
+// client hasn't fixed one), so a run of regenerations still spreads across the
+// taxonomy instead of clustering on abstract symbols.
 const TYPE_GROUPS: { label: string; types: string }[] = [
   { label: "typographic", types: "wordmark and lettermark marks" },
   { label: "symbol", types: "pictorial and abstract marks" },
@@ -65,9 +69,10 @@ const TYPE_GROUPS: { label: string; types: string }[] = [
 
 const SYSTEM = `You are a senior identity designer at Fluid, a brand studio
 operating at the level of Pentagram or Wolff Olins. You are in the DIVERGENCE
-phase: producing quick concept sketches (croquis) for a 9-up exploration board.
-These are marker-on-paper thumbnails of IDEAS, not finished marks — the client
-will pick directions from them, so clarity of concept beats beauty of render.
+phase: sketching ONE quick concept (a croquis) for the client to react to.
+This is a marker-on-paper thumbnail of an IDEA, not a finished mark — the
+client will react to it and either like it or ask for another, so clarity of
+concept beats beauty of render.
 
 ${MARK_TYPES}
 
@@ -75,12 +80,11 @@ ${DESIGN_PRINCIPLES}
 
 ${ANTI_CLICHE}
 
-Your sketches will later be judged against this rubric — design accordingly:
+Your sketch will later be judged against this rubric — design accordingly:
 ${CRITIQUE_RUBRIC}
 
-Produce EXACTLY 3 concepts, each a genuinely different idea (not one idea in
-three weights). Output EXACTLY this format, nothing else — no prose, no code
-fences. Repeat the block 3 times:
+Produce EXACTLY 1 concept. Output EXACTLY this format, nothing else — no
+prose, no code fences:
 
 ===CONCEPT===
 NAME: <short evocative concept name, 1-3 words>
@@ -115,19 +119,12 @@ function buildUserPrompt(
     lines.push(``, `THE CLIENT'S BRIEF — these choices are mandatory:`, configCtx);
   }
 
-  lines.push(``, `YOUR ASSIGNMENT for this board section:`);
+  lines.push(``, `YOUR ASSIGNMENT for this concept:`);
   lines.push(`- Territory to express: "${territory.name}" — ${territory.description}`);
   if (group) {
-    lines.push(
-      `- Mark-type focus: ${group.types}. All 3 concepts from this family, but`,
-      `  each must be a different approach within it.`,
-    );
+    lines.push(`- Mark-type focus: this concept should come from ${group.types}.`);
   } else {
-    lines.push(
-      `- All 3 concepts use the client's chosen mark type. Differentiate them by`,
-      `  IDEA and construction — three distinct answers to this territory, not`,
-      `  three weights of one answer.`,
-    );
+    lines.push(`- Use the client's chosen mark type. Answer this territory with one clear idea.`);
   }
 
   const ctx = (input.styleContext ?? "").trim();
@@ -150,7 +147,7 @@ function buildUserPrompt(
       `Concepts already shown — do NOT repeat these ideas: ${avoid.join(", ")}.`,
     );
   }
-  lines.push(``, `Sketch 3 concepts in the required format.`);
+  lines.push(``, `Sketch the concept in the required format.`);
   return lines.filter((l) => l !== null && l !== undefined).join("\n");
 }
 
@@ -196,92 +193,45 @@ export async function generateLogoSketches(
   }
   const client = new Anthropic();
 
-  // How the 3 parallel designers divide the work depends on the brief. With a
-  // mark type fixed by the client, spreading across mark-type families would
-  // violate it — so we fan out across strategic territories instead, which is
-  // the remaining axis of genuine variety.
+  // With a mark type fixed by the client, spreading across mark-type families
+  // would violate it — rotate across strategic territories instead. avoidNames
+  // is the running count of concepts already shown this session, so successive
+  // regenerations walk forward through both lists rather than repeating the
+  // same territory or family every time.
   const territories = input.platform.territories;
   const fixedType = markTypeById(input.config?.mark_type);
-  const assignments = fixedType
-    ? Array.from({ length: 3 }, (_, i) => ({
-        territory: territories[i % territories.length],
-        group: null,
-      }))
-    : TYPE_GROUPS.map((group, i) => ({
-        territory: territories[i % territories.length],
-        group,
-      }));
+  const attempt = (input.avoidNames ?? []).length;
+  const territory = territories[attempt % territories.length];
+  const group = fixedType ? null : TYPE_GROUPS[attempt % TYPE_GROUPS.length];
 
-  const jobs = assignments.map(async ({ territory, group }) => {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM,
-      messages: [
-        { role: "user", content: buildUserPrompt(input, territory, group) },
-      ],
-    });
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-    return extractSketches(text, territory, fixedType?.id ?? null);
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    thinking: { type: "adaptive" },
+    system: SYSTEM,
+    messages: [{ role: "user", content: buildUserPrompt(input, territory, group) }],
   });
-
-  const settled = await Promise.allSettled(jobs);
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
   input.clock?.lap("design");
-  const concepts: (Omit<LogoSketch, "image_url"> & { id: string })[] = [];
-  const seen = new Set<string>();
-  let n = 0;
-  for (const result of settled) {
-    if (result.status !== "fulfilled") continue;
-    for (const s of result.value) {
-      // De-duplicate concept names across calls so likes reference uniquely.
-      let name = s.name;
-      let suffix = 2;
-      while (seen.has(name.toLowerCase())) name = `${s.name} ${suffix++}`;
-      seen.add(name.toLowerCase());
-      n += 1;
-      concepts.push({ ...s, name, id: `sk_${Date.now().toString(36)}_${n}` });
-    }
-  }
-  if (concepts.length === 0) {
-    // Surface the first failure if every call died; otherwise the model
-    // returned nothing usable.
-    const firstError = settled.find(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-    if (firstError) throw firstError.reason;
-    throw new Error("The studio returned no usable concepts.");
-  }
 
-  // Render every concept in parallel. Sequentially this would be minutes; in
-  // parallel it's roughly the cost of the slowest single image. A concept whose
-  // render fails is dropped rather than failing the whole board.
-  const rendered = await Promise.allSettled(
-    concepts.slice(0, 9).map(async (c) => {
-      const img = await renderLogoImage({
-        brandId: input.brandId,
-        phase: "concept",
-        slot: c.id,
-        direction: c.art,
-        quality: "medium",
-      });
-      return { ...c, image_url: img.url } as LogoSketch;
-    }),
-  );
+  const parsed = extractSketches(text, territory, fixedType?.id ?? null);
+  if (parsed.length === 0) {
+    throw new Error("The studio returned no usable concept.");
+  }
+  const id = `sk_${Date.now().toString(36)}`;
+  const concept = { ...parsed[0], id };
+
+  const img = await renderLogoImage({
+    brandId: input.brandId,
+    phase: "concept",
+    slot: id,
+    direction: concept.art,
+    quality: "medium",
+  });
   input.clock?.lap("render");
-  const sketches = rendered
-    .filter((r): r is PromiseFulfilledResult<LogoSketch> => r.status === "fulfilled")
-    .map((r) => r.value);
 
-  if (sketches.length === 0) {
-    const firstError = rendered.find(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-    if (firstError) throw firstError.reason;
-    throw new Error("The studio could not render any concepts.");
-  }
-  return sketches;
+  return [{ ...concept, image_url: img.url }];
 }

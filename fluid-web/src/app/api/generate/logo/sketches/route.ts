@@ -17,9 +17,11 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 // POST /api/generate/logo/sketches — Phase 1 of the logo studio: generate the
-// creative platform (once, cached) and a 9-up board of low-fidelity concept
-// sketches. Body: { brandId: string, likedIds?: string[] } — likedIds bias a
-// regeneration toward the client's demonstrated taste.
+// creative platform (once, cached) and ONE low-fidelity concept sketch. Body:
+// { brandId: string, likedIds?: string[], reset?: boolean } — likedIds bias
+// the concept toward the client's demonstrated taste; reset starts a fresh
+// board (used when the client just changed the Step 4 brief) instead of
+// adding the new concept to the existing one.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -33,11 +35,13 @@ export async function POST(request: Request) {
     brandId?: unknown;
     likedIds?: unknown;
     config?: unknown;
+    reset?: unknown;
   };
   const brandId = typeof body.brandId === "string" ? body.brandId : "";
   const likedIds = Array.isArray(body.likedIds)
     ? body.likedIds.filter((x): x is string => typeof x === "string")
     : [];
+  const resetRequested = body.reset === true;
   if (!brandId) {
     return NextResponse.json({ error: "Missing brandId." }, { status: 400 });
   }
@@ -134,15 +138,26 @@ export async function POST(request: Request) {
       clock.lap("platform");
     }
 
-    // Regeneration bias: liked sketches inform the new spread; every
-    // previously shown concept name is excluded to prevent repeats.
-    const prior = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
+    // A changed brief invalidates the prior board even if the client forgot to
+    // ask for a reset — concepts drawn under a different mark type or style
+    // don't belong on the same board.
+    const priorConfig = (data.logo_config ?? null) as LogoConfig | null;
+    const configChanged =
+      priorConfig !== null &&
+      (priorConfig.mark_type !== config.mark_type ||
+        priorConfig.design_style !== config.design_style);
+    const reset = resetRequested || configChanged;
+
+    // Regeneration bias: liked concepts inform the new one; every previously
+    // shown concept name is excluded to prevent repeats. `prior` is the whole
+    // board built up so far this session — one call draws one more concept and
+    // adds it here, it doesn't replace the board.
+    const priorAll = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
+    const prior = reset ? [] : priorAll;
     const liked = prior.filter((s) => likedIds.includes(s.id));
 
-    // The design pass fans out to parallel designers and then renders every
-    // concept, so it needs the largest single slice of the budget.
-    clock.guard("draw the concepts", 170_000);
-    const sketches = await generateLogoSketches({
+    clock.guard("draw the concept", 170_000);
+    const drawn = await generateLogoSketches({
       brandId,
       brief: String(brand.brief),
       name: brandName,
@@ -153,18 +168,19 @@ export async function POST(request: Request) {
       avoidNames: prior.map((s) => s.name),
       clock,
     });
+    const sketches = [...prior, ...drawn];
 
     await spendTokens(user.id, TOKEN_COST.asset);
 
-    // A fresh board starts with a clean slate of likes. The brief is stored so
-    // Phase 2 refines under the same constraints.
+    // A reset board starts with a clean slate of likes; adding one more
+    // concept to an existing board keeps whatever the client already liked.
     const nextData = {
       ...data,
       ...(research ? { research } : {}),
       creative_platform: platform,
       logo_config: config,
       logo_sketches: sketches,
-      logo_sketch_likes: [],
+      logo_sketch_likes: reset ? [] : likedIds,
     };
     const { error: saveError } = await supabase
       .from("brands")

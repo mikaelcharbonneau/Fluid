@@ -7,10 +7,20 @@
 // enough. So it runs as a real tool loop over Claude's server-side web search
 // rather than as a single scripted call.
 //
-// It also OWNS the decisions the client delegated in Step 2 ("Let AI choose").
-// Those arrive as an explicit assignment and come back as concrete
-// recommendations — real hex values, real font families — grounded in what the
-// category actually looks like rather than picked off a preset list.
+// Two things it is FOR:
+//  1. Finding what's actually current in logo design right now — real trends
+//     and treatments the model can point to, not a static list.
+//  2. Deciding what visual style, palette, and typography actually SUIT this
+//     brand and its category — but only for the decisions the client
+//     delegated in Step 2 ("Let AI choose"). Those arrive as an explicit
+//     assignment and come back as concrete recommendations grounded in
+//     research, not picked off a preset list.
+//
+// One thing it is explicitly NOT for: treating a shared category convention as
+// a problem to route around. If most players in a category use the same
+// visual language, that is usually evidence the language fits the category —
+// not proof the category is "saturated". The research separates genuine
+// suitability from stale execution instead of defaulting to differentiation.
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -24,12 +34,17 @@ export interface ResearchRecommendation {
   rationale: string; // why, tied to a finding
 }
 
+export interface ConventionNote {
+  pattern: string; // the shared visual move, stated concretely
+  note: string; // is this a genuine fit for the category, or just tired execution — and why
+}
+
 export interface CategoryResearch {
   category: string; // the competitive set as the model understands it
   landscape: string; // 2-3 sentences on the category's visual conventions
   competitors: CompetitorNote[];
-  saturated: string[]; // moves that are overused HERE — feeds anti-cliché
-  whitespace: string[]; // differentiation opportunities
+  conventions: ConventionNote[]; // shared visual moves in this category, each judged on fit vs. staleness
+  trends: string[]; // current logo design trends/styles relevant to this brief, from research
   // Present only for decisions the client delegated in Step 2.
   recommended_direction?: ResearchRecommendation | null;
   recommended_palette?: ResearchRecommendation | null;
@@ -46,38 +61,49 @@ export interface ResearchBrief {
   delegated: { style: boolean; palette: boolean; font: boolean };
 }
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-sonnet-5";
 const MAX_CONTINUATIONS = 4; // guard the pause_turn resume loop
 
 const SYSTEM = `You are the research director at Fluid, a brand studio operating
 at the level of Pentagram or Wolff Olins. Before any strategy or design work
-begins, you study the category the brand is entering.
+begins, you study the category the brand is entering and what's actually
+current in logo design right now.
 
 Use web search to ground your findings in what is actually out there. Search
 for the real competitive set, look at how those brands present themselves
-visually, and find what the category's identity conventions are. Do not invent
-competitors or describe logos you have not verified — if you are unsure what a
-brand's mark looks like, say so or leave it out.
+visually, and search separately for current logo design trends and styles
+(recent identity work, design-award coverage, trend reports) — not just this
+one category's competitors. Do not invent competitors or describe logos you
+have not verified — if you are unsure what a brand's mark looks like, say so
+or leave it out.
 
 What you are looking for:
-- The visual conventions of this category — what nearly everyone does.
-- What is SATURATED: the specific moves so overused here that they now read as
-  generic. Be concrete ("cold blue-to-teal gradients", "abstract connected
-  nodes"), never vague ("boring logos").
-- WHITESPACE: what almost nobody in this category is doing that would still
-  suit this brand — the differentiation opportunity.
+- The visual conventions of this category — what nearly everyone does, and
+  concretely what that looks like.
+- For each convention: is it a genuine fit, or just tired execution? A shared
+  visual language across a category is usually evidence that language WORKS
+  for that category — navy and a restrained geometric sans across banks isn't
+  "saturation", it's what trust and restraint look like in finance. Only flag
+  a convention as stale when the execution itself has gone generic (a specific
+  treatment every competitor now uses the same tired way), never merely
+  because it's common. Do not default to recommending differentiation for its
+  own sake — recommend it only when it's a better answer than the convention.
+- Current logo design trends and styles worth knowing about for this brief —
+  from research, not assumption. Note which (if any) genuinely suit this
+  brand versus which are just current.
 
-Be specific and useful. "The category is competitive" helps no one; "six of the
-eight largest players use a lowercase geometric sans in navy, so a warm serif
-would read as instantly different" is the kind of finding that changes a design.
+Be specific and useful. "The category is competitive" helps no one; "six of
+the eight largest players use a lowercase geometric sans in navy — this fits
+finance's need to signal restraint and trust, not a rut to escape" is the kind
+of finding that changes a design.
 
 Respond with ONLY a JSON object — no prose, no markdown fences:
 {
   "category": "...",
   "landscape": "...",
   "competitors": [{"name": "...", "identity": "..."}],
-  "saturated": ["..."],
-  "whitespace": ["..."],
+  "conventions": [{"pattern": "...", "note": "..."}],
+  "trends": ["..."],
   "sources": ["https://..."]
 }`;
 
@@ -122,9 +148,13 @@ function buildUserPrompt(input: ResearchBrief): string {
   if (d.style || d.palette || d.font) {
     lines.push(
       ``,
-      `THE CLIENT HAS DELEGATED THESE DECISIONS TO THE STUDIO. Decide them`,
-      `yourself, grounded in your research — you are NOT limited to any preset`,
-      `list, and you must return concrete values, not descriptions of options:`,
+      `THE CLIENT HAS DELEGATED THESE DECISIONS TO THE STUDIO. Decide what is`,
+      `most SUITABLE for this brand and category — grounded in your research,`,
+      `not limited to any preset list. "Suitable" can mean confidently using a`,
+      `strong category convention if it genuinely fits this brand, or drawing`,
+      `on a current trend if that fits better — you are not obligated to`,
+      `differentiate for its own sake. Return concrete values, not descriptions`,
+      `of options:`,
     );
     if (d.style) lines.push(`- The visual direction.`);
     if (d.palette) lines.push(`- The colour palette (real hex values).`);
@@ -178,12 +208,25 @@ function extractResearch(text: string, d: ResearchBrief["delegated"]): CategoryR
     .filter((c) => c.name)
     .slice(0, 8);
 
+  const conventions: ConventionNote[] = (
+    Array.isArray(p.conventions) ? p.conventions : []
+  )
+    .map((c) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      return {
+        pattern: String(o.pattern ?? "").trim(),
+        note: String(o.note ?? "").trim(),
+      };
+    })
+    .filter((c) => c.pattern)
+    .slice(0, 8);
+
   return {
     category: String(p.category ?? "").trim(),
     landscape: String(p.landscape ?? "").trim(),
     competitors,
-    saturated: strArray(p.saturated, 8),
-    whitespace: strArray(p.whitespace, 6),
+    conventions,
+    trends: strArray(p.trends, 6),
     recommended_direction: d.style ? rec(p.recommended_direction) : null,
     recommended_palette: d.palette ? rec(p.recommended_palette) : null,
     recommended_typography: d.font ? rec(p.recommended_typography) : null,
@@ -273,16 +316,17 @@ export function researchContext(data: unknown): string {
       ...r.competitors.map((c) => `  · ${c.name}: ${c.identity}`),
     );
   }
-  if (r.saturated.length) {
+  if (r.conventions.length) {
     lines.push(
-      `- SATURATED in this category — avoid these specifically:`,
-      ...r.saturated.map((s) => `  · ${s}`),
+      `- Category conventions (judge fit, don't default to avoiding — shared`,
+      `  language is often evidence it suits the category):`,
+      ...r.conventions.map((c) => `  · ${c.pattern} — ${c.note}`),
     );
   }
-  if (r.whitespace.length) {
+  if (r.trends.length) {
     lines.push(
-      `- Differentiation opportunities:`,
-      ...r.whitespace.map((s) => `  · ${s}`),
+      `- Current logo design trends relevant to this brief:`,
+      ...r.trends.map((s) => `  · ${s}`),
     );
   }
   const recs: string[] = [];

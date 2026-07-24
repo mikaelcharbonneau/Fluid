@@ -2504,12 +2504,15 @@ const AResearchPanel = ({ research }) => {
         </div>
       )}
 
-      {(research.saturated || []).length > 0 && (
+      {(research.conventions || []).length > 0 && (
         <div>
-          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Overused here — avoided</div>
-          <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
-            {research.saturated.slice(0, open ? 99 : 4).map((s, i) => (
-              <span key={i} style={{fontSize:10.5, color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'3px 8px', borderRadius:99, lineHeight:1.35}}>{s}</span>
+          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Category conventions</div>
+          <div style={{display:'flex', flexDirection:'column', gap:4}}>
+            {research.conventions.slice(0, open ? 99 : 3).map((c, i) => (
+              <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>
+                <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.pattern}</span>
+                {c.note ? ` — ${c.note}` : ''}
+              </div>
             ))}
           </div>
         </div>
@@ -2517,10 +2520,10 @@ const AResearchPanel = ({ research }) => {
 
       {open && (
         <>
-          {(research.whitespace || []).length > 0 && (
+          {(research.trends || []).length > 0 && (
             <div>
-              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Opportunities</div>
-              {research.whitespace.map((w, i) => (
+              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Current design trends</div>
+              {research.trends.map((w, i) => (
                 <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>· {w}</div>
               ))}
             </div>
@@ -2747,9 +2750,11 @@ const DirA_Step4_Logo = () => {
 
   const loading = loadingSketches || loadingRefine;
 
-  // Phase 1 — generate (or regenerate) the 9-up sketch board. Likes so far
-  // bias the new spread; a fresh board starts with a clean slate of likes.
-  const generateSketches = React.useCallback(async (likedIds) => {
+  // Phase 1 — draw one more concept sketch. Likes so far bias the new concept;
+  // `fresh` starts a new board (used when the brief just changed) instead of
+  // adding this concept to the existing one. The server returns the full
+  // board either way, so the client just displays whatever comes back.
+  const generateSketches = React.useCallback(async (likedIds, { fresh = false } = {}) => {
     if (!brandId || !markType) return;
     setLoadingSketches(true); setError('');
     setPhase('sketch');
@@ -2772,7 +2777,7 @@ const DirA_Step4_Logo = () => {
     setStage('sketch');
     const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
       mark_type: markType, design_style: designStyle, instructions,
-    });
+    }, fresh);
     if (res.error) {
       setError(res.error);
       if (!sketches.length) setPhase('brief');
@@ -2780,14 +2785,14 @@ const DirA_Step4_Logo = () => {
       setPlatform(res.platform);
       if (res.research) setResearch(res.research);
       setSketches(res.sketches);
-      setLikes([]);
+      setLikes(fresh ? [] : (likedIds || []));
       setField('data', {
         ...((draft && draft.data) || {}),
         ...(res.research ? { research: res.research } : {}),
         creative_platform: res.platform,
         logo_config: { mark_type: markType, design_style: designStyle, instructions },
         logo_sketches: res.sketches,
-        logo_sketch_likes: [],
+        logo_sketch_likes: fresh ? [] : (likedIds || []),
       });
     }
     setStage('');
@@ -2857,7 +2862,7 @@ const DirA_Step4_Logo = () => {
   };
   const SUBTITLES = {
     brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
-    sketch: 'The studio sketched nine concepts across the brand’s strategic territories. Like the ones that feel right — your picks steer the finished designs.',
+    sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
     final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
   };
 
@@ -2903,7 +2908,7 @@ const DirA_Step4_Logo = () => {
                   boxShadow:'inset 0 0 0 1px var(--line)',
                   cursor: loading || !hasBrief ? 'default' : 'pointer', opacity: loading || !hasBrief ? 0.6 : 1,
                 }}>
-                  <Sparkle size={11}/> {sketches.length ? 'Regenerate sketches' : 'Generate sketches'}
+                  <Sparkle size={11}/> {sketches.length ? 'Draw another concept' : 'Sketch a concept'}
                 </button>
                 <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
                   ...toolBtn, background:'#000', color:'#fff',
@@ -2991,11 +2996,11 @@ const DirA_Step4_Logo = () => {
             </div>
 
             <div style={{display:'flex', alignItems:'center', gap:12, flexWrap:'wrap'}}>
-              <button onClick={() => !loading && markType && generateSketches([])} disabled={loading || !markType} style={{
+              <button onClick={() => !loading && markType && generateSketches([], { fresh: true })} disabled={loading || !markType} style={{
                 ...toolBtn, padding:'11px 18px', fontSize:13.5, background:'#000', color:'#fff',
                 cursor: loading || !markType ? 'default' : 'pointer', opacity: loading || !markType ? 0.5 : 1,
               }}>
-                <Sparkle size={12} color="#fff"/> Sketch nine concepts <ArrowRight size={12}/>
+                <Sparkle size={12} color="#fff"/> Sketch a concept <ArrowRight size={12}/>
               </button>
               {!markType && <span style={{fontSize:12, color:'var(--fg-4)'}}>Choose a mark type to continue.</span>}
               {sketches.length > 0 && markType && (
@@ -3006,30 +3011,40 @@ const DirA_Step4_Logo = () => {
         )}
 
         {/* ── Phase 1 · the sketch board ──────────────────────────── */}
+        {/* One concept renders at a time; the board grows as the client asks
+            for more, rather than arriving all at once as a 9-up. */}
         {phase === 'sketch' && hasBrief && sketches.length === 0 && (
           <div className="home-grid-3" style={{display:'grid', gap:12}}>
-            {Array.from({length:9}).map((_, i) => (
-              <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                {loadingSketches && i === 4 ? (
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
-                    <Thinking/>
-                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
-                      {stage === 'research'
-                        ? 'Studying the category…'
-                        : 'Drawing concepts…'}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            ))}
+            <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
+              {loadingSketches ? (
+                <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
+                  <Thinking/>
+                  <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
+                    {stage === 'research'
+                      ? 'Studying the category…'
+                      : 'Drawing a concept…'}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
         )}
         {phase === 'sketch' && sketches.length > 0 && (
           <>
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
+            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loadingRefine ? 0.45 : 1}}>
               {sketches.map((s) => (
                 <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
               ))}
+              {loadingSketches && (
+                <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
+                      {stage === 'research' ? 'Studying the category…' : 'Drawing a concept…'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             {loadingRefine && (
               <div style={{marginTop:14, padding:'12px 16px', borderRadius:12, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', fontSize:12.5, color:'var(--fg-2)', display:'flex', alignItems:'center', gap:10}}>
@@ -6404,13 +6419,14 @@ async function apiResearchCategory(brandId) {
   } catch { return { error: 'Network error.' }; }
 }
 
-// Logo studio · Phase 1 — 9 low-fi concept sketches, rendered as images.
-// likedIds bias a regeneration toward the client's demonstrated taste.
-async function apiGenerateLogoSketches(brandId, likedIds, config) {
+// Logo studio · Phase 1 — one low-fi concept sketch at a time, rendered as an
+// image. likedIds bias the concept toward the client's demonstrated taste;
+// reset starts a fresh board instead of adding to the existing one.
+async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
   try {
     const r = await fetch('/api/generate/logo/sketches', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {} }),
+      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset }),
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
