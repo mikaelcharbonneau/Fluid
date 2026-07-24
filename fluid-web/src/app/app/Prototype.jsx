@@ -2231,6 +2231,19 @@ const DirA_Step3_Name = () => {
   const [error, setError] = React.useState('');
   const requestedFor = React.useRef(null);
 
+  // The "type your own name" input. It's controlled and shows a confirmation
+  // once submitted — previously it was uncontrolled with no feedback at all,
+  // so a chosen custom name (unlike a chosen grid card) never appeared
+  // anywhere in the UI and looked like it had done nothing.
+  const [customName, setCustomName] = React.useState(
+    chosen && !names.some((o) => o.name === chosen) && !liked.includes(chosen) ? chosen : '',
+  );
+  const customChosen = !!customName.trim() && chosen === customName.trim();
+  const submitCustomName = () => {
+    const v = customName.trim();
+    if (v) chooseName(v);
+  };
+
   // Persist names + liked together, merging onto whatever else is in data.
   const persist = React.useCallback((nextNames, nextLiked) => {
     setField('data', { ...((draft && draft.data) || {}), names: nextNames, liked_names: nextLiked });
@@ -2281,16 +2294,26 @@ const DirA_Step3_Name = () => {
       <div style={{
         flex:1, display:'flex', alignItems:'center', gap:10,
         background:'var(--bg-elev)', borderRadius:12,
-        boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+        boxShadow: customChosen ? 'inset 0 0 0 1.5px #000' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
         padding:'10px 14px',
       }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v16M4 12h16"/></svg>
         <input
           placeholder="Type your own name…"
-          onKeyDown={(e) => { if (e.key === 'Enter' && e.currentTarget.value.trim()) chooseName(e.currentTarget.value.trim()); }}
+          value={customName}
+          onChange={(e) => setCustomName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitCustomName(); }}
+          onBlur={submitCustomName}
           style={{flex:1, border:0, background:'transparent', outline:'none', fontSize:13, color:'var(--fg-1)', fontFamily:'inherit'}}
         />
-        <span style={{fontSize:10.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)'}}>↵</span>
+        {customChosen ? (
+          <span style={{display:'inline-flex', alignItems:'center', gap:4, fontSize:10.5, fontWeight:600, color:'#000'}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Selected
+          </span>
+        ) : (
+          <span style={{fontSize:10.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)'}}>↵</span>
+        )}
       </div>
       <button onClick={() => setLikedOpen((o) => !o)} style={{
         ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
@@ -6558,6 +6581,7 @@ function BrandDraftProvider({ children }) {
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
   const saveTimer = React.useRef(null);
+  const pendingPatch = React.useRef({});
 
   const refresh = React.useCallback(async () => {
     setBrands(await apiListBrands());
@@ -6607,7 +6631,12 @@ function BrandDraftProvider({ children }) {
     return () => window.removeEventListener('fluid:no-tokens', onNoTokens);
   }, []);
 
-  // Debounced field autosave.
+  // Debounced field autosave. Calls made within the same debounce window are
+  // merged into one pending patch rather than replacing each other — e.g.
+  // chooseName() sets name_choice then name back to back, and both must reach
+  // the server. A single shared timer that resent only its own call's patch
+  // silently dropped every key but the last one: the field still looked
+  // chosen locally (setDraft merges), but only the final key was ever saved.
   const setField = React.useCallback((key, value) => {
     // Editing the brief also refreshes the derived brand name.
     const patch = key === 'brief'
@@ -6616,9 +6645,12 @@ function BrandDraftProvider({ children }) {
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
     const d = draftRef.current;
     if (!d || !d.id) return;
+    pendingPatch.current = { ...pendingPatch.current, ...patch };
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const updated = await apiUpdateBrand(d.id, patch);
+      const toSave = pendingPatch.current;
+      pendingPatch.current = {};
+      const updated = await apiUpdateBrand(d.id, toSave);
       if (updated) refresh();
     }, 500);
   }, [refresh]);
