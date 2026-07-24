@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { styleContext } from "@/lib/ai/step2";
+import { styleContext, delegatedChoices } from "@/lib/ai/step2";
+import { researchCategory, getResearch } from "@/lib/ai/research";
 import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
@@ -82,10 +83,40 @@ export async function POST(request: Request) {
   }
 
   const data = (brand.data as Record<string, unknown>) ?? {};
-  const ctx = styleContext(brand);
   const brandName = chosenBrandName(brand);
 
   try {
+    // Phase -1 — category research. The one agentic step: Claude drives its own
+    // web searches until it understands the competitive set. Cached, because it
+    // is the slowest step and the findings don't change between regenerations.
+    //
+    // Degrades gracefully: if research fails (search unavailable, bad JSON) the
+    // studio still designs, just without category grounding. Losing the whole
+    // paid generation over a failed search would be a worse outcome.
+    let research = getResearch(data);
+    if (!research) {
+      try {
+        research = await researchCategory({
+          brief: String(brand.brief),
+          name: brandName,
+          audience: brand.audience as string | null,
+          competitors: brand.competitors as string | null,
+          delegated: delegatedChoices(brand),
+        });
+      } catch (err) {
+        console.error("Category research failed; continuing without it:", err);
+        research = null;
+      }
+    }
+
+    // styleContext() assembles every piece of design context (Step 2 picks,
+    // delegated-decision brief, research, platform) into one string. Research
+    // is merged in here because on a first run it exists only in memory — it
+    // isn't written to brand.data until the end of this request.
+    const ctx = styleContext(
+      research ? { ...brand, data: { ...data, research } } : brand,
+    );
+
     // Phase 0 — the creative platform, generated once and reused by every
     // downstream asset generator.
     let platform = getPlatform(data);
@@ -120,6 +151,7 @@ export async function POST(request: Request) {
     // Phase 2 refines under the same constraints.
     const nextData = {
       ...data,
+      ...(research ? { research } : {}),
       creative_platform: platform,
       logo_config: config,
       logo_sketches: sketches,
@@ -133,7 +165,7 @@ export async function POST(request: Request) {
       console.error("Failed to cache logo sketches:", saveError.message);
     }
 
-    return NextResponse.json({ platform, sketches });
+    return NextResponse.json({ platform, sketches, research });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sketch generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });

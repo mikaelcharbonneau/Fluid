@@ -50,7 +50,9 @@ Rules:
   could take this brand. Each is a lens, not a style: e.g. "Engineering
   honesty" vs "Neighborhood warmth" lead to different marks, palettes, and
   voices. Give each a "key" (kebab-case slug), "name", and "description"
-  (1–2 sentences on how it would look and speak).
+  (1–2 sentences on how it would look and speak). When category research is
+  supplied, the territories must earn their place against it — pull away from
+  what the research calls saturated, and toward the whitespace it identifies.
 - "design_notes": 2–3 sentences of visual guidance that apply across ALL
   territories — what this brand should never look like, and the register it
   must hold (e.g. "premium but never precious; avoid startup gradients").

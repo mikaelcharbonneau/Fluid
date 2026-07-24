@@ -2463,6 +2463,91 @@ const AFinalistCard = ({ f, sel, onClick }) => (
   </div>
 );
 
+// Right-rail panel showing what the studio found in the category. Research is
+// part of the deliverable — the client should see the evidence behind the work,
+// including which clichés the marks are deliberately avoiding.
+const AResearchPanel = ({ research }) => {
+  const [open, setOpen] = React.useState(false);
+  if (!research) return null;
+  const rec = [
+    research.recommended_direction && ['Direction', research.recommended_direction],
+    research.recommended_palette && ['Palette', research.recommended_palette],
+    research.recommended_typography && ['Typography', research.recommended_typography],
+  ].filter(Boolean);
+  return (
+    <div style={{
+      background:'var(--bg-elev)', borderRadius:16, padding:16,
+      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+      display:'flex', flexDirection:'column', gap:12,
+    }}>
+      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>
+        Category research{research.category ? ' · ' + research.category : ''}
+      </div>
+      {research.landscape && (
+        <div style={{fontSize:12, color:'var(--fg-2)', lineHeight:1.5}}>{research.landscape}</div>
+      )}
+
+      {/* The studio's calls on whatever the client delegated in Step 2. */}
+      {rec.length > 0 && (
+        <div style={{display:'flex', flexDirection:'column', gap:8, padding:'10px 12px', borderRadius:10, background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.30)'}}>
+          <div style={{fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'#8A5A12'}}>Fluid decided</div>
+          {rec.map(([label, r]) => (
+            <div key={label}>
+              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{label}: {r.value}</div>
+              {r.rationale && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{r.rationale}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(research.saturated || []).length > 0 && (
+        <div>
+          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Overused here — avoided</div>
+          <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
+            {research.saturated.slice(0, open ? 99 : 4).map((s, i) => (
+              <span key={i} style={{fontSize:10.5, color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'3px 8px', borderRadius:99, lineHeight:1.35}}>{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {open && (
+        <>
+          {(research.whitespace || []).length > 0 && (
+            <div>
+              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Opportunities</div>
+              {research.whitespace.map((w, i) => (
+                <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>· {w}</div>
+              ))}
+            </div>
+          )}
+          {(research.competitors || []).length > 0 && (
+            <div>
+              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Competitor identities</div>
+              {research.competitors.map((c) => (
+                <div key={c.name} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45, marginBottom:3}}>
+                  <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.name}</span> — {c.identity}
+                </div>
+              ))}
+            </div>
+          )}
+          {(research.sources || []).length > 0 && (
+            <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.5, wordBreak:'break-all'}}>
+              {research.sources.length} source{research.sources.length === 1 ? '' : 's'} consulted
+            </div>
+          )}
+        </>
+      )}
+
+      <button onClick={() => setOpen((v) => !v)} style={{
+        alignSelf:'flex-start', padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
+        background:'transparent', color:'var(--fg-2)', fontSize:11.5, fontWeight:600,
+        boxShadow:'inset 0 0 0 1px var(--line)',
+      }}>{open ? 'Show less' : 'Full findings'}</button>
+    </div>
+  );
+};
+
 // Right-rail panel showing the creative platform the board was designed
 // from — the strategy is part of the deliverable, not hidden plumbing.
 const APlatformPanel = ({ platform }) => {
@@ -2637,6 +2722,7 @@ const DirA_Step4_Logo = () => {
 
   const savedConfig = data.logo_config || {};
   const [platform, setPlatform] = React.useState(data.creative_platform || null);
+  const [research, setResearch] = React.useState(data.research || null);
   const [sketches, setSketches] = React.useState(data.logo_sketches || []);
   const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
   const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
@@ -2670,10 +2756,12 @@ const DirA_Step4_Logo = () => {
       if (!sketches.length) setPhase('brief');
     } else {
       setPlatform(res.platform);
+      if (res.research) setResearch(res.research);
       setSketches(res.sketches);
       setLikes([]);
       setField('data', {
         ...((draft && draft.data) || {}),
+        ...(res.research ? { research: res.research } : {}),
         creative_platform: res.platform,
         logo_config: { mark_type: markType, design_style: designStyle, instructions },
         logo_sketches: res.sketches,
@@ -2925,6 +3013,7 @@ const DirA_Step4_Logo = () => {
 
       {/* ── Right rail: strategy + context ───────────────────────── */}
       <div style={{display:'flex', flexDirection:'column', gap:14}}>
+        <AResearchPanel research={research} />
         <APlatformPanel platform={platform} />
         <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
       </div>
@@ -6246,7 +6335,7 @@ async function apiGenerateLogoSketches(brandId, likedIds, config) {
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
     if (!r.ok) return { error: j.error || 'Sketch generation failed.', code: j.code };
-    return { platform: j.platform || null, sketches: j.sketches || [] };
+    return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
   } catch { return { error: 'Network error.' }; }
 }
 // Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.

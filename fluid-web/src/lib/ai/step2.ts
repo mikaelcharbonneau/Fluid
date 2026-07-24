@@ -7,6 +7,7 @@
 // Keep them in sync if those lists change.
 
 import { platformContext } from "./platform";
+import { researchContext } from "./research";
 
 export interface CustomFont {
   id: string;
@@ -173,9 +174,13 @@ export function styleContext(brand: {
     );
   }
 
-  // When a creative platform has been generated (Phase 0 of the logo studio),
-  // every asset generator designs from the same strategy — this is what keeps
-  // logo, palette, type, and guidelines expressing one idea.
+  // Category research and the creative platform are appended here rather than
+  // threaded through every generator's signature, so palette, typography,
+  // guidelines and both logo phases all design from the same evidence and the
+  // same strategy. This is what keeps the kit expressing one idea.
+  const research = researchContext(brand.data);
+  if (research) lines.push("", research);
+
   const platform = platformContext(brand.data);
   if (platform) lines.push("", platform);
 
