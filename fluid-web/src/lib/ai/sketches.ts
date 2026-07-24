@@ -14,7 +14,7 @@
 //     spreads across the taxonomy.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { sanitizeSvg } from "./logo";
+import { renderLogoImage } from "./images";
 import type { CreativePlatform } from "./platform";
 import {
   type LogoConfig,
@@ -26,7 +26,6 @@ import {
   DESIGN_PRINCIPLES,
   ANTI_CLICHE,
   CRITIQUE_RUBRIC,
-  CROQUIS_STYLE,
 } from "./design";
 
 export interface LogoSketch {
@@ -37,10 +36,12 @@ export interface LogoSketch {
   mark_type: string; // wordmark | lettermark | pictorial | abstract | emblem | combination | dynamic
   attributes: string[]; // formal attributes, e.g. ["geometric", "bold", "structural"]
   idea: string; // one-line rationale
-  svg: string; // sanitized croquis SVG
+  art: string; // the art direction that produced the image
+  image_url: string; // rendered PNG in Supabase storage
 }
 
 export interface SketchBrief {
+  brandId: string;
   brief: string;
   name?: string | null;
   platform: CreativePlatform;
@@ -75,8 +76,6 @@ ${ANTI_CLICHE}
 Your sketches will later be judged against this rubric — design accordingly:
 ${CRITIQUE_RUBRIC}
 
-${CROQUIS_STYLE}
-
 Produce EXACTLY 3 concepts, each a genuinely different idea (not one idea in
 three weights). Output EXACTLY this format, nothing else — no prose, no code
 fences. Repeat the block 3 times:
@@ -86,7 +85,10 @@ NAME: <short evocative concept name, 1-3 words>
 TYPE: <one mark-type key>
 ATTRS: <3-5 comma-separated formal attributes, e.g. geometric, quiet, structural>
 IDEA: <one sentence: the concept and why it expresses the territory>
-<svg viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">...</svg>`;
+ART: <a precise art-direction brief describing the mark to be drawn: the exact
+forms, their arrangement, proportion, weight, and colour. Write it so an
+illustrator could execute it without seeing your head. Describe ONLY the mark
+itself — never the background, framing, or rendering style.>`;
 
 function buildUserPrompt(
   input: SketchBrief,
@@ -155,16 +157,13 @@ function extractSketches(
   text: string,
   territory: { key: string; name: string },
   fixedType: string | null,
-): Omit<LogoSketch, "id">[] {
+): Omit<LogoSketch, "id" | "image_url">[] {
   const raw = text.replace(/```[a-z]*\n?|```/gi, "").trim();
-  let segments = raw.split(/===\s*CONCEPT\s*===/i).map((s) => s.trim()).filter(Boolean);
-  if (segments.length <= 1) {
-    segments = raw.split(/(?=<svg\b)/i).map((s) => s.trim()).filter(Boolean);
-  }
-  const out: Omit<LogoSketch, "id">[] = [];
+  const segments = raw.split(/===\s*CONCEPT\s*===/i).map((s) => s.trim()).filter(Boolean);
+  const out: Omit<LogoSketch, "id" | "image_url">[] = [];
   for (const seg of segments) {
-    const svg = sanitizeSvg(seg);
-    if (!svg) continue;
+    const art = seg.match(/ART:\s*([\s\S]+?)(?=\n[A-Z]{3,}:|$)/i)?.[1]?.trim() ?? "";
+    if (!art) continue;
     const name = seg.match(/NAME:\s*(.+)/i)?.[1]?.trim() ?? "";
     const type = seg.match(/TYPE:\s*(.+)/i)?.[1]?.trim().toLowerCase() ?? "abstract";
     const attrs = (seg.match(/ATTRS:\s*(.+)/i)?.[1] ?? "")
@@ -181,7 +180,7 @@ function extractSketches(
       mark_type: fixedType ?? type,
       attributes: attrs,
       idea,
-      svg,
+      art,
     });
   }
   return out;
@@ -229,7 +228,7 @@ export async function generateLogoSketches(
   });
 
   const settled = await Promise.allSettled(jobs);
-  const sketches: LogoSketch[] = [];
+  const concepts: (Omit<LogoSketch, "image_url"> & { id: string })[] = [];
   const seen = new Set<string>();
   let n = 0;
   for (const result of settled) {
@@ -241,17 +240,44 @@ export async function generateLogoSketches(
       while (seen.has(name.toLowerCase())) name = `${s.name} ${suffix++}`;
       seen.add(name.toLowerCase());
       n += 1;
-      sketches.push({ ...s, name, id: `sk_${Date.now().toString(36)}_${n}` });
+      concepts.push({ ...s, name, id: `sk_${Date.now().toString(36)}_${n}` });
     }
   }
-  if (sketches.length === 0) {
+  if (concepts.length === 0) {
     // Surface the first failure if every call died; otherwise the model
     // returned nothing usable.
     const firstError = settled.find(
       (r): r is PromiseRejectedResult => r.status === "rejected",
     );
     if (firstError) throw firstError.reason;
-    throw new Error("The studio returned no usable sketches.");
+    throw new Error("The studio returned no usable concepts.");
   }
-  return sketches.slice(0, 9);
+
+  // Render every concept in parallel. Sequentially this would be minutes; in
+  // parallel it's roughly the cost of the slowest single image. A concept whose
+  // render fails is dropped rather than failing the whole board.
+  const rendered = await Promise.allSettled(
+    concepts.slice(0, 9).map(async (c) => {
+      const img = await renderLogoImage({
+        brandId: input.brandId,
+        phase: "concept",
+        slot: c.id,
+        direction: c.art,
+        quality: "medium",
+      });
+      return { ...c, image_url: img.url } as LogoSketch;
+    }),
+  );
+  const sketches = rendered
+    .filter((r): r is PromiseFulfilledResult<LogoSketch> => r.status === "fulfilled")
+    .map((r) => r.value);
+
+  if (sketches.length === 0) {
+    const firstError = rendered.find(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    if (firstError) throw firstError.reason;
+    throw new Error("The studio could not render any concepts.");
+  }
+  return sketches;
 }

@@ -89,6 +89,7 @@ export async function POST(request: Request) {
 
   try {
     const finalists = await generateLogoFinalists({
+      brandId,
       brief: String(brand.brief),
       name: chosenBrandName(brand),
       platform,
@@ -110,7 +111,8 @@ export async function POST(request: Request) {
       logos: finalists.map((f) => ({
         name: f.name,
         descriptor: f.idea,
-        svg: f.svg,
+        svg: f.svg ?? "",
+        image_url: f.image_url,
       })),
     };
     const { error: saveError } = await supabase

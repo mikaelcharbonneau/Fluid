@@ -136,6 +136,7 @@ export async function POST(request: Request) {
     const liked = prior.filter((s) => likedIds.includes(s.id));
 
     const sketches = await generateLogoSketches({
+      brandId,
       brief: String(brand.brief),
       name: brandName,
       platform,

@@ -2416,7 +2416,8 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
       display:'flex', alignItems:'center', justifyContent:'center',
       boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
     }}>
-      <SvgMark svg={sketch.svg} size={92} />
+      <img src={sketch.image_url} alt={sketch.name} loading="lazy"
+        style={{width:'100%', height:'100%', objectFit:'contain', borderRadius:8, display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>
@@ -2440,7 +2441,7 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
 
 // A high-fidelity finalist card: the finished mark plus the designer's
 // rationale and the creative director's verdict from the critique pass.
-const AFinalistCard = ({ f, sel, onClick }) => (
+const AFinalistCard = ({ f, sel, busy, onClick }) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12, cursor:'pointer',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -2448,12 +2449,15 @@ const AFinalistCard = ({ f, sel, onClick }) => (
   }}>
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
       <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
-        {f.refines ? 'From your pick' : 'New direction'}
+        {f.svg ? 'Vector ready' : f.refines ? 'From your pick' : 'New direction'}
       </span>
-      {sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
+      {busy
+        ? <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:10, fontWeight:600, color:'var(--fg-2)'}}><Thinking/> tracing</span>
+        : sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
     </div>
-    <div style={{background:'#fff', borderRadius: 10, height: 130, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 1px var(--line)'}}>
-      <SvgMark svg={f.svg} size={104} />
+    <div style={{background:'#fff', borderRadius: 10, height: 130, padding:8, boxShadow:'inset 0 0 0 1px var(--line)'}}>
+      <img src={f.image_url} alt={f.name} loading="lazy"
+        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
     </div>
     <div>
       <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000'}}>{f.name}</div>
@@ -2791,6 +2795,28 @@ const DirA_Step4_Logo = () => {
     setLoadingRefine(false);
   }, [brandId, likes, draft, setField]);
 
+  // Choosing a mark is also the trigger to produce the real vector file.
+  // Cached server-side, so re-picking the same mark costs nothing.
+  const [vectorizing, setVectorizing] = React.useState('');
+  const chooseFinalist = async (f) => {
+    setField('logo_choice', f.name);
+    if (f.svg || vectorizing) return;
+    setVectorizing(f.id); setError('');
+    const res = await apiVectorizeLogo(brandId, f.id);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
+      setFinalists(next);
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        logo_finalists: next,
+        logos: next.map((x) => ({ name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url })),
+      });
+    }
+    setVectorizing('');
+  };
+
   const toggleLike = (id) => {
     const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
     setLikes(next);
@@ -2996,7 +3022,8 @@ const DirA_Step4_Logo = () => {
             <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
               {finalists.map((f) => (
                 <AFinalistCard key={f.id || f.name} f={f} sel={chosen === f.name}
-                  onClick={() => setField('logo_choice', f.name)} />
+                  busy={vectorizing === f.id}
+                  onClick={() => chooseFinalist(f)} />
               ))}
             </div>
           ) : (
@@ -6349,6 +6376,19 @@ async function apiRefineLogoSketches(brandId, likedIds) {
     signalBalanceChanged(j.code);
     if (!r.ok) return { error: j.error || 'Refinement failed.', code: j.code };
     return { finalists: j.finalists || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
+async function apiVectorizeLogo(brandId, conceptId) {
+  try {
+    const r = await fetch('/api/generate/logo/vectorize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, conceptId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Vectorization failed.', code: j.code };
+    return { svg: j.svg || '', url: j.url || '' };
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask Claude to synthesize written brand guidelines.
