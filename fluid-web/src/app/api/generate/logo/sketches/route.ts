@@ -6,6 +6,7 @@ import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import { startClock } from "@/lib/ai/budget";
 import {
   type LogoConfig,
   markTypeById,
@@ -85,16 +86,18 @@ export async function POST(request: Request) {
   const data = (brand.data as Record<string, unknown>) ?? {};
   const brandName = chosenBrandName(brand);
 
+  const clock = startClock("logo/sketches", 270_000);
+
   try {
-    // Phase -1 — category research. The one agentic step: Claude drives its own
-    // web searches until it understands the competitive set. Cached, because it
-    // is the slowest step and the findings don't change between regenerations.
-    //
-    // Degrades gracefully: if research fails (search unavailable, bad JSON) the
-    // studio still designs, just without category grounding. Losing the whole
-    // paid generation over a failed search would be a worse outcome.
+    // Research (Phase -1) and the creative platform (Phase 0) normally arrive
+    // already cached, because the client calls /logo/research first. Running
+    // all four phases in one request is what pushed this route past the 300s
+    // ceiling. They're still generated here if missing, so the route works
+    // standalone — but with guards, so a cold start fails with a real message
+    // instead of being killed silently.
     let research = getResearch(data);
     if (!research) {
+      clock.guard("research the category", 150_000);
       try {
         research = await researchCategory({
           brief: String(brand.brief),
@@ -107,6 +110,7 @@ export async function POST(request: Request) {
         console.error("Category research failed; continuing without it:", err);
         research = null;
       }
+      clock.lap("research");
     }
 
     // styleContext() assembles every piece of design context (Step 2 picks,
@@ -117,10 +121,9 @@ export async function POST(request: Request) {
       research ? { ...brand, data: { ...data, research } } : brand,
     );
 
-    // Phase 0 — the creative platform, generated once and reused by every
-    // downstream asset generator.
     let platform = getPlatform(data);
     if (!platform) {
+      clock.guard("write the creative platform", 60_000);
       platform = await generateCreativePlatform({
         brief: String(brand.brief),
         name: brandName,
@@ -128,6 +131,7 @@ export async function POST(request: Request) {
         competitors: brand.competitors as string | null,
         styleContext: ctx,
       });
+      clock.lap("platform");
     }
 
     // Regeneration bias: liked sketches inform the new spread; every
@@ -135,6 +139,9 @@ export async function POST(request: Request) {
     const prior = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
     const liked = prior.filter((s) => likedIds.includes(s.id));
 
+    // The design pass fans out to parallel designers and then renders every
+    // concept, so it needs the largest single slice of the budget.
+    clock.guard("draw the concepts", 170_000);
     const sketches = await generateLogoSketches({
       brandId,
       brief: String(brand.brief),
@@ -144,6 +151,7 @@ export async function POST(request: Request) {
       config,
       likedSketches: liked.length ? liked : null,
       avoidNames: prior.map((s) => s.name),
+      clock,
     });
 
     await spendTokens(user.id, TOKEN_COST.asset);

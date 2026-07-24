@@ -2742,6 +2742,7 @@ const DirA_Step4_Logo = () => {
   );
   const [loadingSketches, setLoadingSketches] = React.useState(false);
   const [loadingRefine, setLoadingRefine] = React.useState(false);
+  const [stage, setStage] = React.useState('');
   const [error, setError] = React.useState('');
 
   const loading = loadingSketches || loadingRefine;
@@ -2752,6 +2753,23 @@ const DirA_Step4_Logo = () => {
     if (!brandId || !markType) return;
     setLoadingSketches(true); setError('');
     setPhase('sketch');
+
+    // Research and the platform run as their own request. Doing them inline
+    // with the design and render passes exceeded the server's time limit and
+    // the whole board was lost. Both are cached, so this returns immediately
+    // on a regeneration.
+    setStage('research');
+    const pre = await apiResearchCategory(brandId);
+    if (pre.error) {
+      // Not fatal: the studio can still design without category grounding.
+      // Say so rather than failing silently on a degraded result.
+      console.warn('Research unavailable:', pre.error);
+    } else {
+      if (pre.research) setResearch(pre.research);
+      if (pre.platform) setPlatform(pre.platform);
+    }
+
+    setStage('sketch');
     const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
       mark_type: markType, design_style: designStyle, instructions,
     });
@@ -2772,6 +2790,7 @@ const DirA_Step4_Logo = () => {
         logo_sketch_likes: [],
       });
     }
+    setStage('');
     setLoadingSketches(false);
   }, [brandId, draft, setField, markType, designStyle, instructions, sketches.length]);
 
@@ -2991,7 +3010,16 @@ const DirA_Step4_Logo = () => {
           <div className="home-grid-3" style={{display:'grid', gap:12}}>
             {Array.from({length:9}).map((_, i) => (
               <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                {loadingSketches && i === 4 ? <Thinking/> : null}
+                {loadingSketches && i === 4 ? (
+                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
+                      {stage === 'research'
+                        ? 'Studying the category…'
+                        : 'Drawing concepts…'}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -6351,7 +6379,32 @@ async function apiGenerateLogos(brandId) {
     return { logos: j.logos || [] };
   } catch { return { error: 'Network error.' }; }
 }
-// Logo studio · Phase 1 — creative platform + 9 low-fi concept sketches.
+// A function killed at its maxDuration returns no body at all, so there is no
+// j.error to show. Name that case rather than blaming it on generation.
+function describeFailure(r, j, fallback) {
+  if (j && j.error) return j.error;
+  if (r.status === 504 || r.status === 502) {
+    return 'That took longer than the server allows. Your progress was saved — try again and it will pick up where it left off.';
+  }
+  return fallback;
+}
+
+// Logo studio · Phase -1/0 — category research and the creative platform.
+// Split from the sketch call because all four phases in one request exceeded
+// the serverless time limit. Cached server-side, so this is fast on reruns.
+async function apiResearchCategory(brandId) {
+  try {
+    const r = await fetch('/api/generate/logo/research', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: describeFailure(r, j, 'Category research failed.'), code: j.code };
+    return { research: j.research || null, platform: j.platform || null };
+  } catch { return { error: 'Network error.' }; }
+}
+
+// Logo studio · Phase 1 — 9 low-fi concept sketches, rendered as images.
 // likedIds bias a regeneration toward the client's demonstrated taste.
 async function apiGenerateLogoSketches(brandId, likedIds, config) {
   try {
@@ -6361,7 +6414,7 @@ async function apiGenerateLogoSketches(brandId, likedIds, config) {
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
-    if (!r.ok) return { error: j.error || 'Sketch generation failed.', code: j.code };
+    if (!r.ok) return { error: describeFailure(r, j, 'Sketch generation failed.'), code: j.code };
     return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
   } catch { return { error: 'Network error.' }; }
 }
@@ -6374,7 +6427,7 @@ async function apiRefineLogoSketches(brandId, likedIds) {
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
-    if (!r.ok) return { error: j.error || 'Refinement failed.', code: j.code };
+    if (!r.ok) return { error: describeFailure(r, j, 'Refinement failed.'), code: j.code };
     return { finalists: j.finalists || [] };
   } catch { return { error: 'Network error.' }; }
 }

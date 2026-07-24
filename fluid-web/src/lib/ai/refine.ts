@@ -15,6 +15,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
+import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import type { LogoSketch } from "./sketches";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
@@ -49,6 +50,7 @@ export interface RefineBrief {
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
   paletteColors?: string[] | null; // brand hexes for the finished marks
+  clock?: Clock | null; // phase timing, so the slow step shows up in the logs
 }
 
 const MODEL = "claude-opus-4-8";
@@ -298,6 +300,7 @@ export async function generateLogoFinalists(
   ];
 
   const settled = await Promise.allSettled(jobs);
+  input.clock?.lap("refine+expand");
   const pool: Candidate[] = [];
   const seen = new Set<string>();
   for (const result of settled) {
@@ -347,8 +350,11 @@ export async function generateLogoFinalists(
     return vb - va;
   });
 
+  input.clock?.lap("critique");
+
   // Render the survivors in parallel at high quality. One failed render drops
   // that mark rather than losing the whole (paid) board.
+  input.clock?.guard("render the finished marks", 150_000);
   const rendered = await Promise.allSettled(
     ranked.slice(0, FINAL_COUNT).map(async (c, i) => {
       const id = `fin_${Date.now().toString(36)}_${i + 1}`;

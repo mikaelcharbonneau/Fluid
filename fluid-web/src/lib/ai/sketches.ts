@@ -15,6 +15,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
+import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import {
   type LogoConfig,
@@ -49,6 +50,7 @@ export interface SketchBrief {
   config?: LogoConfig | null; // the client's Step 4 brief
   likedSketches?: LogoSketch[] | null; // bias regeneration toward these
   avoidNames?: string[] | null; // previously shown concepts — don't repeat
+  clock?: Clock | null; // phase timing, so the slow step shows up in the logs
 }
 
 const MODEL = "claude-opus-4-8";
@@ -228,6 +230,7 @@ export async function generateLogoSketches(
   });
 
   const settled = await Promise.allSettled(jobs);
+  input.clock?.lap("design");
   const concepts: (Omit<LogoSketch, "image_url"> & { id: string })[] = [];
   const seen = new Set<string>();
   let n = 0;
@@ -268,6 +271,7 @@ export async function generateLogoSketches(
       return { ...c, image_url: img.url } as LogoSketch;
     }),
   );
+  input.clock?.lap("render");
   const sketches = rendered
     .filter((r): r is PromiseFulfilledResult<LogoSketch> => r.status === "fulfilled")
     .map((r) => r.value);

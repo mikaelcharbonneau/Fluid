@@ -46,10 +46,16 @@ export function logoImagePrompt(direction: string): string {
   ].join("\n");
 }
 
+// A render that hangs would otherwise stall until the whole function is killed
+// at maxDuration — taking the eight healthy concepts down with it. Capping each
+// request means a stuck one is dropped and the board still ships.
+const RENDER_TIMEOUT_MS = 120_000;
+
 // Generate one image. Returns raw PNG bytes.
 async function generatePng(prompt: string, quality: "low" | "medium" | "high"): Promise<Buffer> {
   const res = await fetch(OPENAI_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(RENDER_TIMEOUT_MS),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey()}`,

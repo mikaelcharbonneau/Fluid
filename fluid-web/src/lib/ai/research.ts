@@ -193,41 +193,55 @@ function extractResearch(text: string, d: ResearchBrief["delegated"]): CategoryR
 
 // Run the research agent. Loops on pause_turn so a long search session
 // completes rather than returning half-finished.
+//
+// `budgetMs` bounds the loop in wall-clock time. A continuation cap alone
+// doesn't: each round is an Opus call that may run eight searches with adaptive
+// thinking, so five rounds can outlast the whole serverless function. When the
+// budget runs out we stop searching and extract from what we have — partial
+// research beats a killed request, and the caller degrades to none at all if
+// the model never got as far as emitting its findings.
 export async function researchCategory(
   input: ResearchBrief,
+  budgetMs = 200_000,
 ): Promise<CategoryResearch> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not configured.");
   }
   const client = new Anthropic();
+  const startedAt = Date.now();
+  const outOfTime = () => Date.now() - startedAt > budgetMs;
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: buildUserPrompt(input) },
   ];
-
-  let response = await client.messages.create({
+  const request = {
     model: MODEL,
     max_tokens: 8000,
-    thinking: { type: "adaptive" },
+    thinking: { type: "adaptive" as const },
     system: SYSTEM,
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 8 }],
-    messages,
-  });
+    tools: [
+      { type: "web_search_20260209", name: "web_search", max_uses: 8 },
+    ],
+  } satisfies Omit<Anthropic.MessageCreateParamsNonStreaming, "messages">;
+
+  let response = await client.messages.create({ ...request, messages });
 
   // Server-side tools run their own loop; when it hits the per-request cap the
   // turn pauses and we resume by echoing the assistant turn back.
   let continuations = 0;
-  while (response.stop_reason === "pause_turn" && continuations < MAX_CONTINUATIONS) {
+  while (
+    response.stop_reason === "pause_turn" &&
+    continuations < MAX_CONTINUATIONS &&
+    !outOfTime()
+  ) {
     continuations += 1;
     messages.push({ role: "assistant", content: response.content });
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 8 }],
-      messages,
-    });
+    response = await client.messages.create({ ...request, messages });
+  }
+  if (response.stop_reason === "pause_turn") {
+    console.warn(
+      `[research] stopped mid-search after ${continuations} continuation(s), ${Date.now() - startedAt}ms`,
+    );
   }
 
   const text = response.content

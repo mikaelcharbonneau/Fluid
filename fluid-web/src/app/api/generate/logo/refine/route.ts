@@ -7,6 +7,7 @@ import { generateLogoFinalists } from "@/lib/ai/refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { getLogoConfig } from "@/lib/logo-styles";
+import { startClock } from "@/lib/ai/budget";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -87,6 +88,8 @@ export async function POST(request: Request) {
     paletteBasis(getStep2(data)) ??
     undefined;
 
+  const clock = startClock("logo/refine", 270_000);
+
   try {
     const finalists = await generateLogoFinalists({
       brandId,
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
       styleContext: styleContext(brand),
       config: getLogoConfig(data),
       paletteColors,
+      clock,
     });
 
     await spendTokens(user.id, TOKEN_COST.asset);
