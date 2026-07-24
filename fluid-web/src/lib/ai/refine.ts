@@ -14,15 +14,16 @@
 // responses fast and reliable.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { sanitizeSvg } from "./logo";
+import { renderLogoImage } from "./images";
+import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import type { LogoSketch } from "./sketches";
+import { type LogoConfig, logoConfigContext } from "../logo-styles";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
   ANTI_CLICHE,
   CRITIQUE_RUBRIC,
-  HIFI_STYLE,
 } from "./design";
 
 export interface LogoFinalist {
@@ -33,17 +34,23 @@ export interface LogoFinalist {
   idea: string; // designer's rationale
   critique: string; // creative director's verdict note
   score: number; // 0–100 from the critique pass
-  refines: string | null; // name of the source sketch, or null if new
-  svg: string;
+  refines: string | null; // name of the source concept, or null if new
+  art: string; // the art direction that produced the image
+  image_url: string; // rendered PNG in Supabase storage
+  svg?: string; // filled in later, when the client vectorizes their pick
+  vector_url?: string;
 }
 
 export interface RefineBrief {
+  brandId: string;
   brief: string;
   name?: string | null;
   platform: CreativePlatform;
   liked: LogoSketch[]; // ≥1
   styleContext?: string | null;
+  config?: LogoConfig | null; // the client's Step 4 brief
   paletteColors?: string[] | null; // brand hexes for the finished marks
+  clock?: Clock | null; // phase timing, so the slow step shows up in the logs
 }
 
 const MODEL = "claude-opus-4-8";
@@ -64,17 +71,18 @@ ${ANTI_CLICHE}
 Your marks will be judged by the creative director against this rubric:
 ${CRITIQUE_RUBRIC}
 
-${HIFI_STYLE}
-
 Output EXACTLY this format for each mark, nothing else — no prose, no code
 fences:
 
 ===CONCEPT===
 NAME: <concept name>
 TYPE: <one mark-type key>
-REFINES: <name of the sketch this develops, or NEW>
+REFINES: <name of the concept this develops, or NEW>
 IDEA: <one sentence: the concept and the idea it expresses>
-<svg viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">...</svg>`;
+ART: <a precise art-direction brief for the finished mark: exact forms, their
+arrangement, proportion, stroke weight, and colour (use the brand colours by
+hex). Write it so an illustrator could execute it exactly. Describe ONLY the
+mark — never the background, framing, or rendering style.>`;
 
 function platformLines(p: CreativePlatform): string[] {
   return [
@@ -92,6 +100,12 @@ function commonContext(input: RefineBrief): string[] {
     ``,
     ...platformLines(input.platform),
   ];
+  // The client's Step 4 brief is mandatory — it constrains the finished marks
+  // exactly as it constrained the sketches.
+  const configCtx = logoConfigContext(input.config ?? {});
+  if (configCtx) {
+    lines.push(``, `THE CLIENT'S BRIEF — these choices are mandatory:`, configCtx);
+  }
   const palette = (input.paletteColors ?? []).filter(Boolean);
   if (palette.length) {
     lines.push(``, `Brand colors (use purposefully — 1 or 2 per mark): ${palette.join(", ")}`);
@@ -123,8 +137,8 @@ function buildRefinePrompt(input: RefineBrief, chunk: LogoSketch[]): string {
     `construction, optical correction, and the brand colors.`,
     ``,
     ...chunk.flatMap((s) => [
-      `SKETCH "${s.name}" (${s.mark_type}; territory: ${s.territory_name}) — ${s.idea}`,
-      s.svg,
+      `CONCEPT "${s.name}" (${s.mark_type}; territory: ${s.territory_name}) — ${s.idea}`,
+      `Its art direction: ${s.art}`,
       ``,
     ]),
     `Produce ${chunk.length} marks in the required format, with REFINES set to`,
@@ -198,19 +212,16 @@ interface Candidate {
   mark_type: string;
   idea: string;
   refines: string | null;
-  svg: string;
+  art: string;
 }
 
 function extractCandidates(text: string, fallbackTerritory: string): Candidate[] {
   const raw = text.replace(/```[a-z]*\n?|```/gi, "").trim();
-  let segments = raw.split(/===\s*CONCEPT\s*===/i).map((s) => s.trim()).filter(Boolean);
-  if (segments.length <= 1) {
-    segments = raw.split(/(?=<svg\b)/i).map((s) => s.trim()).filter(Boolean);
-  }
+  const segments = raw.split(/===\s*CONCEPT\s*===/i).map((s) => s.trim()).filter(Boolean);
   const out: Candidate[] = [];
   for (const seg of segments) {
-    const svg = sanitizeSvg(seg);
-    if (!svg) continue;
+    const art = seg.match(/ART:\s*([\s\S]+?)(?=\n[A-Z]{3,}:|$)/i)?.[1]?.trim() ?? "";
+    if (!art) continue;
     const refinesRaw = seg.match(/REFINES:\s*(.+)/i)?.[1]?.trim() ?? "NEW";
     out.push({
       name: seg.match(/NAME:\s*(.+)/i)?.[1]?.trim() || "Concept",
@@ -219,7 +230,7 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
         seg.match(/TYPE:\s*(.+)/i)?.[1]?.trim().toLowerCase() ?? "abstract",
       idea: seg.match(/IDEA:\s*(.+)/i)?.[1]?.trim() ?? "",
       refines: /^new$/i.test(refinesRaw) ? null : refinesRaw,
-      svg,
+      art,
     });
   }
   return out;
@@ -289,6 +300,7 @@ export async function generateLogoFinalists(
   ];
 
   const settled = await Promise.allSettled(jobs);
+  input.clock?.lap("refine+expand");
   const pool: Candidate[] = [];
   const seen = new Set<string>();
   for (const result of settled) {
@@ -320,8 +332,8 @@ export async function generateLogoFinalists(
       `CANDIDATES (${pool.length}):`,
       ...pool.flatMap((c, i) => [
         ``,
-        `#${i + 1} "${c.name}" (${c.mark_type}${c.refines ? `; refines client-approved sketch "${c.refines}"` : "; new exploration"}) — ${c.idea}`,
-        c.svg,
+        `#${i + 1} "${c.name}" (${c.mark_type}${c.refines ? `; develops client-approved concept "${c.refines}"` : "; new exploration"}) — ${c.idea}`,
+        `Art direction: ${c.art}`,
       ]),
       ``,
       `Score and rank every candidate as a JSON array.`,
@@ -338,18 +350,46 @@ export async function generateLogoFinalists(
     return vb - va;
   });
 
-  return ranked.slice(0, FINAL_COUNT).map((c, i) => {
-    const v = verdictFor.get(c.name.toLowerCase());
-    return {
-      id: `fin_${Date.now().toString(36)}_${i + 1}`,
-      name: c.name,
-      territory: c.territory,
-      mark_type: c.mark_type,
-      idea: c.idea,
-      critique: v?.note ?? "",
-      score: v?.score ?? 50,
-      refines: c.refines,
-      svg: c.svg,
-    };
-  });
+  input.clock?.lap("critique");
+
+  // Render the survivors in parallel at high quality. One failed render drops
+  // that mark rather than losing the whole (paid) board.
+  input.clock?.guard("render the finished marks", 150_000);
+  const rendered = await Promise.allSettled(
+    ranked.slice(0, FINAL_COUNT).map(async (c, i) => {
+      const id = `fin_${Date.now().toString(36)}_${i + 1}`;
+      const img = await renderLogoImage({
+        brandId: input.brandId,
+        phase: "final",
+        slot: id,
+        direction: c.art,
+        quality: "high",
+      });
+      const v = verdictFor.get(c.name.toLowerCase());
+      return {
+        id,
+        name: c.name,
+        territory: c.territory,
+        mark_type: c.mark_type,
+        idea: c.idea,
+        critique: v?.note ?? "",
+        score: v?.score ?? 50,
+        refines: c.refines,
+        art: c.art,
+        image_url: img.url,
+      } as LogoFinalist;
+    }),
+  );
+
+  const finalists = rendered
+    .filter((r): r is PromiseFulfilledResult<LogoFinalist> => r.status === "fulfilled")
+    .map((r) => r.value);
+  if (finalists.length === 0) {
+    const firstError = rendered.find(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    if (firstError) throw firstError.reason;
+    throw new Error("The studio could not render any finished marks.");
+  }
+  return finalists;
 }

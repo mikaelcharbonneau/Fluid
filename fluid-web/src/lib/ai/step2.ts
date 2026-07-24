@@ -7,6 +7,7 @@
 // Keep them in sync if those lists change.
 
 import { platformContext } from "./platform";
+import { researchContext } from "./research";
 
 export interface CustomFont {
   id: string;
@@ -51,9 +52,35 @@ export function getStep2(data: unknown): Step2 {
   return (d.step2 as Step2) ?? {};
 }
 
-// The five hex values behind a chosen Step 2 palette, or null.
+// Sentinel written by Step 2's "Let AI choose" — the client is DELEGATING the
+// decision to the studio, not leaving it blank. The distinction matters:
+//   • undefined/null → the user simply hasn't decided; generators get no
+//     guidance and fall back to their own judgement.
+//   • DELEGATED      → an explicit instruction to decide this during research,
+//     free of the app's curated option lists.
+// Anything that reads a Step 2 field must handle all three states.
+export const DELEGATED = "__ai__";
+
+export function isDelegated(value: string | null | undefined): boolean {
+  return value === DELEGATED;
+}
+
+// Which Step 2 decisions the client handed to the studio.
+export function delegatedChoices(brand: {
+  style_id?: string | null;
+  data?: unknown;
+}): { style: boolean; palette: boolean; font: boolean; any: boolean } {
+  const s2 = getStep2(brand.data);
+  const style = isDelegated(brand.style_id);
+  const palette = isDelegated(s2.palette);
+  const font = isDelegated(s2.font);
+  return { style, palette, font, any: style || palette || font };
+}
+
+// The five hex values behind a chosen Step 2 palette, or null. Delegated and
+// unset both yield null — callers wanting to tell them apart use isDelegated.
 export function paletteBasis(s2: Step2): string[] | null {
-  if (!s2.palette) return null;
+  if (!s2.palette || isDelegated(s2.palette)) return null;
   const p = PALETTES[s2.palette];
   return p ? p.colors : null;
 }
@@ -61,7 +88,7 @@ export function paletteBasis(s2: Step2): string[] | null {
 // The chosen font pairing (open-source or uploaded custom), or null.
 export function fontChoice(s2: Step2): { heading: string; body: string } | null {
   const f = s2.font;
-  if (!f) return null;
+  if (!f || isDelegated(f)) return null;
   if (f.startsWith("custom:")) {
     const cf = (s2.custom_fonts ?? []).find((c) => "custom:" + c.id === f);
     return cf ? { heading: cf.family, body: cf.family } : null;
@@ -93,9 +120,19 @@ export function styleContext(brand: {
 }): string {
   const s2 = getStep2(brand.data);
   const lines: string[] = [];
+  // Decisions the client delegated. These are collected separately and stated
+  // as an open brief at the end — an instruction to decide, not a constraint.
+  const open: string[] = [];
 
-  const style = brand.style_id ? STYLE_NAMES[brand.style_id] || brand.style_id : "";
-  if (style) lines.push(`Visual direction: ${style}.`);
+  if (isDelegated(brand.style_id)) {
+    open.push(
+      "the visual direction — you are NOT limited to any preset style list; " +
+        "define the direction the brand actually needs",
+    );
+  } else {
+    const style = brand.style_id ? STYLE_NAMES[brand.style_id] || brand.style_id : "";
+    if (style) lines.push(`Visual direction: ${style}.`);
+  }
 
   const refine = refineWords(s2.refine);
   if (refine.length) lines.push(`Tuned to feel: ${refine.join(", ")}.`);
@@ -104,19 +141,46 @@ export function styleContext(brand: {
     lines.push(`Draws inspiration from ${s2.inspiration}'s design language (adapt its spirit, do not copy it).`);
   }
 
-  const basis = paletteBasis(s2);
-  if (s2.palette && basis) {
-    lines.push(`Preferred color palette "${s2.palette}": ${basis.join(", ")}.`);
+  if (isDelegated(s2.palette)) {
+    open.push(
+      "the colour palette — derive real hex values from the research and the " +
+        "brand idea; you are NOT limited to any preset palette",
+    );
+  } else {
+    const basis = paletteBasis(s2);
+    if (s2.palette && basis) {
+      lines.push(`Preferred color palette "${s2.palette}": ${basis.join(", ")}.`);
+    }
   }
 
-  const fonts = fontChoice(s2);
-  if (fonts) {
-    lines.push(`Chosen typography: ${fonts.heading} for headings, ${fonts.body} for body.`);
+  if (isDelegated(s2.font)) {
+    open.push(
+      "the typography — recommend a real pairing that suits the brand; you are " +
+        "NOT limited to any preset pairing",
+    );
+  } else {
+    const fonts = fontChoice(s2);
+    if (fonts) {
+      lines.push(`Chosen typography: ${fonts.heading} for headings, ${fonts.body} for body.`);
+    }
   }
 
-  // When a creative platform has been generated (Phase 0 of the logo studio),
-  // every asset generator designs from the same strategy — this is what keeps
-  // logo, palette, type, and guidelines expressing one idea.
+  if (open.length) {
+    lines.push(
+      "",
+      `The client has delegated these decisions to the studio — make them ` +
+        `deliberately, grounded in the brief and the research:`,
+      ...open.map((o) => `- ${o}.`),
+    );
+  }
+
+  // Category research and the creative platform are appended here rather than
+  // threaded through every generator's signature, so palette, typography,
+  // guidelines and both logo phases all design from the same evidence and the
+  // same strategy. This is what keeps the kit expressing one idea.
+  const research = researchContext(brand.data);
+  if (research) lines.push("", research);
+
   const platform = platformContext(brand.data);
   if (platform) lines.push("", platform);
 

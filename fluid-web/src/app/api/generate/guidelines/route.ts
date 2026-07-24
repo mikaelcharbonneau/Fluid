@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandGuidelines } from "@/lib/ai/guidelines";
-import { styleContext } from "@/lib/ai/step2";
+import { styleContext, isDelegated } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,8 +76,12 @@ export async function POST(request: Request) {
     guidelines = await generateBrandGuidelines({
       brief: String(brand.brief),
       audience: brand.audience as string | null,
-      name: (brand.name_choice || brand.name) as string | null,
-      style: brand.style_id as string | null,
+      name: chosenBrandName(brand),
+      // A delegated style is described by styleContext() as an open brief;
+      // passing the raw sentinel here would print "__ai__" into the prompt.
+      style: isDelegated(brand.style_id as string | null)
+        ? null
+        : (brand.style_id as string | null),
       paletteSummary: paletteSummary ?? null,
       typeSummary,
       logoChoice: brand.logo_choice as string | null,

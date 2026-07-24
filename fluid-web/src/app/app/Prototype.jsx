@@ -8,6 +8,7 @@
 // Imported with { ssr: false } so top-level window writes run client-only.
 // =====================================================================
 import React from "react";
+import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
 
 // Two source files declare the bare `const { useState } = React` (and the
 // bootstrap adds useEffect); in a single shared scope those collide, so we
@@ -1103,21 +1104,45 @@ const DirA_Step1_Brief = () => {
 //      sliders within the chosen register.
 // =====================================================================
 
-// Sparkle button — section-level "Let AI choose" affordance
-const ALetAI = ({ onClick, busy }) => (
-  <button onClick={onClick} disabled={busy} style={{
+// Sparkle button — section-level "Let AI choose" affordance. Toggles the
+// delegation on and off; `active` means the studio owns this decision.
+const ALetAI = ({ onClick, active }) => (
+  <button onClick={onClick} style={{
     display:'inline-flex', alignItems:'center', gap:6,
     padding:'6px 12px', borderRadius: 99,
-    background:'#0E0F12', color:'#fff',
-    fontSize: 11.5, fontWeight: 600, border:0, cursor: busy ? 'default' : 'pointer',
-    boxShadow:'0 1px 4px rgba(0,0,0,.18)', opacity: busy ? 0.7 : 1,
+    background: active ? 'rgba(253,186,80,.16)' : '#0E0F12',
+    color: active ? '#8A5A12' : '#fff',
+    boxShadow: active ? 'inset 0 0 0 1px rgba(253,186,80,.55)' : '0 1px 4px rgba(0,0,0,.18)',
+    fontSize: 11.5, fontWeight: 600, border:0, cursor:'pointer',
   }}>
-    <Sparkle size={11} color="#FDBA50"/> {busy ? 'Choosing…' : 'Let AI choose'}
+    <Sparkle size={11} color={active ? '#C77D14' : '#FDBA50'}/>
+    {active ? 'Fluid decides' : 'Let AI choose'}
   </button>
 );
 
+// Shown under a section the client delegated. States plainly that the choice
+// is deferred to the research step — not silently left blank.
+const ADelegatedNote = ({ what, onClear }) => (
+  <div style={{
+    display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+    padding:'10px 14px', borderRadius:12, marginBottom:12,
+    background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.35)',
+    fontSize:12.5, color:'#8A5A12', lineHeight:1.45,
+  }}>
+    <span style={{flex:1, minWidth:200}}>
+      Fluid will choose the {what} while researching your category — it won’t be
+      limited to the options below.
+    </span>
+    <button onClick={onClear} style={{
+      padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
+      background:'transparent', color:'#8A5A12', fontSize:11.5, fontWeight:700,
+      boxShadow:'inset 0 0 0 1px rgba(253,186,80,.55)',
+    }}>Pick it myself</button>
+  </div>
+);
+
 // Section heading: number badge + title + meta + AI button
-const ASectionHead = ({ n, title, sub, count, ai, onAI, aiBusy }) => (
+const ASectionHead = ({ n, title, sub, count, ai, onAI, aiActive }) => (
   <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:14}}>
     <div style={{display:'flex', alignItems:'center', gap:12, minWidth:0}}>
       {n && (
@@ -1137,7 +1162,7 @@ const ASectionHead = ({ n, title, sub, count, ai, onAI, aiBusy }) => (
     </div>
     <div style={{display:'flex', alignItems:'center', gap:10}}>
       {count && <span style={{fontSize:11, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>{count}</span>}
-      {ai && <ALetAI onClick={onAI} busy={aiBusy}/>}
+      {ai && <ALetAI onClick={onAI} active={aiActive}/>}
     </div>
   </div>
 );
@@ -1634,6 +1659,12 @@ const visualStyleImage = (id) => {
   return paths[id];
 };
 
+// "Let AI choose" writes this sentinel instead of resolving to one of the
+// curated options below. It means "the studio decides this during research,
+// unconstrained by these lists" — deliberately distinct from an unset field,
+// which just means the user hasn't decided. Mirrors DELEGATED in lib/ai/step2.
+const AI_CHOICE = '__ai__';
+
 const VISUAL_STYLE_OPTIONS = [
   {
     id: 'modern-minimal',
@@ -1763,18 +1794,16 @@ const AVisualStyleSection = () => {
   const { step2, setStep2 } = useStep2();
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState((draft && draft.style_id) || null);
+  const delegated = selectedId === AI_CHOICE;
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
   const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
-  const brandId = draft && draft.id;
-  const [picking, setPicking] = useState(false);
-  const letAIChoose = async () => {
-    if (!brandId || picking) return;
-    setPicking(true);
-    const opts = VISUAL_STYLE_OPTIONS.map((o) => ({ id: o.id, label: o.name, desc: o.descriptor }));
-    const { result } = await apiAssist(brandId, 'pick_style', opts);
-    if (result && result.choice) { setSelectedId(result.choice); setField('style_id', result.choice); }
-    setPicking(false);
+  // Delegating is instant and free — no model call. The decision is made later,
+  // by the research agent, with the category evidence in hand.
+  const letAIChoose = () => {
+    const next = delegated ? null : AI_CHOICE;
+    setSelectedId(next);
+    setField('style_id', next);
   };
 
   return (
@@ -1783,9 +1812,10 @@ const AVisualStyleSection = () => {
         n="01"
         title="Visual style"
         sub="Each card is a full preview of that visual direction."
-        ai onAI={letAIChoose} aiBusy={picking}
+        ai onAI={letAIChoose} aiActive={delegated}
       />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      {delegated && <ADelegatedNote what="visual direction" onClear={letAIChoose} />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, opacity: delegated ? 0.45 : 1 }}>
         {VISUAL_STYLE_OPTIONS.map((opt) => (
           <AVisualStyleCard
             key={opt.id}
@@ -1823,7 +1853,7 @@ const AVisualStyleSection = () => {
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Refine within {selected.name}
+              {delegated ? 'Tune the register' : 'Refine within ' + selected.name}
             </span>
             <div style={{ flex: 1, height: 1, background: 'var(--line)' }}/>
             <span style={{ fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>3 attributes</span>
@@ -1996,11 +2026,8 @@ const AUploadFontCard = ({ onPick }) => {
 
 // Typography section — open-source pairs, custom uploads, and Let AI choose.
 const ATypographySection = () => {
-  const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
-  const brandId = draft && draft.id;
   const customFonts = step2.custom_fonts || [];
-  const [picking, setPicking] = React.useState(false);
   const [uploadErr, setUploadErr] = React.useState('');
 
   React.useEffect(() => {
@@ -2010,14 +2037,9 @@ const ATypographySection = () => {
     customFonts.forEach((cf) => registerCustomFont(cf.family, cf.dataUrl));
   }, [customFonts]);
 
-  const pickFont = async () => {
-    if (!brandId || picking) return;
-    setPicking(true);
-    const opts = OPEN_SOURCE_FONT_PAIRS.map((p) => ({ id: p.id, label: p.name, desc: p.mood + ' — ' + p.display.family + ' / ' + p.body.family }));
-    const { result } = await apiAssist(brandId, 'pick_font', opts);
-    if (result && result.choice) setStep2({ font: result.choice });
-    setPicking(false);
-  };
+  // Defer to the studio rather than picking from the list (see AI_CHOICE).
+  const fontDelegated = step2.font === AI_CHOICE;
+  const pickFont = () => setStep2({ font: fontDelegated ? null : AI_CHOICE });
 
   const onUpload = async (file) => {
     setUploadErr('');
@@ -2040,8 +2062,9 @@ const ATypographySection = () => {
 
   return (
     <div style={{marginBottom: 12}}>
-      <ASectionHead n="03" title="Typography" sub="Open-source pairs previewed live — or upload your own font." ai onAI={pickFont} aiBusy={picking}/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10}}>
+      <ASectionHead n="03" title="Typography" sub="Open-source pairs previewed live — or upload your own font." ai onAI={pickFont} aiActive={fontDelegated}/>
+      {fontDelegated && <ADelegatedNote what="typography" onClear={pickFont} />}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 10, opacity: fontDelegated ? 0.45 : 1}}>
         {OPEN_SOURCE_FONT_PAIRS.map((p) => (
           <AFontPairOption
             key={p.id}
@@ -2066,24 +2089,16 @@ const ATypographySection = () => {
 };
 
 const DirA_Step2_Style = () => {
-  const { draft } = useBrandDraft();
   const { step2, setStep2 } = useStep2();
-  const brandId = draft && draft.id;
-  const [picking, setPicking] = React.useState('');
 
   // Load all preview fonts once when the step opens.
   React.useEffect(() => {
     OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
   }, []);
 
-  const pickPalette = async () => {
-    if (!brandId || picking) return;
-    setPicking('palette');
-    const opts = PALETTE_OPTIONS.map((p) => ({ id: p.name, label: p.name, desc: p.mood }));
-    const { result } = await apiAssist(brandId, 'pick_palette', opts);
-    if (result && result.choice) setStep2({ palette: result.choice });
-    setPicking('');
-  };
+  // Defer to the studio rather than picking from the list (see AI_CHOICE).
+  const paletteDelegated = step2.palette === AI_CHOICE;
+  const pickPalette = () => setStep2({ palette: paletteDelegated ? null : AI_CHOICE });
 
   return (
   <AWizardLayout
@@ -2148,8 +2163,9 @@ const DirA_Step2_Style = () => {
 
     {/* 2b · Color palette */}
     <div style={{marginBottom: 24}}>
-      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai onAI={pickPalette} aiBusy={picking === 'palette'}/>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10}}>
+      <ASectionHead n="02" title="Color palette" sub="Hand-picked palettes that carry the chosen register." ai onAI={pickPalette} aiActive={paletteDelegated}/>
+      {paletteDelegated && <ADelegatedNote what="colour palette" onClear={pickPalette} />}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 10, opacity: paletteDelegated ? 0.45 : 1}}>
         {PALETTE_OPTIONS.map((p) => (
           <APaletteOption key={p.name} name={p.name} mood={p.mood} palette={p.palette}
             sel={step2.palette === p.name}
@@ -2400,7 +2416,8 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
       display:'flex', alignItems:'center', justifyContent:'center',
       boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
     }}>
-      <SvgMark svg={sketch.svg} size={92} />
+      <img src={sketch.image_url} alt={sketch.name} loading="lazy"
+        style={{width:'100%', height:'100%', objectFit:'contain', borderRadius:8, display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>
@@ -2424,7 +2441,7 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
 
 // A high-fidelity finalist card: the finished mark plus the designer's
 // rationale and the creative director's verdict from the critique pass.
-const AFinalistCard = ({ f, sel, onClick }) => (
+const AFinalistCard = ({ f, sel, busy, onClick }) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12, cursor:'pointer',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -2432,12 +2449,15 @@ const AFinalistCard = ({ f, sel, onClick }) => (
   }}>
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
       <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
-        {f.refines ? 'From your pick' : 'New direction'}
+        {f.svg ? 'Vector ready' : f.refines ? 'From your pick' : 'New direction'}
       </span>
-      {sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
+      {busy
+        ? <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:10, fontWeight:600, color:'var(--fg-2)'}}><Thinking/> tracing</span>
+        : sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
     </div>
-    <div style={{background:'#fff', borderRadius: 10, height: 130, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 1px var(--line)'}}>
-      <SvgMark svg={f.svg} size={104} />
+    <div style={{background:'#fff', borderRadius: 10, height: 130, padding:8, boxShadow:'inset 0 0 0 1px var(--line)'}}>
+      <img src={f.image_url} alt={f.name} loading="lazy"
+        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
     </div>
     <div>
       <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000'}}>{f.name}</div>
@@ -2446,6 +2466,94 @@ const AFinalistCard = ({ f, sel, onClick }) => (
     </div>
   </div>
 );
+
+// Right-rail panel showing what the studio found in the category. Research is
+// part of the deliverable — the client should see the evidence behind the work,
+// including which clichés the marks are deliberately avoiding.
+const AResearchPanel = ({ research }) => {
+  const [open, setOpen] = React.useState(false);
+  if (!research) return null;
+  const rec = [
+    research.recommended_direction && ['Direction', research.recommended_direction],
+    research.recommended_palette && ['Palette', research.recommended_palette],
+    research.recommended_typography && ['Typography', research.recommended_typography],
+  ].filter(Boolean);
+  return (
+    <div style={{
+      background:'var(--bg-elev)', borderRadius:16, padding:16,
+      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+      display:'flex', flexDirection:'column', gap:12,
+    }}>
+      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>
+        Category research{research.category ? ' · ' + research.category : ''}
+      </div>
+      {research.landscape && (
+        <div style={{fontSize:12, color:'var(--fg-2)', lineHeight:1.5}}>{research.landscape}</div>
+      )}
+
+      {/* The studio's calls on whatever the client delegated in Step 2. */}
+      {rec.length > 0 && (
+        <div style={{display:'flex', flexDirection:'column', gap:8, padding:'10px 12px', borderRadius:10, background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.30)'}}>
+          <div style={{fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'#8A5A12'}}>Fluid decided</div>
+          {rec.map(([label, r]) => (
+            <div key={label}>
+              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{label}: {r.value}</div>
+              {r.rationale && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{r.rationale}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(research.conventions || []).length > 0 && (
+        <div>
+          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Category conventions</div>
+          <div style={{display:'flex', flexDirection:'column', gap:4}}>
+            {research.conventions.slice(0, open ? 99 : 3).map((c, i) => (
+              <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>
+                <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.pattern}</span>
+                {c.note ? ` — ${c.note}` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {open && (
+        <>
+          {(research.trends || []).length > 0 && (
+            <div>
+              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Current design trends</div>
+              {research.trends.map((w, i) => (
+                <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>· {w}</div>
+              ))}
+            </div>
+          )}
+          {(research.competitors || []).length > 0 && (
+            <div>
+              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Competitor identities</div>
+              {research.competitors.map((c) => (
+                <div key={c.name} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45, marginBottom:3}}>
+                  <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.name}</span> — {c.identity}
+                </div>
+              ))}
+            </div>
+          )}
+          {(research.sources || []).length > 0 && (
+            <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.5, wordBreak:'break-all'}}>
+              {research.sources.length} source{research.sources.length === 1 ? '' : 's'} consulted
+            </div>
+          )}
+        </>
+      )}
+
+      <button onClick={() => setOpen((v) => !v)} style={{
+        alignSelf:'flex-start', padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
+        background:'transparent', color:'var(--fg-2)', fontSize:11.5, fontWeight:600,
+        boxShadow:'inset 0 0 0 1px var(--line)',
+      }}>{open ? 'Show less' : 'Full findings'}</button>
+    </div>
+  );
+};
 
 // Right-rail panel showing the creative platform the board was designed
 // from — the strategy is part of the deliverable, not hidden plumbing.
@@ -2482,6 +2590,133 @@ const APlatformPanel = ({ platform }) => {
   );
 };
 
+// ── Step 4 brief · preview illustrations ─────────────────────────────
+// Small hand-authored SVGs showing what each choice produces. These are
+// illustrative samples, not generated output — their job is to make an
+// abstract taxonomy legible at a glance.
+const INK = '#1C1C1E';
+
+const MARK_TYPE_PREVIEW = {
+  wordmark: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <text x="60" y="38" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="26" letterSpacing="-1.2" fill={INK}>FORMA</text>
+    </svg>
+  ),
+  lettermark: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="42" y="8" width="36" height="44" rx="8" fill={INK}/>
+      <text x="60" y="40" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="24" fill="#fff">F</text>
+    </svg>
+  ),
+  pictorial: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M44 46 L60 14 L76 46 Z" fill="none" stroke={INK} strokeWidth="4" strokeLinejoin="round"/>
+      <circle cx="60" cy="34" r="4" fill={INK}/>
+    </svg>
+  ),
+  abstract: (
+    // Two offset rounded squares — layered, geometric, and (unlike a circle
+    // beside a stem) impossible to misread as a letterform.
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="40" y="9" width="30" height="30" rx="9" fill="none" stroke={INK} strokeWidth="4"/>
+      <rect x="53" y="22" width="30" height="30" rx="9" fill={INK}/>
+    </svg>
+  ),
+  combination: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="20" r="11" fill="none" stroke={INK} strokeWidth="4"/>
+      <circle cx="60" cy="20" r="3.5" fill={INK}/>
+      <text x="60" y="50" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="700" fontSize="15" letterSpacing="-0.5" fill={INK}>FORMA</text>
+    </svg>
+  ),
+  emblem: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="30" r="25" fill="none" stroke={INK} strokeWidth="3.5"/>
+      <text x="60" y="34" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="700" fontSize="9" letterSpacing="0.2" fill={INK}>FORMA</text>
+    </svg>
+  ),
+};
+
+const DESIGN_STYLE_PREVIEW = {
+  studio: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M60 14 L64.5 26 L76 30 L64.5 34 L60 46 L55.5 34 L44 30 L55.5 26 Z" fill={INK}/>
+    </svg>
+  ),
+  longlegs: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M46 8 L46 52 M60 8 L60 52 M74 8 L74 40 Q74 52 86 52" stroke={INK} strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+      <path d="M34 52 L46 52" stroke={INK} strokeWidth="4.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  sprinklers: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M60 10 C68 24 72 28 72 34 A12 12 0 0 1 48 34 C48 28 52 24 60 10 Z" fill={INK}/>
+      <path d="M40 30 C44 37 46 39 46 42 A6 6 0 0 1 34 42 C34 39 36 37 40 30 Z" fill={INK} opacity="0.65"/>
+      <path d="M84 34 C87 39 88 40 88 42 A4.5 4.5 0 0 1 79 42 C79 40 81 39 84 34 Z" fill={INK} opacity="0.45"/>
+    </svg>
+  ),
+  blurtails: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bt-prev" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor={INK} stopOpacity="0.55"/>
+          <stop offset="1" stopColor={INK} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect x="24" y="22" width="44" height="16" rx="8" fill="url(#bt-prev)"/>
+      <circle cx="74" cy="30" r="14" fill={INK}/>
+    </svg>
+  ),
+  typemelts: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M38 46 L38 16 A9 9 0 0 1 56 16 L56 26 Q60 30 64 26 L64 16 A9 9 0 0 1 82 16 L82 46" stroke={INK} strokeWidth="10" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  polygrids: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <g fill={INK}>
+        <circle cx="44" cy="16" r="4.5"/>
+        <rect x="55.5" y="11.5" width="9" height="9"/>
+        <path d="M76 11 L80.5 20 L71.5 20 Z"/>
+        <path d="M39.5 32 L48.5 32 M44 27.5 L44 36.5" stroke={INK} strokeWidth="3.5"/>
+        <circle cx="60" cy="32" r="4.5"/>
+        <rect x="71.5" y="27.5" width="9" height="9" rx="4.5"/>
+        <rect x="39.5" y="43.5" width="9" height="9"/>
+        <path d="M60 43 L64.5 52 L55.5 52 Z"/>
+        <circle cx="76" cy="48" r="4.5"/>
+      </g>
+    </svg>
+  ),
+};
+
+// A selectable choice card with an illustrative preview.
+const AChoiceCard = ({ option, preview, sel, onClick }) => (
+  <button onClick={onClick} type="button" style={{
+    background: 'var(--bg-elev)', borderRadius: 14, padding: 12, cursor: 'pointer',
+    border: 0, textAlign: 'left', width: '100%',
+    boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    display: 'flex', flexDirection: 'column', gap: 10,
+  }}>
+    <div style={{
+      background: '#FBFAF6', borderRadius: 9, height: 62,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)', padding: '0 8px',
+    }}>
+      {preview}
+    </div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, letterSpacing: '-0.015em', color: '#000' }}>{option.name}</span>
+        {sel && <span style={{ width: 15, height: 15, borderRadius: 99, background: '#000', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 15px' }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.35, marginTop: 3 }}>{option.blurb}</div>
+    </div>
+  </button>
+);
+
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
   const brandId = draft && draft.id;
@@ -2492,40 +2727,77 @@ const DirA_Step4_Logo = () => {
   const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
   const chosen = (draft && draft.logo_choice) || null;
 
+  const savedConfig = data.logo_config || {};
   const [platform, setPlatform] = React.useState(data.creative_platform || null);
+  const [research, setResearch] = React.useState(data.research || null);
   const [sketches, setSketches] = React.useState(data.logo_sketches || []);
   const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
   const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
-  const [phase, setPhase] = React.useState((data.logo_finalists || []).length ? 'final' : 'sketch');
+  // The Step 4 brief — the studio doesn't draw a line until the client has
+  // specified what kind of mark they're commissioning.
+  const [markType, setMarkType] = React.useState(savedConfig.mark_type || null);
+  const [designStyle, setDesignStyle] = React.useState(savedConfig.design_style || 'studio');
+  const [instructions, setInstructions] = React.useState(savedConfig.instructions || '');
+  const [phase, setPhase] = React.useState(
+    (data.logo_finalists || []).length ? 'final'
+      : (data.logo_sketches || []).length ? 'sketch'
+      : 'brief',
+  );
   const [loadingSketches, setLoadingSketches] = React.useState(false);
   const [loadingRefine, setLoadingRefine] = React.useState(false);
+  const [stage, setStage] = React.useState('');
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
 
   const loading = loadingSketches || loadingRefine;
 
-  // Phase 1 — generate (or regenerate) the 9-up sketch board. Likes so far
-  // bias the new spread; a fresh board starts with a clean slate of likes.
-  const generateSketches = React.useCallback(async (likedIds) => {
-    if (!brandId) return;
+  // Phase 1 — draw one more concept sketch. Likes so far bias the new concept;
+  // `fresh` starts a new board (used when the brief just changed) instead of
+  // adding this concept to the existing one. The server returns the full
+  // board either way, so the client just displays whatever comes back.
+  const generateSketches = React.useCallback(async (likedIds, { fresh = false } = {}) => {
+    if (!brandId || !markType) return;
     setLoadingSketches(true); setError('');
-    const res = await apiGenerateLogoSketches(brandId, likedIds || []);
+    setPhase('sketch');
+
+    // Research and the platform run as their own request. Doing them inline
+    // with the design and render passes exceeded the server's time limit and
+    // the whole board was lost. Both are cached, so this returns immediately
+    // on a regeneration.
+    setStage('research');
+    const pre = await apiResearchCategory(brandId);
+    if (pre.error) {
+      // Not fatal: the studio can still design without category grounding.
+      // Say so rather than failing silently on a degraded result.
+      console.warn('Research unavailable:', pre.error);
+    } else {
+      if (pre.research) setResearch(pre.research);
+      if (pre.platform) setPlatform(pre.platform);
+    }
+
+    setStage('sketch');
+    const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
+      mark_type: markType, design_style: designStyle, instructions,
+    }, fresh);
     if (res.error) {
       setError(res.error);
+      if (!sketches.length) setPhase('brief');
     } else {
       setPlatform(res.platform);
+      if (res.research) setResearch(res.research);
       setSketches(res.sketches);
-      setLikes([]);
-      setPhase('sketch');
+      setLikes(fresh ? [] : (likedIds || []));
       setField('data', {
         ...((draft && draft.data) || {}),
+        ...(res.research ? { research: res.research } : {}),
         creative_platform: res.platform,
+        logo_config: { mark_type: markType, design_style: designStyle, instructions },
         logo_sketches: res.sketches,
-        logo_sketch_likes: [],
+        logo_sketch_likes: fresh ? [] : (likedIds || []),
       });
     }
+    setStage('');
     setLoadingSketches(false);
-  }, [brandId, draft, setField]);
+  }, [brandId, draft, setField, markType, designStyle, instructions, sketches.length]);
 
   // Phase 2 — refine the liked directions into 9 critiqued finalists.
   const refine = React.useCallback(async () => {
@@ -2547,33 +2819,58 @@ const DirA_Step4_Logo = () => {
     setLoadingRefine(false);
   }, [brandId, likes, draft, setField]);
 
+  // Choosing a mark is also the trigger to produce the real vector file.
+  // Cached server-side, so re-picking the same mark costs nothing.
+  const [vectorizing, setVectorizing] = React.useState('');
+  const chooseFinalist = async (f) => {
+    setField('logo_choice', f.name);
+    if (f.svg || vectorizing) return;
+    setVectorizing(f.id); setError('');
+    const res = await apiVectorizeLogo(brandId, f.id);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
+      setFinalists(next);
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        logo_finalists: next,
+        logos: next.map((x) => ({ name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url })),
+      });
+    }
+    setVectorizing('');
+  };
+
   const toggleLike = (id) => {
     const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
     setLikes(next);
     setField('data', { ...((draft && draft.data) || {}), logo_sketch_likes: next });
   };
 
-  // Auto-generate the first board when the step opens with a brief and no
-  // sketches yet.
-  React.useEffect(() => {
-    if (!brandId || !hasBrief || sketches.length) return;
-    if (requestedFor.current === brandId) return;
-    requestedFor.current = brandId;
-    generateSketches([]);
-  }, [brandId, hasBrief, sketches.length, generateSketches]);
+  // No auto-generation: the studio waits for the client's brief. Nothing is
+  // drawn (and no tokens spent) until a mark type is chosen.
 
   const toolBtn = {
     padding:'8px 12px', borderRadius:10, fontSize:12, fontWeight:600, border:0,
     display:'inline-flex', alignItems:'center', gap:6,
   };
 
+  const TITLES = {
+    brief: 'Brief the studio.',
+    sketch: 'Pick the directions you like.',
+    final: 'Choose the mark.',
+  };
+  const SUBTITLES = {
+    brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
+    sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
+    final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
+  };
+
   return (
   <AWizardLayout
     step={4}
-    title={phase === 'final' ? 'Choose the mark.' : 'Pick the directions you like.'}
-    subtitle={phase === 'final'
-      ? 'Nine finished marks, developed from your picks and ranked by the studio’s critique.'
-      : 'The studio sketched nine rough concepts across the brand’s strategic territories. Like the ones that feel right — your picks steer the finished designs.'}
+    title={TITLES[phase]}
+    subtitle={SUBTITLES[phase]}
     status="Draft"
     progress="Step 4 of 5"
     nextLabel="Assemble Brand Kit"
@@ -2584,18 +2881,34 @@ const DirA_Step4_Logo = () => {
       <div>
         {/* ── Toolbar ─────────────────────────────────────────────── */}
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:14, flexWrap:'wrap'}}>
-          {phase === 'sketch' ? (
+          {phase === 'brief' ? (
+            <>
+              <div className="eyebrow" style={{color:'var(--fg-3)'}}>The brief</div>
+              {sketches.length > 0 && (
+                <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
+                  Back to sketches
+                </button>
+              )}
+            </>
+          ) : phase === 'sketch' ? (
             <>
               <div className="eyebrow" style={{color:'var(--fg-3)'}}>
                 Concept sketches{likes.length ? ' · ' + likes.length + ' liked' : ''}
               </div>
               <div style={{display:'flex', gap:8}}>
+                <button onClick={() => !loading && setPhase('brief')} disabled={loading} style={{
+                  ...toolBtn, background:'transparent', color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line)',
+                  cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1,
+                }}>
+                  Edit brief
+                </button>
                 <button onClick={() => !loading && hasBrief && generateSketches(likes)} disabled={loading || !hasBrief} style={{
                   ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
                   boxShadow:'inset 0 0 0 1px var(--line)',
                   cursor: loading || !hasBrief ? 'default' : 'pointer', opacity: loading || !hasBrief ? 0.6 : 1,
                 }}>
-                  <Sparkle size={11}/> {sketches.length ? 'Regenerate sketches' : 'Generate sketches'}
+                  <Sparkle size={11}/> {sketches.length ? 'Draw another concept' : 'Sketch a concept'}
                 </button>
                 <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
                   ...toolBtn, background:'#000', color:'#fff',
@@ -2633,22 +2946,105 @@ const DirA_Step4_Logo = () => {
           </div>
         )}
 
+        {/* ── Phase 0 · the brief ─────────────────────────────────── */}
+        {phase === 'brief' && hasBrief && (
+          <div style={{display:'flex', flexDirection:'column', gap:22}}>
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>What kind of mark?</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Required</span>
+              </div>
+              <div className="home-grid-3" style={{display:'grid', gap:10}}>
+                {MARK_TYPE_OPTIONS.map((o) => (
+                  <AChoiceCard key={o.id} option={o} preview={MARK_TYPE_PREVIEW[o.id]}
+                    sel={markType === o.id} onClick={() => setMarkType(o.id)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Visual language</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Current logo-design trends</span>
+              </div>
+              <div className="home-grid-3" style={{display:'grid', gap:10}}>
+                {DESIGN_STYLE_OPTIONS.map((o) => (
+                  <AChoiceCard key={o.id} option={o} preview={DESIGN_STYLE_PREVIEW[o.id]}
+                    sel={designStyle === o.id} onClick={() => setDesignStyle(o.id)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Anything else?</span>
+                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Optional</span>
+              </div>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value.slice(0, 1000))}
+                placeholder="e.g. avoid anything circular · reference our origami packaging · must work embroidered on a cap"
+                rows={3}
+                style={{
+                  width:'100%', resize:'vertical', padding:'12px 14px', borderRadius:12,
+                  background:'var(--bg-elev)', border:0, outline:'none',
+                  boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+                  fontSize:13, lineHeight:1.5, color:'var(--fg-1)', fontFamily:'inherit',
+                }}
+              />
+              <div style={{fontSize:11, color:'var(--fg-4)', marginTop:5, textAlign:'right'}}>{instructions.length}/1000</div>
+            </div>
+
+            <div style={{display:'flex', alignItems:'center', gap:12, flexWrap:'wrap'}}>
+              <button onClick={() => !loading && markType && generateSketches([], { fresh: true })} disabled={loading || !markType} style={{
+                ...toolBtn, padding:'11px 18px', fontSize:13.5, background:'#000', color:'#fff',
+                cursor: loading || !markType ? 'default' : 'pointer', opacity: loading || !markType ? 0.5 : 1,
+              }}>
+                <Sparkle size={12} color="#fff"/> Sketch a concept <ArrowRight size={12}/>
+              </button>
+              {!markType && <span style={{fontSize:12, color:'var(--fg-4)'}}>Choose a mark type to continue.</span>}
+              {sketches.length > 0 && markType && (
+                <span style={{fontSize:12, color:'var(--fg-4)'}}>This replaces your current board.</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Phase 1 · the sketch board ──────────────────────────── */}
+        {/* One concept renders at a time; the board grows as the client asks
+            for more, rather than arriving all at once as a 9-up. */}
         {phase === 'sketch' && hasBrief && sketches.length === 0 && (
           <div className="home-grid-3" style={{display:'grid', gap:12}}>
-            {Array.from({length:9}).map((_, i) => (
-              <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                {loadingSketches && i === 4 ? <Thinking/> : null}
-              </div>
-            ))}
+            <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
+              {loadingSketches ? (
+                <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
+                  <Thinking/>
+                  <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
+                    {stage === 'research'
+                      ? 'Studying the category…'
+                      : 'Drawing a concept…'}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
         )}
         {phase === 'sketch' && sketches.length > 0 && (
           <>
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
+            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loadingRefine ? 0.45 : 1}}>
               {sketches.map((s) => (
                 <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
               ))}
+              {loadingSketches && (
+                <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
+                      {stage === 'research' ? 'Studying the category…' : 'Drawing a concept…'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             {loadingRefine && (
               <div style={{marginTop:14, padding:'12px 16px', borderRadius:12, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', fontSize:12.5, color:'var(--fg-2)', display:'flex', alignItems:'center', gap:10}}>
@@ -2669,7 +3065,8 @@ const DirA_Step4_Logo = () => {
             <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
               {finalists.map((f) => (
                 <AFinalistCard key={f.id || f.name} f={f} sel={chosen === f.name}
-                  onClick={() => setField('logo_choice', f.name)} />
+                  busy={vectorizing === f.id}
+                  onClick={() => chooseFinalist(f)} />
               ))}
             </div>
           ) : (
@@ -2686,6 +3083,7 @@ const DirA_Step4_Logo = () => {
 
       {/* ── Right rail: strategy + context ───────────────────────── */}
       <div style={{display:'flex', flexDirection:'column', gap:14}}>
+        <AResearchPanel research={research} />
         <APlatformPanel platform={platform} />
         <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
       </div>
@@ -5996,18 +6394,44 @@ async function apiGenerateLogos(brandId) {
     return { logos: j.logos || [] };
   } catch { return { error: 'Network error.' }; }
 }
-// Logo studio · Phase 1 — creative platform + 9 low-fi concept sketches.
-// likedIds bias a regeneration toward the client's demonstrated taste.
-async function apiGenerateLogoSketches(brandId, likedIds) {
+// A function killed at its maxDuration returns no body at all, so there is no
+// j.error to show. Name that case rather than blaming it on generation.
+function describeFailure(r, j, fallback) {
+  if (j && j.error) return j.error;
+  if (r.status === 504 || r.status === 502) {
+    return 'That took longer than the server allows. Your progress was saved — try again and it will pick up where it left off.';
+  }
+  return fallback;
+}
+
+// Logo studio · Phase -1/0 — category research and the creative platform.
+// Split from the sketch call because all four phases in one request exceeded
+// the serverless time limit. Cached server-side, so this is fast on reruns.
+async function apiResearchCategory(brandId) {
+  try {
+    const r = await fetch('/api/generate/logo/research', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: describeFailure(r, j, 'Category research failed.'), code: j.code };
+    return { research: j.research || null, platform: j.platform || null };
+  } catch { return { error: 'Network error.' }; }
+}
+
+// Logo studio · Phase 1 — one low-fi concept sketch at a time, rendered as an
+// image. likedIds bias the concept toward the client's demonstrated taste;
+// reset starts a fresh board instead of adding to the existing one.
+async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
   try {
     const r = await fetch('/api/generate/logo/sketches', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
+      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset }),
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
-    if (!r.ok) return { error: j.error || 'Sketch generation failed.', code: j.code };
-    return { platform: j.platform || null, sketches: j.sketches || [] };
+    if (!r.ok) return { error: describeFailure(r, j, 'Sketch generation failed.'), code: j.code };
+    return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
   } catch { return { error: 'Network error.' }; }
 }
 // Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.
@@ -6019,8 +6443,21 @@ async function apiRefineLogoSketches(brandId, likedIds) {
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
-    if (!r.ok) return { error: j.error || 'Refinement failed.', code: j.code };
+    if (!r.ok) return { error: describeFailure(r, j, 'Refinement failed.'), code: j.code };
     return { finalists: j.finalists || [] };
+  } catch { return { error: 'Network error.' }; }
+}
+// Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
+async function apiVectorizeLogo(brandId, conceptId) {
+  try {
+    const r = await fetch('/api/generate/logo/vectorize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, conceptId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: j.error || 'Vectorization failed.', code: j.code };
+    return { svg: j.svg || '', url: j.url || '' };
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask Claude to synthesize written brand guidelines.

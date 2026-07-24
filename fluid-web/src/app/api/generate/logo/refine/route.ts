@@ -5,6 +5,9 @@ import { getPlatform } from "@/lib/ai/platform";
 import type { LogoSketch } from "@/lib/ai/sketches";
 import { generateLogoFinalists } from "@/lib/ai/refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { chosenBrandName } from "@/lib/brands";
+import { getLogoConfig } from "@/lib/logo-styles";
+import { startClock } from "@/lib/ai/budget";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -85,14 +88,19 @@ export async function POST(request: Request) {
     paletteBasis(getStep2(data)) ??
     undefined;
 
+  const clock = startClock("logo/refine", 270_000);
+
   try {
     const finalists = await generateLogoFinalists({
+      brandId,
       brief: String(brand.brief),
-      name: (brand.name_choice || brand.name) as string | null,
+      name: chosenBrandName(brand),
       platform,
       liked,
       styleContext: styleContext(brand),
+      config: getLogoConfig(data),
       paletteColors,
+      clock,
     });
 
     await spendTokens(user.id, TOKEN_COST.asset);
@@ -107,7 +115,8 @@ export async function POST(request: Request) {
       logos: finalists.map((f) => ({
         name: f.name,
         descriptor: f.idea,
-        svg: f.svg,
+        svg: f.svg ?? "",
+        image_url: f.image_url,
       })),
     };
     const { error: saveError } = await supabase
