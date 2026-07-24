@@ -4198,12 +4198,18 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
       position: 'relative',
     }}
   >
+    {/* zIndex is load-bearing: BA_CardVisual below is position:relative and
+        comes later in the DOM, so with both at z-index auto it painted on top
+        of this button and swallowed every click — the delete button looked
+        dead because the click was landing on the card and opening the brand
+        instead. Any positioned sibling added after this one needs the same
+        consideration. */}
     <button
       onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}
       aria-label={'Delete ' + brandDisplayName(brand)}
       title="Delete brand"
       style={{
-        position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 8,
+        position: 'absolute', zIndex: 2, top: 10, right: 10, width: 28, height: 28, borderRadius: 8,
         background: 'rgba(0,0,0,.35)', color: '#fff', border: 0, cursor: 'pointer',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)',
       }}
