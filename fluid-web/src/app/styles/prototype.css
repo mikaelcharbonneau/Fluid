@@ -157,6 +157,26 @@
     .ash-breadcrumb { display: none !important; }
   }
 
+  /* Screen content width. Every screen's content column lives in .main-pad,
+     and each one used to carry its own inline max-width — which drifted
+     (1080 / 1240 / 1340) and, on Home, omitted the auto margins entirely, so
+     the whole dashboard hugged the left edge and dumped every spare pixel
+     into one dead strip on the right.
+
+     Owning it here instead means one place to change and no way for a screen
+     to silently disagree. The cap is deliberately generous: the previous
+     values were set for a 1440px artboard and left roughly a third of a
+     large display empty. Prose still gets its own much narrower max-width at
+     the element level, so widening this only stretches cards and grids —
+     never a line of text. */
+  .main-pad {
+    width: 100%;
+    max-width: var(--content-max, 1720px);
+    margin-inline: auto;
+  }
+  /* Reading-width screens (the brand kit) stay narrow on purpose. */
+  .main-pad.is-narrow { max-width: 1080px; }
+
   /* Screen content padding: 56px a side is fine on desktop, but eats a
      third of a phone's width. */
   @media (max-width: 700px) {

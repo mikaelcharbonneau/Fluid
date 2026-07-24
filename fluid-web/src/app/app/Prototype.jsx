@@ -3748,7 +3748,7 @@ const DirA_KitSummary = () => {
   return (
     <AShell activeNav="brands" breadcrumb={['Brands', b.name || 'Brand kit']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 30 }}>
+        <div className="main-pad is-narrow" style={{ padding: '44px 56px 64px', display: 'flex', flexDirection: 'column', gap: 30 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
             <div>
               <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Brand kit · {b.status === 'live' ? 'Live' : 'Draft'}</div>
@@ -4065,7 +4065,7 @@ const DirA_AssetsScreen = () => {
   return (
     <AShell activeNav="assets" breadcrumb={['Assets']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', display: 'flex', flexDirection: 'column', gap: 32 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Assets</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Your assets.</h1>
@@ -4087,7 +4087,7 @@ const DirA_GuidesScreen = () => {
   return (
     <AShell activeNav="guides" breadcrumb={['Guides']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', display: 'flex', flexDirection: 'column', gap: 32 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>Guides</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1, margin: 0, color: '#000' }}>Brand guidelines.</h1>
@@ -4266,7 +4266,7 @@ const DirA_BrandsActive = () => {
   return (
     <AShell activeNav="brands" breadcrumb={['Brands']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        <div className="main-pad" style={{ padding: '44px 56px 64px', maxWidth: 1340, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="main-pad" style={{ padding: '44px 56px 64px', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
           {/* ── Header ─────────────────────────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
@@ -4433,6 +4433,9 @@ if (typeof document !== 'undefined' && !document.getElementById('brands-active-c
   s.textContent = `
     .bacard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
     @media (max-width: 1040px) { .bacard-grid { grid-template-columns: 1fr; } }
+    /* Now that the content column fills large displays, two columns would
+       stretch each card past ~800px. Add a third instead of inflating them. */
+    @media (min-width: 1500px) { .bacard-grid { grid-template-columns: repeat(3, 1fr); } }
     .bacard {
       background: var(--bg-elev); border-radius: 20px; overflow: hidden;
       box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
@@ -4646,7 +4649,7 @@ const DirA_Home = () => {
       : "You have " + drafts.length + " brands in progress. Pick one up, or start something new.";
   return (
 <AShell activeNav="home" breadcrumb={['Home']}>
-    <div className="main-pad" style={{ padding: '48px 56px 64px', maxWidth: 1240, display: 'flex', flexDirection: 'column', gap: 40 }}>
+    <div className="main-pad" style={{ padding: '48px 56px 64px', display: 'flex', flexDirection: 'column', gap: 40 }}>
 
       {/* ── Greeting ───────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 }}>
