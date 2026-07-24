@@ -90,31 +90,48 @@ export async function POST(request: Request) {
   const data = (brand.data as Record<string, unknown>) ?? {};
   const brandName = chosenBrandName(brand);
 
-  const clock = startClock("logo/sketches", 270_000);
+  const clock = startClock("logo/sketches", 240_000);
+  const RESEARCH_BUDGET_MS = 90_000;
 
   try {
     // Research (Phase -1) and the creative platform (Phase 0) normally arrive
     // already cached, because the client calls /logo/research first. Running
     // all four phases in one request is what pushed this route past the 300s
     // ceiling. They're still generated here if missing, so the route works
-    // standalone — but with guards, so a cold start fails with a real message
-    // instead of being killed silently.
+    // standalone — but on a tighter research budget than the dedicated route,
+    // since this request still has to draw and render afterwards.
     let research = getResearch(data);
     if (!research) {
-      clock.guard("research the category", 150_000);
+      clock.guard("research the category", 100_000);
       try {
-        research = await researchCategory({
-          brief: String(brand.brief),
-          name: brandName,
-          audience: brand.audience as string | null,
-          competitors: brand.competitors as string | null,
-          delegated: delegatedChoices(brand),
-        });
+        research = await researchCategory(
+          {
+            brief: String(brand.brief),
+            name: brandName,
+            audience: brand.audience as string | null,
+            competitors: brand.competitors as string | null,
+            delegated: delegatedChoices(brand),
+          },
+          RESEARCH_BUDGET_MS,
+        );
       } catch (err) {
         console.error("Category research failed; continuing without it:", err);
         research = null;
       }
       clock.lap("research");
+
+      // Persist research before the passes that can still run out of time, so
+      // a retry doesn't pay for the whole search again. See the same guard in
+      // /logo/research for why this ordering matters.
+      if (research) {
+        const { error: cacheError } = await supabase
+          .from("brands")
+          .update({ data: { ...data, research } })
+          .eq("id", brandId);
+        if (cacheError) {
+          console.error("Failed to cache research:", cacheError.message);
+        }
+      }
     }
 
     // styleContext() assembles every piece of design context (Step 2 picks,
@@ -156,7 +173,10 @@ export async function POST(request: Request) {
     const prior = reset ? [] : priorAll;
     const liked = prior.filter((s) => likedIds.includes(s.id));
 
-    clock.guard("draw the concept", 170_000);
+    // One design call plus one image render. This reserve was 170s back when
+    // the route drew and rendered a full nine-up board; at that size it would
+    // now falsely abort a cold run that still had ample time for one concept.
+    clock.guard("draw the concept", 90_000);
     const drawn = await generateLogoSketches({
       brandId,
       brief: String(brand.brief),

@@ -70,7 +70,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const clock = startClock("logo/research", 270_000);
+  // 240s of the route's 300s ceiling, leaving real headroom to send a response.
+  // Research is capped well inside this so the platform pass always has room.
+  const clock = startClock("logo/research", 240_000);
+  const RESEARCH_BUDGET_MS = 120_000;
 
   try {
     // Research degrades gracefully: if search is unavailable or the model
@@ -79,18 +82,36 @@ export async function POST(request: Request) {
     let research = cachedResearch;
     if (!research) {
       try {
-        research = await researchCategory({
-          brief: String(brand.brief),
-          name: brandName,
-          audience: brand.audience as string | null,
-          competitors: brand.competitors as string | null,
-          delegated: delegatedChoices(brand),
-        });
+        research = await researchCategory(
+          {
+            brief: String(brand.brief),
+            name: brandName,
+            audience: brand.audience as string | null,
+            competitors: brand.competitors as string | null,
+            delegated: delegatedChoices(brand),
+          },
+          RESEARCH_BUDGET_MS,
+        );
       } catch (err) {
         console.error("Category research failed; continuing without it:", err);
         research = null;
       }
       clock.lap("research");
+
+      // Save research the moment it exists, BEFORE the platform pass. Research
+      // is by far the most expensive step here, and the platform guard below
+      // can throw — previously that threw away the finished research too, so
+      // every retry re-ran (and re-paid for) the whole search from scratch and
+      // never got any further. Persisting here is what makes a retry cheap.
+      if (research) {
+        const { error: cacheError } = await supabase
+          .from("brands")
+          .update({ data: { ...data, research } })
+          .eq("id", brandId);
+        if (cacheError) {
+          console.error("Failed to cache research:", cacheError.message);
+        }
+      }
     }
 
     // Research exists only in memory on a first run — it isn't on the brand

@@ -62,7 +62,18 @@ export interface ResearchBrief {
 }
 
 const MODEL = "claude-sonnet-5";
-const MAX_CONTINUATIONS = 4; // guard the pause_turn resume loop
+
+// Cost and latency controls. These are the tuning knobs for this step — raise
+// EFFORT first if the findings ever come back thin.
+//
+// `effort` matters more here than anything else: it defaults to `high` on
+// Sonnet 5, and this model reaches for tools readily, so at the default it
+// deliberated between every single search and ran for minutes. Research reads
+// search results and fills in a fixed schema; it is not reasoning-heavy work.
+const EFFORT = "low";
+const SEARCH_USES = 5; // per round
+const MAX_SEARCH_ROUNDS = 2; // initial call + at most one pause_turn resume
+const MIN_CALL_MS = 20_000; // don't start a call we can't plausibly finish
 
 const SYSTEM = `You are the research director at Fluid, a brand studio operating
 at the level of Pentagram or Wolff Olins. Before any strategy or design work
@@ -96,6 +107,12 @@ Be specific and useful. "The category is competitive" helps no one; "six of
 the eight largest players use a lowercase geometric sans in navy — this fits
 finance's need to signal restraint and trust, not a rut to escape" is the kind
 of finding that changes a design.
+
+Work quickly and search sparingly — a handful of well-chosen searches, not an
+exhaustive survey. Two or three broad searches usually cover both the
+competitive set and current trends. Stop searching as soon as you can answer
+every field below, and write up your findings immediately; a fast, grounded
+answer is worth far more here than a complete one that arrives too late.
 
 Respond with ONLY a JSON object — no prose, no markdown fences:
 {
@@ -234,63 +251,102 @@ function extractResearch(text: string, d: ResearchBrief["delegated"]): CategoryR
   };
 }
 
+function textOf(response: Anthropic.Message): string {
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+}
+
+function looksLikeJson(text: string): boolean {
+  const raw = text.replace(/```(?:json)?/gi, "");
+  const start = raw.indexOf("{");
+  return start !== -1 && raw.lastIndexOf("}") > start;
+}
+
 // Run the research agent. Loops on pause_turn so a long search session
 // completes rather than returning half-finished.
 //
-// `budgetMs` bounds the loop in wall-clock time. A continuation cap alone
-// doesn't: each round is an Opus call that may run eight searches with adaptive
-// thinking, so five rounds can outlast the whole serverless function. When the
-// budget runs out we stop searching and extract from what we have — partial
-// research beats a killed request, and the caller degrades to none at all if
-// the model never got as far as emitting its findings.
+// `budgetMs` is a HARD deadline, enforced by passing the remaining time as the
+// per-request timeout. Checking the clock between rounds is not enough on its
+// own: the SDK defaults to a 10-minute timeout with 2 retries, so a single
+// slow call can block for ~30 minutes — far longer than the whole serverless
+// function — and no between-rounds check can interrupt it. That is exactly how
+// this step used to overrun its budget into negative time.
 export async function researchCategory(
   input: ResearchBrief,
-  budgetMs = 200_000,
+  budgetMs = 120_000,
 ): Promise<CategoryResearch> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not configured.");
   }
-  const client = new Anthropic();
+  // No retries. The SDK retries timed-out requests, so wall clock can reach
+  // timeout × (retries + 1) — leaving retries on would let a call overrun the
+  // deadline by a multiple no matter what timeout we set. Research already
+  // degrades gracefully to "none" if it fails, and the caller keeps going, so
+  // a predictable deadline is worth more here than one more attempt.
+  const client = new Anthropic({ maxRetries: 0 });
+
   const startedAt = Date.now();
-  const outOfTime = () => Date.now() - startedAt > budgetMs;
+  const remainingMs = () => budgetMs - (Date.now() - startedAt);
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: buildUserPrompt(input) },
   ];
+  // The search tool stays declared on every call, including the finalize call
+  // below: once web_search_tool_result blocks are in the history, the request
+  // that replays them has to declare the tool that produced them.
   const request = {
     model: MODEL,
     max_tokens: 8000,
     thinking: { type: "adaptive" as const },
+    output_config: { effort: EFFORT },
     system: SYSTEM,
     tools: [
-      { type: "web_search_20260209", name: "web_search", max_uses: 8 },
+      { type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES },
     ],
   } satisfies Omit<Anthropic.MessageCreateParamsNonStreaming, "messages">;
 
-  let response = await client.messages.create({ ...request, messages });
+  const call = (msgs: Anthropic.MessageParam[]) =>
+    client.messages.create(
+      { ...request, messages: msgs },
+      { timeout: Math.max(MIN_CALL_MS, remainingMs()) },
+    );
+
+  let response = await call(messages);
 
   // Server-side tools run their own loop; when it hits the per-request cap the
   // turn pauses and we resume by echoing the assistant turn back.
-  let continuations = 0;
+  let rounds = 1;
   while (
     response.stop_reason === "pause_turn" &&
-    continuations < MAX_CONTINUATIONS &&
-    !outOfTime()
+    rounds < MAX_SEARCH_ROUNDS &&
+    remainingMs() > MIN_CALL_MS
   ) {
-    continuations += 1;
+    rounds += 1;
     messages.push({ role: "assistant", content: response.content });
-    response = await client.messages.create({ ...request, messages });
-  }
-  if (response.stop_reason === "pause_turn") {
-    console.warn(
-      `[research] stopped mid-search after ${continuations} continuation(s), ${Date.now() - startedAt}ms`,
-    );
+    response = await call(messages);
   }
 
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  let text = textOf(response);
+
+  // The searching is the expensive part, and it all lives in `messages` by
+  // now. If the loop stopped before Claude wrote up its findings we used to
+  // throw the entire run away with "No JSON object found" — so ask once more,
+  // cheaply, for the write-up alone.
+  if (!looksLikeJson(text)) {
+    console.warn(
+      `[research] no findings after ${rounds} round(s), ${Date.now() - startedAt}ms — asking for the write-up`,
+    );
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({
+      role: "user",
+      content:
+        "Stop searching. Using only what you have already found, respond now " +
+        "with ONLY the JSON object described in your instructions.",
+    });
+    text = textOf(await call(messages));
+  }
 
   return extractResearch(text, input.delegated);
 }
