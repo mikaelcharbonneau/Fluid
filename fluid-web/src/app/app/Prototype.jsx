@@ -2623,15 +2623,32 @@ const APlatformPanel = ({ platform }) => {
 const INK = '#1C1C1E';
 
 const MARK_TYPE_PREVIEW = {
+  // Deliberately the same sparkle as the "Studio's choice" visual-language
+  // card below — both cards mean the same thing, so they should look it.
+  [AI_CHOICE]: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M60 12 L65 26 L79 31 L65 36 L60 50 L55 36 L41 31 L55 26 Z" fill={INK}/>
+      <path d="M88 16 L90 21 L95 23 L90 25 L88 30 L86 25 L81 23 L86 21 Z" fill={INK} opacity="0.45"/>
+      <path d="M32 36 L33.5 40 L37.5 41.5 L33.5 43 L32 47 L30.5 43 L26.5 41.5 L30.5 40 Z" fill={INK} opacity="0.3"/>
+    </svg>
+  ),
   wordmark: (
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <text x="60" y="38" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="26" letterSpacing="-1.2" fill={INK}>FORMA</text>
     </svg>
   ),
+  // Two initials, tightly interlocked. It must not show a single letter: that
+  // is a letterform, and the count is the whole distinction between the two.
   lettermark: (
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
-      <rect x="42" y="8" width="36" height="44" rx="8" fill={INK}/>
-      <text x="60" y="40" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="24" fill="#fff">F</text>
+      <text x="60" y="44" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="38" letterSpacing="-5" fill={INK}>FM</text>
+    </svg>
+  ),
+  // One oversized letter with no container — the bare letter is the whole
+  // distinction from a lettermark, which is a monogram of two or more.
+  letterform: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <text x="60" y="48" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="46" letterSpacing="-2" fill={INK}>R</text>
     </svg>
   ),
   pictorial: (
@@ -2646,6 +2663,18 @@ const MARK_TYPE_PREVIEW = {
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <rect x="40" y="9" width="30" height="30" rx="9" fill="none" stroke={INK} strokeWidth="4"/>
       <rect x="53" y="22" width="30" height="30" rx="9" fill={INK}/>
+    </svg>
+  ),
+  // A character read entirely from bold shapes — knockouts use the card's own
+  // canvas colour, which is the same restraint the guidance asks the model for.
+  mascot: (
+    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="47" cy="18" r="7.5" fill={INK}/>
+      <circle cx="73" cy="18" r="7.5" fill={INK}/>
+      <rect x="41" y="20" width="38" height="30" rx="13" fill={INK}/>
+      <circle cx="52" cy="32" r="3.6" fill="#FBFAF6"/>
+      <circle cx="68" cy="32" r="3.6" fill="#FBFAF6"/>
+      <path d="M53 41 Q60 46 67 41" stroke="#FBFAF6" strokeWidth="3" fill="none" strokeLinecap="round"/>
     </svg>
   ),
   combination: (

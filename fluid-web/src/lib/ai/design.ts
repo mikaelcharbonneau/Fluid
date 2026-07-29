@@ -9,9 +9,16 @@
 // colors/shapes — this is what makes a 9-up board feel like real exploration.
 export const MARK_TYPES = `Mark types (use these exact keys in TYPE fields):
 - wordmark: the full name set in distinctive custom-feeling type (Google, Braun).
-- lettermark: initials or a single letter as the mark (IBM's stripes, Unilever's U).
+- lettermark: a monogram of TWO OR MORE initials (IBM, HBO, CNN). The interest
+  lives in how the letters relate — interlocking, sharing a stroke, nesting.
+- letterform: a SINGLE letter carrying the whole mark, pushed well past ordinary
+  type (Unilever's U, Honda's H, McDonald's M). One letter only — still legible
+  as that letter, or it has become an abstract mark.
 - pictorial: a literal, recognizable object drawn distinctively (Apple, Shell).
 - abstract: non-literal geometry carrying the brand idea (Chase, Pepsi).
+- mascot: a character, creature, or face acting as the brand's persona (KFC's
+  Colonel, the Michelin Man, Mailchimp's Freddie). Bold simple shapes only — a
+  mascot needing fine detail to read is an illustration, not a mark.
 - emblem: name locked inside a shape/badge (Levi's, NFL).
 - combination: symbol + wordmark designed as one lockup (Lacoste, Burger King).
 - dynamic: a system with a consistent skeleton and variable expression (MIT Media Lab).`;
