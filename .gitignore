@@ -1,0 +1,20 @@
+# Repo-root ignores.
+#
+# fluid-web/ has its own .gitignore covering the Next.js app, but it only
+# applies from that directory down — the repo root had no ignore file at all,
+# so in a fresh clone nothing here was protected. Most importantly that
+# includes env files: the rule existed only as an uncommitted local file, so
+# it guarded this working copy and nobody else's.
+
+# Local environment + platform config. Never commit real values —
+# fluid-web/.env.example documents the variable names instead.
+.env*
+!.env.example
+.vercel
+
+# macOS directory metadata. Also stops a stray .DS_Store being swept into a
+# commit by a broad `git add`.
+.DS_Store
+
+# Machine-specific editor / tooling config (e.g. local dev-server paths).
+.claude/
