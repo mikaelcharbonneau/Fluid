@@ -157,6 +157,15 @@
     .ash-breadcrumb { display: none !important; }
   }
 
+  /* Reference-logo reel on the Step 4 mark-type cards. The cross-fade is the
+     only motion here — the cycling itself is the content, and it is triggered
+     by the user hovering or focusing the card, so it stays put under
+     reduced-motion; only the fade is dropped. */
+  .mark-ref-frame { transition: opacity 220ms var(--ease-out); }
+  @media (prefers-reduced-motion: reduce) {
+    .mark-ref-frame { transition: none; }
+  }
+
   /* Screen content width. Every screen's content column lives in .main-pad,
      and each one used to carry its own inline max-width — which drifted
      (1080 / 1240 / 1340) and, on Home, omitted the auto margins entirely, so
