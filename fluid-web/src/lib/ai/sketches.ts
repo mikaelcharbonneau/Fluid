@@ -23,7 +23,7 @@ import type { CreativePlatform } from "./platform";
 import {
   type LogoConfig,
   logoConfigContext,
-  markTypeById,
+  fixedMarkType,
 } from "../logo-styles";
 import {
   MARK_TYPES,
@@ -37,7 +37,7 @@ export interface LogoSketch {
   name: string; // concept name, e.g. "Ledger stripe"
   territory: string; // territory key from the platform
   territory_name: string;
-  mark_type: string; // wordmark | lettermark | pictorial | abstract | emblem | combination | dynamic
+  mark_type: string; // wordmark | lettermark | letterform | pictorial | abstract | mascot | emblem | combination | dynamic
   attributes: string[]; // formal attributes, e.g. ["geometric", "bold", "structural"]
   idea: string; // one-line rationale
   art: string; // the art direction that produced the image
@@ -62,8 +62,8 @@ const MODEL = "claude-opus-4-8";
 // client hasn't fixed one), so a run of regenerations still spreads across the
 // taxonomy instead of clustering on abstract symbols.
 const TYPE_GROUPS: { label: string; types: string }[] = [
-  { label: "typographic", types: "wordmark and lettermark marks" },
-  { label: "symbol", types: "pictorial and abstract marks" },
+  { label: "typographic", types: "wordmark, lettermark, or letterform marks" },
+  { label: "figurative", types: "pictorial, abstract, or mascot marks" },
   { label: "structural", types: "combination, emblem, or dynamic marks" },
 ];
 
@@ -199,7 +199,10 @@ export async function generateLogoSketches(
   // regenerations walk forward through both lists rather than repeating the
   // same territory or family every time.
   const territories = input.platform.territories;
-  const fixedType = markTypeById(input.config?.mark_type);
+  // Null when the client delegated the choice as well as when they never made
+  // one — both mean "spread across the type families", which is exactly what
+  // the group rotation below does.
+  const fixedType = fixedMarkType(input.config?.mark_type);
   const attempt = (input.avoidNames ?? []).length;
   const territory = territories[attempt % territories.length];
   const group = fixedType ? null : TYPE_GROUPS[attempt % TYPE_GROUPS.length];
