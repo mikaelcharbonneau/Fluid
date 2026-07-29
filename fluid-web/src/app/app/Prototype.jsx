@@ -9,6 +9,7 @@
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
+import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
 // bootstrap adds useEffect); in a single shared scope those collide, so we
@@ -2746,8 +2747,56 @@ const DESIGN_STYLE_PREVIEW = {
 };
 
 // A selectable choice card with an illustrative preview.
-const AChoiceCard = ({ option, preview, sel, onClick }) => (
-  <button onClick={onClick} type="button" style={{
+// A reel of real reference logos for one mark type. Every frame is mounted up
+// front and cross-faded rather than swapped in on demand, so a logo never pops
+// in half-loaded partway through a cycle.
+//
+// Cycling is driven by `active`, which the card sets on hover AND on focus —
+// keyboard users get the same reference material as mouse users.
+const AMarkReferenceReel = ({ refs, active }) => {
+  const [i, setI] = React.useState(0);
+  React.useEffect(() => {
+    if (!active || refs.length < 2) { setI(0); return; }
+    const t = setInterval(() => setI((n) => (n + 1) % refs.length), 850);
+    return () => clearInterval(t);
+  }, [active, refs.length]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {refs.map((r, n) => (
+        <img
+          key={r.src}
+          className="mark-ref-frame"
+          src={r.src}
+          alt={n === 0 ? `Example ${'' + r.name} wordmark` : ''}
+          aria-hidden={n !== 0}
+          style={{
+            position: 'absolute', maxWidth: '84%', maxHeight: 28,
+            objectFit: 'contain', opacity: n === i ? 1 : 0,
+          }}
+        />
+      ))}
+      {/* Names the mark being shown, so the reel reads as a reference gallery
+          rather than as branding attached to the option itself. */}
+      <span style={{
+        position: 'absolute', right: 2, bottom: -2, fontSize: 9,
+        fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+        color: 'var(--fg-4)', opacity: active ? 1 : 0, transition: 'opacity 160ms',
+        pointerEvents: 'none',
+      }}>{refs[i] ? refs[i].name : ''}</span>
+    </div>
+  );
+};
+
+const AChoiceCard = ({ option, preview, refs, sel, onClick }) => {
+  // Hover or keyboard focus both drive the reel.
+  const [hot, setHot] = React.useState(false);
+  const hasRefs = !!(refs && refs.length);
+  return (
+  <button onClick={onClick} type="button"
+    onMouseEnter={() => setHot(true)} onMouseLeave={() => setHot(false)}
+    onFocus={() => setHot(true)} onBlur={() => setHot(false)}
+    style={{
     background: 'var(--bg-elev)', borderRadius: 14, padding: 12, cursor: 'pointer',
     border: 0, textAlign: 'left', width: '100%',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -2757,8 +2806,9 @@ const AChoiceCard = ({ option, preview, sel, onClick }) => (
       background: '#FBFAF6', borderRadius: 9, height: 62,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)', padding: '0 8px',
+      position: 'relative', overflow: 'hidden',
     }}>
-      {preview}
+      {hasRefs ? <AMarkReferenceReel refs={refs} active={hot} /> : preview}
     </div>
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
@@ -2770,7 +2820,8 @@ const AChoiceCard = ({ option, preview, sel, onClick }) => (
       <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.35, marginTop: 3 }}>{option.blurb}</div>
     </div>
   </button>
-);
+  );
+};
 
 const DirA_Step4_Logo = () => {
   const { draft, setField } = useBrandDraft();
@@ -3012,6 +3063,7 @@ const DirA_Step4_Logo = () => {
               <div className="home-grid-3" style={{display:'grid', gap:10}}>
                 {MARK_TYPE_OPTIONS.map((o) => (
                   <AChoiceCard key={o.id} option={o} preview={MARK_TYPE_PREVIEW[o.id]}
+                    refs={logoReferencesFor(o.id)}
                     sel={markType === o.id} onClick={() => setMarkType(o.id)} />
                 ))}
               </div>
