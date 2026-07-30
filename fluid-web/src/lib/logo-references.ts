@@ -133,15 +133,12 @@ export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
     { name: "Booqable", src: "/logo-refs/combination/booqable.svg" },
     { name: "Code Climate", src: "/logo-refs/combination/codeclimate.svg" },
     { name: "CodeSandbox", src: "/logo-refs/combination/codesandbox.svg" },
-    { name: "COMSOL", src: "/logo-refs/combination/comsol.svg" },
-    { name: "Delta", src: "/logo-refs/combination/delta.svg" },
     { name: "Drip", src: "/logo-refs/combination/drip.svg" },
     { name: "Flattr", src: "/logo-refs/combination/flattr.svg" },
     { name: "Grok", src: "/logo-refs/combination/grok.svg" },
     { name: "Kafka", src: "/logo-refs/combination/kafka.svg" },
     { name: "Kirby", src: "/logo-refs/combination/kirby.svg" },
     { name: "Linear", src: "/logo-refs/combination/linear-2.svg" },
-    { name: "Malt", src: "/logo-refs/combination/malt.svg" },
     { name: "Matter", src: "/logo-refs/combination/matter.svg" },
     { name: "Medium", src: "/logo-refs/combination/medium.svg" },
     { name: "Moonshot AI", src: "/logo-refs/combination/moonshot-ai.svg" },
@@ -158,7 +155,6 @@ export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
     { name: "Threads", src: "/logo-refs/combination/threads.svg" },
     { name: "Tidal", src: "/logo-refs/combination/tidal-2.svg" },
     { name: "Vercel", src: "/logo-refs/combination/vercel.svg" },
-    { name: "Zebra Technologies", src: "/logo-refs/combination/zebratechnologies.svg" },
   ],
 };
 
