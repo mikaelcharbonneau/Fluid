@@ -1428,8 +1428,8 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
         {String(index + 1).padStart(2, '0')}
       </span>
       {refs.length > 0 && (
-        <div style={{height:48,padding:'0 4px'}}>
-          <AMarkReferenceReel refs={refs} active={hot}/>
+        <div style={{height:78,padding:'0 2px'}}>
+          <AMarkReferenceReel refs={refs} active={hot} maxHeight={58} showName={false}/>
         </div>
       )}
       <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
@@ -3385,7 +3385,7 @@ const DESIGN_STYLE_PREVIEW = {
 //
 // Cycling is driven by `active`, which the card sets on hover AND on focus —
 // keyboard users get the same reference material as mouse users.
-const AMarkReferenceReel = ({ refs, active }) => {
+const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }) => {
   const [i, setI] = React.useState(0);
   React.useEffect(() => {
     if (!active || refs.length < 2) { setI(0); return; }
@@ -3403,19 +3403,19 @@ const AMarkReferenceReel = ({ refs, active }) => {
           alt={n === 0 ? `Example ${'' + r.name} wordmark` : ''}
           aria-hidden={n !== 0}
           style={{
-            position: 'absolute', maxWidth: '84%', maxHeight: 28,
+            position: 'absolute', maxWidth: '84%', maxHeight,
             objectFit: 'contain', opacity: n === i ? 1 : 0,
           }}
         />
       ))}
       {/* Names the mark being shown, so the reel reads as a reference gallery
           rather than as branding attached to the option itself. */}
-      <span style={{
+      {showName && <span style={{
         position: 'absolute', right: 2, bottom: -2, fontSize: 9,
         fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
         color: 'var(--fg-4)', opacity: active ? 1 : 0, transition: 'opacity 160ms',
         pointerEvents: 'none',
-      }}>{refs[i] ? refs[i].name : ''}</span>
+      }}>{refs[i] ? refs[i].name : ''}</span>}
     </div>
   );
 };
