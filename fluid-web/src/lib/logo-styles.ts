@@ -219,10 +219,87 @@ export function designStyleById(id: string | null | undefined): DesignStyleOptio
 
 // The user's Step 4 brief, stored on brands.data.logo_config.
 export interface LogoConfig {
+  // The concrete pick used for the concept currently being drawn. The main
+  // wizard sets this directly; in the standalone flow the server derives it
+  // from the selections below.
   mark_type?: string | null;
   design_style?: string | null;
   standalone_style?: string | null;
   instructions?: string | null;
+
+  // The standalone flow lets the client choose up to three mark types and
+  // three visual directions, and every concept is drawn from ONE of each. The
+  // full selections are stored so successive concepts can rotate through them
+  // — see selectionForAttempt below.
+  mark_types?: string[] | null;
+  standalone_styles?: string[] | null;
+}
+
+// Keep only ids that name a real mark type, preserving order and dropping
+// duplicates. MARK_TYPE_AI is allowed: it means "the studio decides".
+export function normalizeMarkTypes(raw: unknown, limit = 3): string[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const item of list) {
+    const id = markTypeById(typeof item === "string" ? item.trim() : "")?.id;
+    if (id && !out.includes(id)) out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export function normalizeStandaloneStyles(raw: unknown, limit = 3): string[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const item of list) {
+    const id = typeof item === "string" ? item.trim() : "";
+    if (id && STANDALONE_STYLE_GUIDANCE[id] && !out.includes(id)) out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Which single type and direction this concept should use.
+//
+// A board is built one concept at a time, so `attempt` (how many concepts
+// already exist) rotates through the client's selections. Rotating the two
+// lists at different rates means three types and two styles produce six
+// distinct pairings before anything repeats, rather than three.
+export function selectionForAttempt(
+  config: LogoConfig,
+  attempt: number,
+): { mark_type: string | null; standalone_style: string | null } {
+  const types = config.mark_types?.length
+    ? config.mark_types
+    : (config.mark_type ? [config.mark_type] : []);
+  const styles = config.standalone_styles?.length
+    ? config.standalone_styles
+    : (config.standalone_style ? [config.standalone_style] : []);
+  return {
+    mark_type: types.length ? types[attempt % types.length] : null,
+    standalone_style: styles.length
+      ? styles[Math.floor(attempt / Math.max(types.length, 1)) % styles.length]
+      : null,
+  };
+}
+
+// Identity of the client's *selection*, used to decide whether an existing
+// board is still valid. It deliberately ignores which concept is being drawn
+// right now: rotating through the same selection must not wipe the board,
+// which is what comparing the single mark_type field would have done.
+export function logoConfigSignature(config: LogoConfig): string {
+  const types = config.mark_types?.length
+    ? [...config.mark_types].sort()
+    : (config.mark_type ? [config.mark_type] : []);
+  const styles = config.standalone_styles?.length
+    ? [...config.standalone_styles].sort()
+    : (config.standalone_style ? [config.standalone_style] : []);
+  return JSON.stringify({
+    types,
+    styles,
+    design_style: config.design_style ?? null,
+    instructions: (config.instructions ?? "").trim(),
+  });
 }
 
 // The standalone flow deliberately exposes neutral style placeholders while

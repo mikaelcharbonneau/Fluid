@@ -1099,8 +1099,13 @@ const DirA_Step1_Brief = () => {
 // decisions belong to later steps in the logo workflow.
 // =====================================================================
 
+// Reference-browsing and concept-drawing are separate steps, so the reference
+// gallery is no longer labelled "Concepts". Total is derived from this list —
+// the header used to hard-code "of 5".
+const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Export'];
+
 const ALogoProgress = ({ activeStep = 1 }) => {
-  const steps = ['Brief', 'Style', 'Type', 'Concepts', 'Export'];
+  const steps = LOGO_STEPS;
   return (
     <div className="logo-progress" style={{display:'flex',alignItems:'center',gap:10}} aria-label="Logo creation progress">
       {steps.map((label, i) => (
@@ -1137,7 +1142,7 @@ const ALogoWizardLayout = ({
         <div style={{minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
             <Chip tone="neutral">Draft</Chip>
-            <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>Logo · Step {step} of 5</span>
+            <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>Logo · Step {step} of {LOGO_STEPS.length}</span>
           </div>
           <h2 style={{
             fontFamily:'var(--font-display)',fontWeight:800,fontSize:42,
@@ -1716,9 +1721,9 @@ const DirA_LogoReferences = () => {
       title="Browse logo references."
       subtitle="Like the existing logos that feel closest to the direction you want."
       dockCopy={likes.length ? `${likes.length} liked reference${likes.length === 1 ? '' : 's'} will guide the sketch round.` : 'Like the references that feel most right.'}
-      nextLabel="Continue to sketches"
+      nextLabel="Continue to concepts"
       onBack={() => navigate('logo-type')}
-      onNext={() => { if (likes.length) makeToast('Sketch generation is the next step.'); }}
+      onNext={() => { if (likes.length) navigate('logo-sketches'); }}
       nextDisabled={likes.length === 0}
     >
       <section aria-labelledby="logo-references-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
@@ -1737,6 +1742,213 @@ const DirA_LogoReferences = () => {
             <ALogoReferenceCard key={reference.id} reference={reference} liked={likes.includes(reference.id)} disliked={dislikes.includes(reference.id)} onLike={() => toggleLike(reference.id)} onDislike={() => toggleDislike(reference.id)} />
           ))}
         </div>
+      </section>
+    </ALogoWizardLayout>
+  );
+};
+
+// Standalone logo studio · Step 5 · Concepts. The first screen in this flow
+// that spends tokens: each press draws ONE concept and adds it to the board,
+// so the client controls how much they pay for and can stop as soon as
+// something lands.
+const DirA_LogoSketches = () => {
+  const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+  const brandId = draft && draft.id;
+  const hasBrief = !!String((draft && draft.brief) || '').trim();
+
+  const aiChoosesType = data.logo_type_mode === 'ai';
+  const chosenTypes = Array.isArray(data.logo_types)
+    ? data.logo_types
+    : (data.logo_type ? [data.logo_type] : []);
+  const direction = data.logo_direction || {};
+  const chosenStyles = direction.mode === 'manual'
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : []))
+    : (direction.mode === 'ai' ? ['fluid-choice'] : []);
+
+  // The standalone type cards use 'ai' for the delegated option; the shared
+  // taxonomy uses the AI_CHOICE sentinel. Translate at the boundary so the
+  // server sees one vocabulary.
+  const requestTypes = aiChoosesType ? [AI_CHOICE] : chosenTypes;
+  const briefReady = hasBrief && requestTypes.length > 0;
+
+  const [sketches, setSketches] = React.useState(data.logo_sketches || []);
+  const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
+  const [loading, setLoading] = React.useState(false);
+  const [stage, setStage] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const persist = (nextSketches, nextLikes) => {
+    setField('data', {
+      ...((draft && draft.data) || {}),
+      logo_sketches: nextSketches,
+      logo_sketch_likes: nextLikes,
+    });
+  };
+
+  // `fresh` starts a new board; otherwise the server appends one more concept
+  // and rotates to the next type/style in the selection.
+  const draw = async ({ fresh = false } = {}) => {
+    if (!brandId || loading || !briefReady) return;
+    setLoading(true); setError('');
+
+    // Research and the creative platform are their own request — both are
+    // cached on the brand, so this is a no-op after the first concept.
+    setStage('research');
+    const pre = await apiResearchCategory(brandId);
+    if (pre.error) console.warn('Research unavailable, drawing without it:', pre.error);
+
+    setStage('draw');
+    const res = await apiGenerateLogoSketches(brandId, likes, {
+      mark_types: requestTypes,
+      standalone_styles: chosenStyles,
+      // The tagline is deliberately NOT sent as direction: Step 1 promises it
+      // is context only and won't be forced into the mark.
+    }, fresh);
+
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const nextLikes = fresh ? [] : likes;
+      setSketches(res.sketches);
+      setLikes(nextLikes);
+      persist(res.sketches, nextLikes);
+    }
+    setStage('');
+    setLoading(false);
+  };
+
+  const toggleLike = (id) => {
+    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
+    setLikes(next);
+    persist(sketches, next);
+  };
+
+  const toolBtn = {
+    padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
+    display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
+  };
+  const busyLabel = stage === 'research' ? 'Studying the category…' : 'Drawing a concept…';
+
+  return (
+    <ALogoWizardLayout
+      step={5}
+      title="Explore concepts."
+      subtitle="Draw one concept at a time. Like the ones worth developing."
+      dockCopy={likes.length
+        ? `${likes.length} liked concept${likes.length === 1 ? '' : 's'} will carry into refinement.`
+        : 'Draw a concept, then like the ones worth developing.'}
+      nextLabel="Continue to refinement"
+      onBack={() => navigate('logo-references')}
+      onNext={() => { if (likes.length) makeToast('Refinement is the next step.'); }}
+      nextDisabled={likes.length === 0}
+    >
+      <section aria-labelledby="logo-sketches-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+              Concepts{sketches.length ? ` · ${sketches.length} drawn` : ''}{likes.length ? ` · ${likes.length} liked` : ''}
+            </div>
+            <h3 id="logo-sketches-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>Build a board you actually like.</h3>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {sketches.length > 0 && (
+              <button type="button" onClick={() => draw({ fresh: true })} disabled={loading || !briefReady}
+                style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line-strong)',
+                  cursor:loading || !briefReady ? 'default' : 'pointer',opacity:loading || !briefReady ? .5 : 1}}>
+                Start over
+              </button>
+            )}
+            <button type="button" onClick={() => draw()} disabled={loading || !briefReady}
+              style={{...toolBtn,background:'#0E0F12',color:'#fff',
+                cursor:loading || !briefReady ? 'default' : 'pointer',opacity:loading || !briefReady ? .5 : 1}}>
+              <Sparkle size={12} color="#FDBA50"/>
+              {loading ? busyLabel : (sketches.length ? 'Draw another concept' : 'Draw the first concept')}
+            </button>
+          </div>
+        </div>
+
+        {/* What the concepts are being drawn from — visible so a surprising
+            result is traceable to the brief rather than mysterious. */}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <LogoReferenceContext
+            label="Type"
+            value={aiChoosesType
+              ? 'Fluid chooses'
+              : (chosenTypes.map((id) => (LOGO_TYPE_OPTIONS.find((t) => t.id === id) || {}).label).filter(Boolean).join(' · ') || 'None selected')}
+          />
+          <LogoReferenceContext
+            label="Style"
+            value={direction.mode === 'ai'
+              ? 'Fluid chooses'
+              : (chosenStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((s) => s.id === id) || {}).label).filter(Boolean).join(' · ') || 'None selected')}
+          />
+        </div>
+
+        {!briefReady && (
+          <div role="status" style={{
+            padding:'14px 16px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+          }}>
+            {hasBrief
+              ? 'Choose at least one logo type before drawing concepts.'
+              : 'Add a brand description in the brief before drawing concepts.'}
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>{error}</span>
+            <button type="button" onClick={() => draw()} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Try again</button>
+          </div>
+        )}
+
+        {sketches.length === 0 && !loading && briefReady && !error && (
+          <div style={{
+            padding:'48px 24px',textAlign:'center',borderRadius:16,
+            background:'var(--bg-elev)',boxShadow:'inset 0 0 0 1px var(--line)',
+          }}>
+            <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:16,color:'#000'}}>
+              Nothing drawn yet.
+            </div>
+            <div style={{fontSize:12.5,color:'var(--fg-3)',marginTop:6,lineHeight:1.5,maxWidth:420,margin:'6px auto 0'}}>
+              Each concept is drawn on its own, so you only spend tokens on the
+              ones you ask for — stop as soon as a direction feels right.
+            </div>
+          </div>
+        )}
+
+        {(sketches.length > 0 || loading) && (
+          <div className="home-grid-3" style={{display:'grid',gap:12}}>
+            {sketches.map((s) => (
+              <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
+            ))}
+            {loading && (
+              <div style={{
+                background:'var(--bg-elev)',borderRadius:16,minHeight:196,
+                boxShadow:'inset 0 0 0 1px var(--line)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
+                  <Thinking/>
+                  <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>{busyLabel}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </ALogoWizardLayout>
   );
@@ -6173,7 +6385,7 @@ PR.useContext = React.useContext;
 // All known routes. Determines whether a route string is valid.
 const ROUTES = [
   'home', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
-  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references',
+  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches',
 ];
 
 // Left rail label → route.  The rail labels are rendered by the existing
@@ -6202,6 +6414,7 @@ const ROUTE_META = {
   'logo-direction': { activeNav: 'brands', breadcrumb: ['Brands', 'Logo studio'] },
   'logo-type':    { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'logo-references': { activeNav: 'brands',  breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-sketches': { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'step1':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step2':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step3':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
@@ -6352,7 +6565,7 @@ function RouterProvider({ children }) {
   const routeRef = React.useRef(route);
   PR.useEffect(() => { routeRef.current = route; }, [route]);
 
-  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
+  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','logo-sketches','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
 
   const navigate = PR.useCallback((next) => {
     if (!ROUTES.includes(next)) return;
@@ -6991,6 +7204,7 @@ const SCREEN_FOR_ROUTE = {
   'logo-direction': () => <DirA_LogoDirection />,
   'logo-type':    () => <DirA_LogoType />,
   'logo-references': () => <DirA_LogoReferences />,
+  'logo-sketches': () => <DirA_LogoSketches />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Style />,
   'step3':        () => <DirA_Step3_Name />,
@@ -7027,6 +7241,7 @@ function QuickJump() {
     { id: 'logo-direction', label: 'Logo · 2 Direction' },
     { id: 'logo-type',    label: 'Logo · 3 Type' },
     { id: 'logo-references', label: 'Logo · 4 References' },
+    { id: 'logo-sketches', label: 'Logo · 5 Concepts' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Style' },
     { id: 'step3',        label: 'Wizard · 3 Name' },
@@ -7455,7 +7670,7 @@ function BrandDraftProvider({ children }) {
   // Clear the draft whenever we leave a creation flow, so each new project
   // begins fresh (resume re-selects an explicit saved draft).
   React.useEffect(() => {
-    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references'].includes(route)) setDraft(null);
+    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches'].includes(route)) setDraft(null);
   }, [route]);
 
   // Create the correct kind of draft when either brief screen opens.
