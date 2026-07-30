@@ -1428,7 +1428,7 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
         {String(index + 1).padStart(2, '0')}
       </span>
       {refs.length > 0 && (
-        <div style={{height:48,background:'#FBFAF6',borderRadius:9,padding:'0 8px',boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',overflow:'hidden'}}>
+        <div style={{height:48,padding:'0 4px'}}>
           <AMarkReferenceReel refs={refs} active={hot}/>
         </div>
       )}
