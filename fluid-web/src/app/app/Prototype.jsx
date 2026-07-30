@@ -3388,7 +3388,7 @@ const DESIGN_STYLE_PREVIEW = {
 const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }) => {
   const [i, setI] = React.useState(0);
   React.useEffect(() => {
-    if (!active || refs.length < 2) { setI(0); return; }
+    if (!active || refs.length < 2) return;
     const t = setInterval(() => setI((n) => (n + 1) % refs.length), 850);
     return () => clearInterval(t);
   }, [active, refs.length]);
