@@ -1395,12 +1395,12 @@ const LOGO_STYLE_PLACEHOLDERS = [
 const LOGO_TYPE_OPTIONS = [
   { id: 'wordmark', label: 'Wordmark', description: 'The full brand name, set in distinctive type.' },
   { id: 'lettermark', label: 'Lettermark', description: 'Initials arranged as a compact monogram.' },
-  { id: 'letterform', label: 'Letterform', description: 'One custom letter, shaped into a memorable mark.' },
   { id: 'pictorial', label: 'Pictorial Mark', description: 'A recognisable object, drawn as a distinct symbol.' },
   { id: 'abstract', label: 'Abstract Mark', description: 'A non-literal symbol built around the brand idea.' },
   { id: 'mascot', label: 'Mascot Logo', description: 'A character-led mark with a recognisable personality.' },
   { id: 'combination', label: 'Combination Mark', description: 'A symbol and wordmark designed as one lockup.' },
   { id: 'emblem', label: 'Emblem', description: 'Type contained within a badge, seal, or crest.' },
+  { id: 'ai', label: 'Let AI Choose', description: 'Fluid chooses the structures that best fit your brief.', ai: true },
 ];
 
 const ALogoTypeCard = ({ type, selected, onClick }) => {
@@ -1432,6 +1432,11 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
       {refs.length > 0 && (
         <div style={{height:78,padding:'0 2px'}}>
           <AMarkReferenceReel refs={refs} active={hot} maxHeight={58} showName={false}/>
+        </div>
+      )}
+      {type.ai && (
+        <div style={{height:78,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <Sparkle size={36} color="#FDBA50"/>
         </div>
       )}
       <span style={{fontSize:11.5,color:'var(--fg-4)',lineHeight:1.35}}>{type.description}</span>
@@ -1549,19 +1554,29 @@ const DirA_LogoType = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
+  const aiChoosesType = data.logo_type_mode === 'ai';
   const selectedTypes = Array.isArray(data.logo_types)
     ? data.logo_types
     : (data.logo_type ? [data.logo_type] : []);
 
   const chooseType = (typeId) => {
+    if (typeId === 'ai') {
+      setField('data', {
+        ...data,
+        logo_type_mode: aiChoosesType ? null : 'ai',
+        logo_types: [],
+        logo_type: '',
+      });
+      return;
+    }
     const next = selectedTypes.includes(typeId)
       ? selectedTypes.filter((id) => id !== typeId)
       : (selectedTypes.length < 3 ? [...selectedTypes, typeId] : null);
     if (!next) { makeToast('Choose up to three logo types.'); return; }
-    setField('data', { ...data, logo_types: next, logo_type: next[0] || '' });
+    setField('data', { ...data, logo_type_mode: next.length ? 'manual' : null, logo_types: next, logo_type: next[0] || '' });
   };
   const continueToConcepts = () => {
-    if (selectedTypes.length) navigate('logo-references');
+    if (selectedTypes.length || aiChoosesType) navigate('logo-references');
   };
 
   return (
@@ -1573,7 +1588,7 @@ const DirA_LogoType = () => {
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-direction')}
       onNext={continueToConcepts}
-      nextDisabled={selectedTypes.length === 0}
+      nextDisabled={selectedTypes.length === 0 && !aiChoosesType}
     >
       <section aria-labelledby="logo-type-heading" style={{display:'flex',flexDirection:'column',gap:20}}>
         <div>
@@ -1586,7 +1601,7 @@ const DirA_LogoType = () => {
 
         <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
           {LOGO_TYPE_OPTIONS.map((type) => {
-            const selected = selectedTypes.includes(type.id);
+            const selected = type.ai ? aiChoosesType : selectedTypes.includes(type.id);
             return (
               <ALogoTypeCard key={type.id} type={type} selected={selected} onClick={() => chooseType(type.id)} />
             );
@@ -1654,9 +1669,10 @@ const DirA_LogoReferences = () => {
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
   const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
+  const aiChoosesType = data.logo_type_mode === 'ai';
   const direction = data.logo_direction || {};
   const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : [])) : [];
-  const typeLabel = selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
+  const typeLabel = aiChoosesType ? 'Fluid chooses' : selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
   const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
   const [dislikes, setDislikes] = React.useState(data.logo_reference_dislikes || []);
@@ -1672,6 +1688,7 @@ const DirA_LogoReferences = () => {
       logo_reference_dislikes: nextDislikes,
       logo_reference_context: {
         logo_types: selectedTypes,
+        logo_type_mode: aiChoosesType ? 'ai' : 'manual',
         visual_styles: selectedStyles.length ? selectedStyles : (direction.mode === 'ai' ? ['fluid-choice'] : []),
       },
     });
@@ -1687,6 +1704,7 @@ const DirA_LogoReferences = () => {
       logo_reference_dislikes: next,
       logo_reference_context: {
         logo_types: selectedTypes,
+        logo_type_mode: aiChoosesType ? 'ai' : 'manual',
         visual_styles: selectedStyles.length ? selectedStyles : (direction.mode === 'ai' ? ['fluid-choice'] : []),
       },
     });
