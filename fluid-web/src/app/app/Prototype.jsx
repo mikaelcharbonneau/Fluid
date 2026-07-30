@@ -1094,6 +1094,483 @@ const DirA_Step1_Brief = () => {
 };
 
 // =====================================================================
+// Standalone logo studio · Step 1 · Brief
+// Identity context only. Visual references, constraints, and usage/export
+// decisions belong to later steps in the logo workflow.
+// =====================================================================
+
+const ALogoProgress = ({ activeStep = 1 }) => {
+  const steps = ['Brief', 'Style', 'Type', 'Concepts', 'Export'];
+  return (
+    <div className="logo-progress" style={{display:'flex',alignItems:'center',gap:10}} aria-label="Logo creation progress">
+      {steps.map((label, i) => (
+        <React.Fragment key={label}>
+          {i > 0 && <div className="logo-progress-line" style={{width:16,height:1.5,background:'var(--line)'}}/>}
+          <div style={{display:'flex',alignItems:'center',gap:6}} aria-current={i + 1 === activeStep ? 'step' : undefined}>
+            <div style={{
+              width:22,height:22,borderRadius:'50%',
+              background:i + 1 === activeStep ? '#000' : (i + 1 < activeStep ? 'var(--line-strong)' : 'transparent'),
+              color:i + 1 === activeStep ? '#fff' : (i + 1 < activeStep ? 'var(--fg-1)' : 'var(--fg-3)'),
+              border:i + 1 > activeStep ? '1px solid var(--line-strong)' : 'none',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)'
+            }}>{i + 1}</div>
+            <span className="logo-progress-label" style={{fontSize:12,fontWeight:i + 1 === activeStep ? 700 : 500,color:i + 1 === activeStep ? '#000' : 'var(--fg-3)'}}>{label}</span>
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+const ALogoWizardLayout = ({
+  children, step = 1, title = 'Brief the logo studio.',
+  subtitle = 'Start with the name and the idea. Visual direction comes next.',
+  dockCopy = 'Add a name and brief to shape the first directions.',
+  nextLabel = 'Continue to direction', onNext, nextDisabled, onBack,
+}) => (
+  <AShell breadcrumb={['Brands', 'Logo studio']}>
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      <div className="logo-wizard-header" style={{
+        padding:'24px 36px 6px',display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:24,
+      }}>
+        <div style={{minWidth:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+            <Chip tone="neutral">Draft</Chip>
+            <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>Logo · Step {step} of 5</span>
+          </div>
+          <h2 style={{
+            fontFamily:'var(--font-display)',fontWeight:800,fontSize:42,
+            letterSpacing:'-0.035em',lineHeight:1,margin:0,color:'#000',
+          }}>{title}</h2>
+          <div style={{fontSize:14,color:'var(--fg-3)',marginTop:8}}>{subtitle}</div>
+        </div>
+        <ALogoProgress activeStep={step} />
+      </div>
+
+      <div className="logo-wizard-content" style={{flex:1,minHeight:0,overflowY:'auto',padding:'24px 36px 110px'}}>
+        {children}
+      </div>
+
+      <div className="logo-wizard-dock" style={{
+        position:'absolute',bottom:20,left:24,right:24,
+        background:'#0E0F12',color:'#fff',borderRadius:16,padding:'14px 18px',
+        display:'flex',alignItems:'center',gap:14,
+        boxShadow:'0 18px 50px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06)',
+        overflow:'hidden',zIndex:10,
+      }}>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'var(--fl-accent)'}}/>
+        {onBack && <button type="button" onClick={onBack} style={{
+          padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
+          fontSize:12,fontWeight:600,border:0,cursor:'pointer',flex:'0 0 auto',
+        }}>Back</button>}
+        <div style={{
+          width:28,height:28,background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
+          flex:'0 0 28px',
+        }}/>
+        <div className="logo-dock-copy" style={{flex:1,minWidth:0,fontSize:13,color:'rgba(255,255,255,.85)'}}>
+          {dockCopy}
+        </div>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={nextDisabled}
+          aria-disabled={nextDisabled}
+          style={{
+            padding:'8px 14px',borderRadius:8,
+            background:nextDisabled ? 'rgba(255,255,255,.14)' : '#fff',
+            color:nextDisabled ? 'rgba(255,255,255,.48)' : '#000',
+            fontSize:12,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
+            border:0,cursor:nextDisabled ? 'not-allowed' : 'pointer',whiteSpace:'nowrap',
+          }}
+        >
+          {nextLabel} <ArrowRight size={12}/>
+        </button>
+      </div>
+    </div>
+  </AShell>
+);
+
+const DirA_LogoBrief = () => {
+  const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+  const name = (draft && (draft.name_choice || resolveBrandName(draft))) || '';
+  const brief = (draft && draft.brief) || '';
+  const tagline = String(data.logo_tagline || '');
+  const competitors = ((draft && draft.competitors) || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const [compInput, setCompInput] = React.useState('');
+  const [assisting, setAssisting] = React.useState('');
+  const [assistErr, setAssistErr] = React.useState('');
+
+  const setName = (value) => {
+    setField('name_choice', value);
+    setField('name', value);
+  };
+  const setTagline = (value) => setField('data', { ...data, logo_tagline: value });
+  const addCompetitor = (raw) => {
+    const value = String(raw || '').trim().replace(/,+$/, '').trim();
+    if (!value) return;
+    if (competitors.some((c) => c.toLowerCase() === value.toLowerCase())) { setCompInput(''); return; }
+    setField('competitors', [...competitors, value].join(', '));
+    setCompInput('');
+  };
+  const removeCompetitor = (value) => {
+    setField('competitors', competitors.filter((c) => c !== value).join(', '));
+  };
+
+  const brandId = draft && draft.id;
+  const runAssist = async (task) => {
+    if (!brandId || assisting) return;
+    if (!String(brief).trim()) { setAssistErr('Add a brand description first.'); return; }
+    setAssisting(task); setAssistErr('');
+    const { result, error } = await apiAssist(brandId, task);
+    if (error) setAssistErr(error);
+    else if (result) {
+      if (task === 'competitors' && result.items) {
+        const merged = [...competitors];
+        result.items.forEach((item) => {
+          if (item && !merged.some((c) => c.toLowerCase() === item.toLowerCase())) merged.push(item);
+        });
+        setField('competitors', merged.join(', '));
+      } else if (result.text) {
+        setField('brief', result.text);
+      }
+    }
+    setAssisting('');
+  };
+
+  const pill = {
+    padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',
+    fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,border:0,cursor:'pointer',
+  };
+  const busy = (task) => assisting === task;
+  const canContinue = !!String(name).trim() && !!String(brief).trim();
+  const continueToDirection = () => {
+    if (canContinue) navigate('logo-direction');
+  };
+  const shortcut = (event) => {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && canContinue) continueToDirection();
+  };
+
+  return (
+    <ALogoWizardLayout onNext={continueToDirection} nextDisabled={!canContinue}>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <AFieldCard n="01" title="Brand name" meta={name ? `${String(name).length} / 80` : 'Required'}>
+          <div style={{
+            background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+            padding:'14px 16px',minHeight:64,display:'flex',alignItems:'center',
+          }}>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={80}
+              aria-label="Brand name"
+              placeholder="Cadence"
+              autoComplete="off"
+              style={{
+                width:'100%',border:0,outline:0,background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:24,fontWeight:700,
+                color:'#000',lineHeight:1.2,
+              }}
+            />
+          </div>
+        </AFieldCard>
+
+        <AFieldCard n="02" title="Brand description" meta={`${String(brief).length} / 800`}>
+          <div style={{
+            position:'relative',background:'var(--bg)',borderRadius:14,
+            boxShadow:'inset 0 0 0 1px var(--line)',padding:'18px 18px 14px',
+          }}>
+            <textarea
+              value={brief}
+              onChange={(e) => setField('brief', e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={800}
+              aria-label="Brand description"
+              placeholder="A productivity tool for founders who run on rituals, not roadmaps. Daily focus prompts, weekly retros, and monthly themes in one quiet surface."
+              rows={3}
+              style={{
+                width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:22,fontWeight:500,
+                color:'#000',lineHeight:1.4,minHeight:84,
+              }}
+            />
+            <div className="logo-assist-row" style={{display:'flex',alignItems:'center',gap:8,marginTop:14,paddingTop:14,borderTop:'1px dashed var(--line)'}}>
+              <button type="button" onClick={() => runAssist('brief_shorter')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('brief_shorter') ? .5 : 1}}>
+                <Sparkle size={11}/> {busy('brief_shorter') ? 'Rewriting…' : 'Rewrite shorter'}
+              </button>
+              <button type="button" onClick={() => runAssist('brief_punchier')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('brief_punchier') ? .5 : 1}}>
+                {busy('brief_punchier') ? 'Working…' : 'Make it punchier'}
+              </button>
+              <button type="button" onClick={() => runAssist('brief_sharper')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('brief_sharper') ? .5 : 1}}>
+                {busy('brief_sharper') ? 'Working…' : 'Sharpen the angle'}
+              </button>
+              <div style={{flex:1}}/>
+              <span className="logo-shortcut" style={{fontSize:10.5,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
+            </div>
+            {assistErr && <div role="alert" style={{marginTop:10,fontSize:11.5,color:'#A8421F'}}>{assistErr}</div>}
+          </div>
+        </AFieldCard>
+
+        <div className="logo-brief-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <AFieldCard n="03" title="Competitors" optional>
+            <div style={{
+              background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+              padding:14,display:'flex',flexDirection:'column',gap:12,minHeight:124,
+            }}>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {competitors.map((competitor) => (
+                  <ACompetitorChip key={competitor} name={competitor} onRemove={() => removeCompetitor(competitor)}/>
+                ))}
+              </div>
+              <div style={{flex:1}}/>
+              <div style={{
+                display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:10,
+                boxShadow:'inset 0 0 0 1px var(--line)',background:'var(--bg-elev)',
+              }}>
+                <SearchIcon size={12}/>
+                <input
+                  value={compInput}
+                  onChange={(e) => setCompInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompetitor(e.currentTarget.value); } }}
+                  aria-label="Add competitor"
+                  placeholder="Add a competitor by name or URL…"
+                  style={{flex:1,minWidth:0,border:0,background:'transparent',outline:'none',fontSize:12.5,color:'var(--fg-2)',fontFamily:'inherit'}}
+                />
+                <span style={{fontSize:10,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>↵</span>
+              </div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <button type="button" onClick={() => runAssist('competitors')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('competitors') ? .5 : 1}}>
+                <Sparkle size={11}/> {busy('competitors') ? 'Suggesting…' : 'Suggest 3 more'}
+              </button>
+              <div style={{flex:1}}/>
+              <span style={{fontSize:10.5,color:'var(--fg-4)'}}>Helps avoid familiar category clichés</span>
+            </div>
+          </AFieldCard>
+
+          <AFieldCard n="04" title="Tagline" optional meta={`${String(tagline).length} / 120`}>
+            <div style={{
+              background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+              padding:'14px 16px',display:'flex',flexDirection:'column',gap:10,minHeight:124,
+            }}>
+              <textarea
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                onKeyDown={shortcut}
+                maxLength={120}
+                aria-label="Tagline"
+                placeholder="Focus on what moves."
+                rows={3}
+                style={{
+                  width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                  fontFamily:'var(--font-display)',fontSize:16,fontWeight:500,
+                  color:'var(--fg-1)',lineHeight:1.45,
+                }}
+              />
+              <div style={{flex:1}}/>
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end'}}>
+              <span style={{fontSize:10.5,color:'var(--fg-4)'}}>Context only — it won’t be forced into the logo</span>
+            </div>
+          </AFieldCard>
+        </div>
+      </div>
+    </ALogoWizardLayout>
+  );
+};
+
+const LOGO_STYLE_PLACEHOLDERS = [
+  { id: 'placeholder-01', label: 'Style 01' },
+  { id: 'placeholder-02', label: 'Style 02' },
+  { id: 'placeholder-03', label: 'Style 03' },
+  { id: 'placeholder-04', label: 'Style 04' },
+  { id: 'placeholder-05', label: 'Style 05' },
+  { id: 'placeholder-06', label: 'Style 06' },
+];
+
+const LOGO_TYPE_OPTIONS = [
+  { id: 'wordmark', label: 'Wordmark' },
+  { id: 'lettermark', label: 'Lettermark' },
+  { id: 'letterform', label: 'Letterform' },
+  { id: 'pictorial-mark', label: 'Pictorial Mark' },
+  { id: 'abstract-mark', label: 'Abstract Mark' },
+  { id: 'mascot-logo', label: 'Mascot Logo' },
+  { id: 'combination-mark', label: 'Combination Mark' },
+  { id: 'emblem', label: 'Emblem' },
+];
+
+// Standalone logo studio · Step 2 · Visual style. The cards are deliberately
+// neutral placeholders until the product's final visual-style set is defined.
+const DirA_LogoDirection = () => {
+  const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+  const direction = data.logo_direction || {};
+  const selectedStyle = direction.mode === 'manual' ? direction.style_id : null;
+  const fluidChooses = direction.mode === 'ai';
+  const ready = !!selectedStyle || fluidChooses;
+
+  const chooseStyle = (styleId) => {
+    setField('data', {
+      ...data,
+      logo_direction: { mode: 'manual', style_id: styleId },
+    });
+  };
+  const chooseFluid = () => {
+    setField('data', {
+      ...data,
+      logo_direction: { mode: 'ai', style_id: null },
+    });
+  };
+  const continueToConcepts = () => {
+    if (ready) navigate('logo-type');
+  };
+
+  return (
+    <ALogoWizardLayout
+      step={2}
+      title="Pick a visual style."
+      subtitle="Choose one direction for the first round of logo concepts."
+      dockCopy="Choose a style, or let Fluid make the call."
+      nextLabel="Continue to logo type"
+      onBack={() => navigate('logo-brief')}
+      onNext={continueToConcepts}
+      nextDisabled={!ready}
+    >
+      <section aria-labelledby="logo-style-heading" style={{display:'flex',flexDirection:'column',gap:20}}>
+        <div className="logo-direction-toolbar" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>Visual style</div>
+            <h3 id="logo-style-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>Select a starting direction.</h3>
+          </div>
+          <button
+            type="button"
+            onClick={chooseFluid}
+            aria-pressed={fluidChooses}
+            style={{
+              display:'inline-flex',alignItems:'center',gap:7,padding:'9px 13px',borderRadius:9,
+              background:fluidChooses ? '#0E0F12' : 'var(--bg-elev)',
+              color:fluidChooses ? '#fff' : 'var(--fg-1)',
+              boxShadow:fluidChooses ? '0 6px 18px rgba(0,0,0,.12)' : 'inset 0 0 0 1px var(--line-strong)',
+              border:0,cursor:'pointer',fontSize:12,fontWeight:700,whiteSpace:'nowrap',
+            }}
+          >
+            <Sparkle size={12} color={fluidChooses ? '#FDBA50' : 'currentColor'}/>
+            {fluidChooses ? 'Fluid will choose' : 'Let Fluid choose'}
+          </button>
+        </div>
+
+        <div className="logo-direction-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:14}}>
+          {LOGO_STYLE_PLACEHOLDERS.map((style, index) => {
+            const selected = selectedStyle === style.id;
+            return (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => chooseStyle(style.id)}
+                aria-pressed={selected}
+                style={{
+                  minHeight:178,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  border:selected ? '2px solid #000' : '1px solid var(--line)',
+                  background:selected ? '#fff' : 'var(--bg-elev)',
+                  boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
+                  display:'flex',flexDirection:'column',justifyContent:'space-between',
+                  transition:'border-color .15s, box-shadow .15s, transform .15s',
+                }}
+              >
+                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+                  0{index + 1}
+                </span>
+                <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000',letterSpacing:'-0.02em'}}>
+                  {style.label}
+                </span>
+                <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Placeholder</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </ALogoWizardLayout>
+  );
+};
+
+// Standalone logo studio · Step 3 · Logo type. Visual treatments remain for
+// the later concepts step; this choice controls the structural logo direction.
+const DirA_LogoType = () => {
+  const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+  const selectedType = data.logo_type || '';
+
+  const chooseType = (typeId) => {
+    setField('data', { ...data, logo_type: typeId });
+  };
+  const continueToConcepts = () => {
+    if (selectedType) makeToast('Concept exploration is the next step.');
+  };
+
+  return (
+    <ALogoWizardLayout
+      step={3}
+      title="Choose a logo type."
+      subtitle="Pick the structure you want the first round of concepts to explore."
+      dockCopy="Choose one logo type to shape the concept round."
+      nextLabel="Continue to concepts"
+      onBack={() => navigate('logo-direction')}
+      onNext={continueToConcepts}
+      nextDisabled={!selectedType}
+    >
+      <section aria-labelledby="logo-type-heading" style={{display:'flex',flexDirection:'column',gap:20}}>
+        <div>
+          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Logo type</div>
+          <h3 id="logo-type-heading" style={{
+            margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+            color:'#000',letterSpacing:'-0.015em',
+          }}>Select a starting structure.</h3>
+        </div>
+
+        <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
+          {LOGO_TYPE_OPTIONS.map((type, index) => {
+            const selected = selectedType === type.id;
+            return (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => chooseType(type.id)}
+                aria-pressed={selected}
+                style={{
+                  minHeight:144,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  border:selected ? '2px solid #000' : '1px solid var(--line)',
+                  background:selected ? '#fff' : 'var(--bg-elev)',
+                  boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
+                  display:'flex',flexDirection:'column',justifyContent:'space-between',
+                  transition:'border-color .15s, box-shadow .15s, transform .15s',
+                }}
+              >
+                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
+                  {type.label}
+                </span>
+                <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Logo structure</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </ALogoWizardLayout>
+  );
+};
+
+// =====================================================================
 // A3 · Step 2 · Style Selection Screen
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
@@ -4420,7 +4897,9 @@ const DirA_BrandsActive = () => {
                   brand={b}
                   onOpen={() => {
                     loadBrand(b.id);
-                    const step = b.status === 'live' ? 'step5' : ('step' + (b.step || 1));
+                    const step = b.data && b.data.workflow === 'logo'
+                      ? 'logo-brief'
+                      : (b.status === 'live' ? 'step5' : ('step' + (b.step || 1)));
                     navigate(step);
                   }}
                   onDelete={() => setPendingDelete(b)}
@@ -4681,8 +5160,8 @@ const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, l
 
 
 // ---- Quick path card — focus on one thing ------------------------------
-const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview }) =>
-<div style={{
+const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }) =>
+<div data-route={route} onClick={onClick} style={{
   background: 'var(--bg-elev)', borderRadius: 16,
   boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
   display: 'flex', flexDirection: 'column', cursor: 'pointer', overflow: 'hidden'
@@ -4815,12 +5294,17 @@ const DirA_Home = () => {
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           {drafts.slice(0, 4).map((b) => (
             <div key={b.id}
-              onClick={() => { loadBrand(b.id); navigate('step' + (b.step || 1)); }}
+              onClick={() => {
+                loadBrand(b.id);
+                navigate(b.data && b.data.workflow === 'logo' ? 'logo-brief' : 'step' + (b.step || 1));
+              }}
               style={{ borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
               <BA_CardVisual brand={b} height={96} />
               <div style={{ padding: '13px 15px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brandDisplayName(b)}</span>
-                <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>Step {b.step || 1} of 5</span>
+                <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>
+                  {b.data && b.data.workflow === 'logo' ? 'Logo · Brief' : `Step ${b.step || 1} of 5`}
+                </span>
               </div>
             </div>
           ))}
@@ -4885,6 +5369,8 @@ const DirA_Home = () => {
             title="Logo"
             sub="Skip the strategy. Drop a name, get marks in seconds."
             preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
+            route="logo-brief"
+            onClick={() => navigate('logo-brief')}
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>} />
           
           <QuickPath
@@ -5515,7 +6001,7 @@ PR.useContext = React.useContext;
 // All known routes. Determines whether a route string is valid.
 const ROUTES = [
   'home', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
-  'step1', 'step2', 'step3', 'step4', 'step5',
+  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type',
 ];
 
 // Left rail label → route.  The rail labels are rendered by the existing
@@ -5540,6 +6026,9 @@ const ROUTE_META = {
   'assets':       { activeNav: 'assets',   breadcrumb: ['Assets'] },
   'guides':       { activeNav: 'guides',   breadcrumb: ['Guides'] },
   'settings':     { activeNav: 'settings', breadcrumb: ['Settings'] },
+  'logo-brief':   { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-direction': { activeNav: 'brands', breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-type':    { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'step1':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step2':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step3':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
@@ -5554,6 +6043,7 @@ const CRUMB_TO_ROUTE = {
   'Assets':    'assets',
   'Guides':    'guides',
   'Settings':  'settings',
+  'Logo studio': 'logo-brief',
   // Inside the wizard, clicking 'New brand' bounces to step1.
   'New brand': 'step1',
 };
@@ -5637,7 +6127,7 @@ function matchCtaText(text, currentRoute, out) {
   // Home quick paths — each card ends in "Start" + arrow.
   if (/ Start$/.test(text)) {
     if (/^Rebranding\b/.test(text)) return 'step1';
-    if (/^Logo\b/.test(text))       return 'step1';
+    if (/^Logo\b/.test(text))       return 'logo-brief';
     if (/^Name\b/.test(text))       return 'step1';
     if (/^Guidelines\b/.test(text)) return 'step1';
   }
@@ -5689,7 +6179,7 @@ function RouterProvider({ children }) {
   const routeRef = React.useRef(route);
   PR.useEffect(() => { routeRef.current = route; }, [route]);
 
-  const ORDER = ['home','brands','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
+  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
 
   const navigate = PR.useCallback((next) => {
     if (!ROUTES.includes(next)) return;
@@ -6324,6 +6814,9 @@ const SCREEN_FOR_ROUTE = {
   'assets':       () => <DirA_AssetsScreen />,
   'guides':       () => <DirA_GuidesScreen />,
   'settings':     () => <DirA_Settings />,
+  'logo-brief':   () => <DirA_LogoBrief />,
+  'logo-direction': () => <DirA_LogoDirection />,
+  'logo-type':    () => <DirA_LogoType />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Style />,
   'step3':        () => <DirA_Step3_Name />,
@@ -6356,6 +6849,9 @@ function QuickJump() {
     { id: 'assets',       label: 'Assets' },
     { id: 'guides',       label: 'Guides' },
     { id: 'settings',     label: 'Settings' },
+    { id: 'logo-brief',   label: 'Logo · 1 Brief' },
+    { id: 'logo-direction', label: 'Logo · 2 Direction' },
+    { id: 'logo-type',    label: 'Logo · 3 Type' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Style' },
     { id: 'step3',        label: 'Wizard · 3 Name' },
@@ -6769,8 +7265,8 @@ function BrandDraftProvider({ children }) {
     }, 500);
   }, [refresh]);
 
-  const startNew = React.useCallback(async () => {
-    const b = await apiCreateBrand({ step: 1 });
+  const startNew = React.useCallback(async (input) => {
+    const b = await apiCreateBrand(input || { step: 1 });
     if (b) { setDraft(b); refresh(); }
     return b;
   }, [refresh]);
@@ -6781,15 +7277,18 @@ function BrandDraftProvider({ children }) {
     return b;
   }, [brands]);
 
-  // Clear the draft whenever we leave the wizard, so "Start a new brand"
-  // always begins fresh (resume re-selects an explicit brand).
+  // Clear the draft whenever we leave a creation flow, so each new project
+  // begins fresh (resume re-selects an explicit saved draft).
   React.useEffect(() => {
-    if (!/^step[1-5]$/.test(route)) setDraft(null);
+    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type'].includes(route)) setDraft(null);
   }, [route]);
 
-  // Create a draft when the brief screen opens with none active.
+  // Create the correct kind of draft when either brief screen opens.
   React.useEffect(() => {
     if (route === 'step1' && !draftRef.current) startNew();
+    if (route === 'logo-brief' && !draftRef.current) {
+      startNew({ step: 1, data: { workflow: 'logo' } });
+    }
   }, [route, startNew]);
 
   // Persist wizard progress; mark the brand "live" at the kit.

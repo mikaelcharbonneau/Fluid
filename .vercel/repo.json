@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_6FphA2j49XigOcsXRlbCgOCl4bVd",
+      "name": "fluid",
+      "directory": "fluid-web",
+      "orgId": "team_f2xtDdokmMW21ByVgpJzIDDV"
+    }
+  ]
+}

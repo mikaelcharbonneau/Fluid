@@ -215,3 +215,35 @@
   @media (max-width: 700px) {
     .home-hero { padding: 24px !important; }
   }
+
+  /* Standalone logo brief: preserve the studio hierarchy while letting the
+     progress, field grid, and dock reflow on compact screens. */
+  @media (max-width: 1040px) {
+    .logo-progress-label { display: none; }
+    .logo-progress-line { width: 10px !important; }
+  }
+  @media (max-width: 900px) {
+    .logo-direction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .logo-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
+  @media (max-width: 760px) {
+    .logo-wizard-header {
+      align-items: flex-start !important;
+      flex-direction: column !important;
+      padding: 22px 20px 6px !important;
+      gap: 18px !important;
+    }
+    .logo-wizard-header h2 { font-size: 34px !important; }
+    .logo-wizard-content { padding: 20px 20px 118px !important; }
+    .logo-brief-grid { grid-template-columns: 1fr !important; }
+    .logo-assist-row { flex-wrap: wrap; }
+    .logo-shortcut { display: none; }
+  }
+  @media (max-width: 540px) {
+    .logo-wizard-dock { left: 12px !important; right: 12px !important; bottom: 12px !important; }
+    .logo-dock-copy { display: none; }
+    .logo-wizard-dock button { margin-left: auto; }
+    .logo-direction-grid { grid-template-columns: 1fr !important; }
+    .logo-type-grid { grid-template-columns: 1fr !important; }
+    .logo-direction-toolbar { align-items: flex-start !important; flex-direction: column !important; }
+  }
