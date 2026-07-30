@@ -1393,14 +1393,14 @@ const LOGO_STYLE_PLACEHOLDERS = [
 ];
 
 const LOGO_TYPE_OPTIONS = [
-  { id: 'wordmark', label: 'Wordmark' },
-  { id: 'lettermark', label: 'Lettermark' },
-  { id: 'letterform', label: 'Letterform' },
-  { id: 'pictorial', label: 'Pictorial Mark' },
-  { id: 'abstract', label: 'Abstract Mark' },
-  { id: 'mascot', label: 'Mascot Logo' },
-  { id: 'combination', label: 'Combination Mark' },
-  { id: 'emblem', label: 'Emblem' },
+  { id: 'wordmark', label: 'Wordmark', description: 'The full brand name, set in distinctive type.' },
+  { id: 'lettermark', label: 'Lettermark', description: 'Initials arranged as a compact monogram.' },
+  { id: 'letterform', label: 'Letterform', description: 'One custom letter, shaped into a memorable mark.' },
+  { id: 'pictorial', label: 'Pictorial Mark', description: 'A recognisable object, drawn as a distinct symbol.' },
+  { id: 'abstract', label: 'Abstract Mark', description: 'A non-literal symbol built around the brand idea.' },
+  { id: 'mascot', label: 'Mascot Logo', description: 'A character-led mark with a recognisable personality.' },
+  { id: 'combination', label: 'Combination Mark', description: 'A symbol and wordmark designed as one lockup.' },
+  { id: 'emblem', label: 'Emblem', description: 'Type contained within a badge, seal, or crest.' },
 ];
 
 const ALogoTypeCard = ({ type, index, selected, onClick }) => {
@@ -1425,7 +1425,7 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
       }}
     >
       <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-        <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+        <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
           {String(index + 1).padStart(2, '0')}
         </span>
         <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
@@ -1437,7 +1437,7 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
           <AMarkReferenceReel refs={refs} active={hot} maxHeight={58} showName={false}/>
         </div>
       )}
-      <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Logo structure</span>
+      <span style={{fontSize:11.5,color:'var(--fg-4)',lineHeight:1.35}}>{type.description}</span>
     </button>
   );
 };
