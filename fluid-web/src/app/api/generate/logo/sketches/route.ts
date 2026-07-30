@@ -52,6 +52,7 @@ export async function POST(request: Request) {
   const config: LogoConfig = {
     mark_type: markTypeById(str(rawConfig.mark_type))?.id ?? null,
     design_style: designStyleById(str(rawConfig.design_style))?.id ?? null,
+    standalone_style: str(rawConfig.standalone_style).slice(0, 80) || null,
     instructions: str(rawConfig.instructions).slice(0, 1000) || null,
   };
   if (!config.mark_type) {
@@ -162,7 +163,8 @@ export async function POST(request: Request) {
     const configChanged =
       priorConfig !== null &&
       (priorConfig.mark_type !== config.mark_type ||
-        priorConfig.design_style !== config.design_style);
+        priorConfig.design_style !== config.design_style ||
+        priorConfig.standalone_style !== config.standalone_style);
     const reset = resetRequested || configChanged;
 
     // Regeneration bias: liked concepts inform the new one; every previously

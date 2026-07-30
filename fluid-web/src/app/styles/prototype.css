@@ -225,6 +225,7 @@
   @media (max-width: 900px) {
     .logo-direction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .logo-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .logo-concepts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   }
   @media (max-width: 760px) {
     .logo-wizard-header {
@@ -245,5 +246,6 @@
     .logo-wizard-dock button { margin-left: auto; }
     .logo-direction-grid { grid-template-columns: 1fr !important; }
     .logo-type-grid { grid-template-columns: 1fr !important; }
+    .logo-concepts-grid { grid-template-columns: 1fr !important; }
     .logo-direction-toolbar { align-items: flex-start !important; flex-direction: column !important; }
   }

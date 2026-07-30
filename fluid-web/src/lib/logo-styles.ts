@@ -221,8 +221,22 @@ export function designStyleById(id: string | null | undefined): DesignStyleOptio
 export interface LogoConfig {
   mark_type?: string | null;
   design_style?: string | null;
+  standalone_style?: string | null;
   instructions?: string | null;
 }
+
+// The standalone flow deliberately exposes neutral style placeholders while
+// product names and imagery are being finalized. Keep their prompt treatment
+// here so a card selection still produces a consistent, distinct concept set.
+const STANDALONE_STYLE_GUIDANCE: Record<string, string> = {
+  "placeholder-01": "Use a reduced, geometric construction with crisp edges, generous negative space, and a composed, considered rhythm.",
+  "placeholder-02": "Prioritize expressive custom typography, with one confident typographic gesture and a clean overall silhouette.",
+  "placeholder-03": "Use an organic, editorial sensibility: softened forms, tactile variation, and a warm but disciplined composition.",
+  "placeholder-04": "Use a bold, high-contrast composition with strong scale shifts and an assertive, memorable focal point.",
+  "placeholder-05": "Use an understated premium approach: refined proportions, restrained detail, and calm visual confidence.",
+  "placeholder-06": "Use an energetic modular system with clear movement, adaptable parts, and a contemporary digital feel.",
+  "fluid-choice": "Derive the visual treatment from the brand brief and mark type. Choose the most ownable, strategically appropriate direction rather than a generic category convention.",
+};
 
 export function getLogoConfig(data: unknown): LogoConfig {
   const d = (data ?? {}) as Record<string, unknown>;
@@ -241,6 +255,15 @@ export function logoConfigContext(config: LogoConfig): string {
   const style = designStyleById(config.design_style);
   if (style && style.id !== "studio") {
     lines.push(``, `Visual language — apply this treatment throughout.`, style.guidance);
+  }
+  const standaloneStyle = (config.standalone_style ?? "").trim();
+  const standaloneGuidance = STANDALONE_STYLE_GUIDANCE[standaloneStyle];
+  if (standaloneGuidance) {
+    lines.push(
+      ``,
+      `Standalone visual-direction selection — keep the selected direction consistent across concepts:`,
+      standaloneGuidance,
+    );
   }
   const extra = (config.instructions ?? "").trim();
   if (extra) {
