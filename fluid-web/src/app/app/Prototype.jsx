@@ -1405,7 +1405,7 @@ const LOGO_TYPE_OPTIONS = [
 
 const ALogoTypeCard = ({ type, index, selected, onClick }) => {
   const [hot, setHot] = React.useState(false);
-  const refs = ['wordmark', 'lettermark'].includes(type.id) ? logoReferencesFor(type.id) : [];
+  const refs = logoReferencesFor(type.id);
   return (
     <button
       type="button"
