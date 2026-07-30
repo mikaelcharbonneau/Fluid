@@ -156,6 +156,16 @@ export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
     { name: "Tidal", src: "/logo-refs/combination/tidal-2.svg" },
     { name: "Vercel", src: "/logo-refs/combination/vercel.svg" },
   ],
+  emblem: [
+    { name: "Bentley", src: "/logo-refs/emblem/bentley.svg" },
+    { name: "BMW", src: "/logo-refs/emblem/bmw.svg" },
+    { name: "Ford", src: "/logo-refs/emblem/ford.svg" },
+    { name: "Porsche", src: "/logo-refs/emblem/porsche.svg" },
+    { name: "Paramount+", src: "/logo-refs/emblem/paramountplus.svg" },
+    { name: "NHL", src: "/logo-refs/emblem/nhl.svg" },
+    { name: "UPS", src: "/logo-refs/emblem/ups.svg" },
+    { name: "Starbucks", src: "/logo-refs/emblem/starbucks.svg" },
+  ],
 };
 
 export function logoReferencesFor(id: string | null | undefined): LogoReference[] {
