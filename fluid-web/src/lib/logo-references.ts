@@ -109,6 +109,23 @@ export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
     { name: "Treyarch", src: "/logo-refs/abstract/treyarch.svg" },
     { name: "Unsplash", src: "/logo-refs/abstract/unsplash.svg" },
   ],
+  mascot: [
+    { name: "Android", src: "/logo-refs/mascot/android.svg" },
+    { name: "Claude Code", src: "/logo-refs/mascot/claudecode.svg" },
+    { name: "Deliveroo", src: "/logo-refs/mascot/deliveroo.svg" },
+    { name: "DuckDuckGo", src: "/logo-refs/mascot/duckduckgo.svg" },
+    { name: "Duolingo", src: "/logo-refs/mascot/duolingo.svg" },
+    { name: "GIMP", src: "/logo-refs/mascot/gimp.svg" },
+    { name: "GitHub", src: "/logo-refs/mascot/github.svg" },
+    { name: "Google Jules", src: "/logo-refs/mascot/googlejules.svg" },
+    { name: "Hootsuite", src: "/logo-refs/mascot/hootsuite.svg" },
+    { name: "Linux", src: "/logo-refs/mascot/linux.svg" },
+    { name: "Mailchimp", src: "/logo-refs/mascot/mailchimp.svg" },
+    { name: "Ollama", src: "/logo-refs/mascot/ollama.svg" },
+    { name: "Reddit", src: "/logo-refs/mascot/reddit.svg" },
+    { name: "Tripadvisor", src: "/logo-refs/mascot/tripadvisor.svg" },
+    { name: "Waze", src: "/logo-refs/mascot/waze.svg" },
+  ],
 };
 
 export function logoReferencesFor(id: string | null | undefined): LogoReference[] {
