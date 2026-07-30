@@ -1403,7 +1403,7 @@ const LOGO_TYPE_OPTIONS = [
   { id: 'emblem', label: 'Emblem', description: 'Type contained within a badge, seal, or crest.' },
 ];
 
-const ALogoTypeCard = ({ type, index, selected, onClick }) => {
+const ALogoTypeCard = ({ type, selected, onClick }) => {
   const [hot, setHot] = React.useState(false);
   const refs = logoReferencesFor(type.id);
   return (
@@ -1424,10 +1424,7 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
         transition:'border-color .15s, box-shadow .15s, transform .15s',
       }}
     >
-      <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-        <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
-          {String(index + 1).padStart(2, '0')}
-        </span>
+      <div style={{display:'flex',alignItems:'baseline'}}>
         <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
           {type.label}
         </span>
@@ -1588,10 +1585,10 @@ const DirA_LogoType = () => {
         </div>
 
         <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
-          {LOGO_TYPE_OPTIONS.map((type, index) => {
+          {LOGO_TYPE_OPTIONS.map((type) => {
             const selected = selectedTypes.includes(type.id);
             return (
-              <ALogoTypeCard key={type.id} type={type} index={index} selected={selected} onClick={() => chooseType(type.id)} />
+              <ALogoTypeCard key={type.id} type={type} selected={selected} onClick={() => chooseType(type.id)} />
             );
           })}
         </div>

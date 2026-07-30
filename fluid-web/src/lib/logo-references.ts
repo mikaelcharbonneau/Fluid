@@ -22,19 +22,32 @@ export interface LogoReference {
 // Keyed by MarkTypeOption.id. A type with no entry falls back to its drawn
 // preview illustration, so this can be filled in one mark type at a time.
 export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
-  // Zara leads the reel by product direction; the remaining marks alternate
-  // colour and width so successive frames read as visibly different examples.
+  // Ordered by the supplied reference set for the standalone logo flow.
   wordmark: [
-    { name: "Zara", src: "/logo-refs/wordmark/zara.svg" },
-    { name: "Coca-Cola", src: "/logo-refs/wordmark/coca-cola.svg" },
-    { name: "Visa", src: "/logo-refs/wordmark/visa.svg" },
-    { name: "Uber", src: "/logo-refs/wordmark/uber.svg" },
-    { name: "Amazon", src: "/logo-refs/wordmark/amazon.svg" },
-    { name: "Stripe", src: "/logo-refs/wordmark/stripe.svg" },
-    { name: "Disney", src: "/logo-refs/wordmark/disney.svg" },
-    { name: "Oracle", src: "/logo-refs/wordmark/oracle.svg" },
-    { name: "Virgin", src: "/logo-refs/wordmark/virgin.svg" },
     { name: "Activision", src: "/logo-refs/wordmark/activision.svg" },
+    { name: "Bose", src: "/logo-refs/wordmark/bose.svg" },
+    { name: "Coinbase", src: "/logo-refs/wordmark/coinbase.svg" },
+    { name: "Dior", src: "/logo-refs/wordmark/dior.svg" },
+    { name: "Disney", src: "/logo-refs/wordmark/disney.svg" },
+    { name: "Ferrari", src: "/logo-refs/wordmark/ferrarinv.svg" },
+    { name: "Fila", src: "/logo-refs/wordmark/fila.svg" },
+    { name: "Garmin", src: "/logo-refs/wordmark/garmin.svg" },
+    { name: "Gusto", src: "/logo-refs/wordmark/gusto.svg" },
+    { name: "Hitachi", src: "/logo-refs/wordmark/hitachi.svg" },
+    { name: "Intel", src: "/logo-refs/wordmark/intel.svg" },
+    { name: "Intuit", src: "/logo-refs/wordmark/intuit.svg" },
+    { name: "Lyft", src: "/logo-refs/wordmark/lyft.svg" },
+    { name: "McLaren", src: "/logo-refs/wordmark/mclaren.svg" },
+    { name: "Nokia", src: "/logo-refs/wordmark/nokia.svg" },
+    { name: "Samsung", src: "/logo-refs/wordmark/samsung.svg" },
+    { name: "Sonos", src: "/logo-refs/wordmark/sonos.svg" },
+    { name: "Sony", src: "/logo-refs/wordmark/sony.svg" },
+    { name: "Toshiba", src: "/logo-refs/wordmark/toshiba.svg" },
+    { name: "Uber", src: "/logo-refs/wordmark/uber.svg" },
+    { name: "Venmo", src: "/logo-refs/wordmark/venmo.svg" },
+    { name: "Virgin", src: "/logo-refs/wordmark/virgin-2.svg" },
+    { name: "Visa", src: "/logo-refs/wordmark/visa-2.svg" },
+    { name: "Zara", src: "/logo-refs/wordmark/zara.svg" },
   ],
   lettermark: [
     { name: "Anthropic", src: "/logo-refs/lettermark/anthropic.svg" },
