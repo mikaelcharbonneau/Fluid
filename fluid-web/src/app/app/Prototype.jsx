@@ -1403,6 +1403,43 @@ const LOGO_TYPE_OPTIONS = [
   { id: 'emblem', label: 'Emblem' },
 ];
 
+const ALogoTypeCard = ({ type, index, selected, onClick }) => {
+  const [hot, setHot] = React.useState(false);
+  const refs = type.id === 'wordmark' ? logoReferencesFor(type.id) : [];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHot(true)}
+      onMouseLeave={() => setHot(false)}
+      onFocus={() => setHot(true)}
+      onBlur={() => setHot(false)}
+      aria-pressed={selected}
+      style={{
+        minHeight:164,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+        border:selected ? '2px solid #000' : '1px solid var(--line)',
+        background:selected ? '#fff' : 'var(--bg-elev)',
+        boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
+        display:'flex',flexDirection:'column',justifyContent:'space-between',gap:12,
+        transition:'border-color .15s, box-shadow .15s, transform .15s',
+      }}
+    >
+      <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+        {String(index + 1).padStart(2, '0')}
+      </span>
+      {refs.length > 0 && (
+        <div style={{height:48,background:'#FBFAF6',borderRadius:9,padding:'0 8px',boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',overflow:'hidden'}}>
+          <AMarkReferenceReel refs={refs} active={hot}/>
+        </div>
+      )}
+      <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
+        {type.label}
+      </span>
+      <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Logo structure</span>
+    </button>
+  );
+};
+
 // Standalone logo studio · Step 2 · Visual style. The cards are deliberately
 // neutral placeholders until the product's final visual-style set is defined.
 const DirA_LogoDirection = () => {
@@ -1410,20 +1447,26 @@ const DirA_LogoDirection = () => {
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
   const direction = data.logo_direction || {};
-  const selectedStyle = direction.mode === 'manual' ? direction.style_id : null;
+  const selectedStyles = direction.mode === 'manual'
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : []))
+    : [];
   const fluidChooses = direction.mode === 'ai';
-  const ready = !!selectedStyle || fluidChooses;
+  const ready = selectedStyles.length > 0 || fluidChooses;
 
   const chooseStyle = (styleId) => {
+    const next = selectedStyles.includes(styleId)
+      ? selectedStyles.filter((id) => id !== styleId)
+      : (selectedStyles.length < 3 ? [...selectedStyles, styleId] : null);
+    if (!next) { makeToast('Choose up to three styles.'); return; }
     setField('data', {
       ...data,
-      logo_direction: { mode: 'manual', style_id: styleId },
+      logo_direction: { mode: next.length ? 'manual' : null, style_ids: next, style_id: next[0] || null },
     });
   };
   const chooseFluid = () => {
     setField('data', {
       ...data,
-      logo_direction: { mode: 'ai', style_id: null },
+      logo_direction: fluidChooses ? { mode: null, style_ids: [], style_id: null } : { mode: 'ai', style_ids: [], style_id: null },
     });
   };
   const continueToConcepts = () => {
@@ -1434,8 +1477,8 @@ const DirA_LogoDirection = () => {
     <ALogoWizardLayout
       step={2}
       title="Pick a visual style."
-      subtitle="Choose one direction for the first round of logo concepts."
-      dockCopy="Choose a style, or let Fluid make the call."
+      subtitle="Choose up to three directions for the first round of logo concepts."
+      dockCopy="Choose up to three styles, or let Fluid make the call."
       nextLabel="Continue to logo type"
       onBack={() => navigate('logo-brief')}
       onNext={continueToConcepts}
@@ -1448,7 +1491,7 @@ const DirA_LogoDirection = () => {
             <h3 id="logo-style-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
               color:'#000',letterSpacing:'-0.015em',
-            }}>Select a starting direction.</h3>
+            }}>Select up to three directions.</h3>
           </div>
           <button
             type="button"
@@ -1469,7 +1512,7 @@ const DirA_LogoDirection = () => {
 
         <div className="logo-direction-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:14}}>
           {LOGO_STYLE_PLACEHOLDERS.map((style, index) => {
-            const selected = selectedStyle === style.id;
+            const selected = selectedStyles.includes(style.id);
             return (
               <button
                 key={style.id}
@@ -1507,25 +1550,31 @@ const DirA_LogoType = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
-  const selectedType = data.logo_type || '';
+  const selectedTypes = Array.isArray(data.logo_types)
+    ? data.logo_types
+    : (data.logo_type ? [data.logo_type] : []);
 
   const chooseType = (typeId) => {
-    setField('data', { ...data, logo_type: typeId });
+    const next = selectedTypes.includes(typeId)
+      ? selectedTypes.filter((id) => id !== typeId)
+      : (selectedTypes.length < 3 ? [...selectedTypes, typeId] : null);
+    if (!next) { makeToast('Choose up to three logo types.'); return; }
+    setField('data', { ...data, logo_types: next, logo_type: next[0] || '' });
   };
   const continueToConcepts = () => {
-    if (selectedType) navigate('logo-references');
+    if (selectedTypes.length) navigate('logo-references');
   };
 
   return (
     <ALogoWizardLayout
       step={3}
       title="Choose a logo type."
-      subtitle="Pick the structure you want the first round of concepts to explore."
-      dockCopy="Choose one logo type to shape the concept round."
+      subtitle="Pick up to three structures for the first round of concepts to explore."
+      dockCopy="Choose up to three logo types to shape the concept round."
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-direction')}
       onNext={continueToConcepts}
-      nextDisabled={!selectedType}
+      nextDisabled={selectedTypes.length === 0}
     >
       <section aria-labelledby="logo-type-heading" style={{display:'flex',flexDirection:'column',gap:20}}>
         <div>
@@ -1533,35 +1582,14 @@ const DirA_LogoType = () => {
           <h3 id="logo-type-heading" style={{
             margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
             color:'#000',letterSpacing:'-0.015em',
-          }}>Select a starting structure.</h3>
+          }}>Select up to three starting structures.</h3>
         </div>
 
         <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
           {LOGO_TYPE_OPTIONS.map((type, index) => {
-            const selected = selectedType === type.id;
+            const selected = selectedTypes.includes(type.id);
             return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => chooseType(type.id)}
-                aria-pressed={selected}
-                style={{
-                  minHeight:144,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
-                  border:selected ? '2px solid #000' : '1px solid var(--line)',
-                  background:selected ? '#fff' : 'var(--bg-elev)',
-                  boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
-                  display:'flex',flexDirection:'column',justifyContent:'space-between',
-                  transition:'border-color .15s, box-shadow .15s, transform .15s',
-                }}
-              >
-                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
-                  {type.label}
-                </span>
-                <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Logo structure</span>
-              </button>
+              <ALogoTypeCard key={type.id} type={type} index={index} selected={selected} onClick={() => chooseType(type.id)} />
             );
           })}
         </div>
@@ -1586,10 +1614,10 @@ const LOGO_REFERENCE_PLACEHOLDERS = Array.from({ length: 9 }, (_, index) => ({
   label: `Reference ${String(index + 1).padStart(2, '0')}`,
 }));
 
-const ALogoReferenceCard = ({ reference, liked, onLike }) => (
+const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
   <article style={{
     background:'var(--bg-elev)',borderRadius:16,padding:12,
-    boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
+    boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : (disliked ? '0 0 0 2px var(--line-strong), var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)'),
     display:'flex',flexDirection:'column',gap:10,
   }}>
     <div style={{
@@ -1599,18 +1627,22 @@ const ALogoReferenceCard = ({ reference, liked, onLike }) => (
     }}>Logo placeholder</div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
       <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:13.5,color:'#000'}}>{reference.label}</span>
-      <button
-        type="button"
-        onClick={onLike}
-        aria-pressed={liked}
-        aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.label}`}
-        style={{
-          flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',
-          background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center',
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-      </button>
+      <div style={{display:'inline-flex',gap:5}}>
+        <button
+          type="button" onClick={onLike} aria-pressed={liked} title={liked ? 'Unlike' : 'Like'}
+          aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.label}`}
+          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </button>
+        <button
+          type="button" onClick={onDislike} aria-pressed={disliked} title={disliked ? 'Remove dislike' : 'Dislike'}
+          aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.label}`}
+          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v10"/><path d="M11 20h5.3a2 2 0 0 0 1.9-1.4l1.4-4.5A2 2 0 0 0 17.7 11H14l.6-3.2A2 2 0 0 0 12.6 5L7 10H4v10z"/></svg>
+        </button>
+      </div>
     </div>
   </article>
 );
@@ -1622,22 +1654,41 @@ const DirA_LogoReferences = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
-  const selectedType = data.logo_type || '';
+  const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
   const direction = data.logo_direction || {};
-  const selectedStyle = direction.mode === 'manual' ? direction.style_id : null;
-  const typeLabel = (LOGO_TYPE_OPTIONS.find((type) => type.id === selectedType) || {}).label || 'Logo type';
-  const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === selectedStyle) || {}).label || 'Visual style';
+  const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : [])) : [];
+  const typeLabel = selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
+  const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
+  const [dislikes, setDislikes] = React.useState(data.logo_reference_dislikes || []);
 
   const toggleLike = (id) => {
     const next = likes.includes(id) ? likes.filter((item) => item !== id) : [...likes, id];
+    const nextDislikes = dislikes.filter((item) => item !== id);
     setLikes(next);
+    setDislikes(nextDislikes);
     setField('data', {
       ...((draft && draft.data) || {}),
       logo_reference_likes: next,
+      logo_reference_dislikes: nextDislikes,
       logo_reference_context: {
-        logo_type: selectedType,
-        visual_style: selectedStyle || (direction.mode === 'ai' ? 'fluid-choice' : ''),
+        logo_types: selectedTypes,
+        visual_styles: selectedStyles.length ? selectedStyles : (direction.mode === 'ai' ? ['fluid-choice'] : []),
+      },
+    });
+  };
+  const toggleDislike = (id) => {
+    const next = dislikes.includes(id) ? dislikes.filter((item) => item !== id) : [...dislikes, id];
+    const nextLikes = likes.filter((item) => item !== id);
+    setDislikes(next);
+    setLikes(nextLikes);
+    setField('data', {
+      ...((draft && draft.data) || {}),
+      logo_reference_likes: nextLikes,
+      logo_reference_dislikes: next,
+      logo_reference_context: {
+        logo_types: selectedTypes,
+        visual_styles: selectedStyles.length ? selectedStyles : (direction.mode === 'ai' ? ['fluid-choice'] : []),
       },
     });
   };
@@ -1666,7 +1717,7 @@ const DirA_LogoReferences = () => {
 
         <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
           {LOGO_REFERENCE_PLACEHOLDERS.map((reference) => (
-            <ALogoReferenceCard key={reference.id} reference={reference} liked={likes.includes(reference.id)} onLike={() => toggleLike(reference.id)} />
+            <ALogoReferenceCard key={reference.id} reference={reference} liked={likes.includes(reference.id)} disliked={dislikes.includes(reference.id)} onLike={() => toggleLike(reference.id)} onDislike={() => toggleDislike(reference.id)} />
           ))}
         </div>
       </section>

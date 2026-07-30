@@ -22,9 +22,10 @@ export interface LogoReference {
 // Keyed by MarkTypeOption.id. A type with no entry falls back to its drawn
 // preview illustration, so this can be filled in one mark type at a time.
 export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
-  // Ordered to alternate colour and width rather than to rank the brands, so
-  // successive frames in the reel read as visibly different marks.
+  // Zara leads the reel by product direction; the remaining marks alternate
+  // colour and width so successive frames read as visibly different examples.
   wordmark: [
+    { name: "Zara", src: "/logo-refs/wordmark/zara.svg" },
     { name: "Coca-Cola", src: "/logo-refs/wordmark/coca-cola.svg" },
     { name: "Visa", src: "/logo-refs/wordmark/visa.svg" },
     { name: "Uber", src: "/logo-refs/wordmark/uber.svg" },
@@ -32,7 +33,6 @@ export const LOGO_REFERENCES: Record<string, LogoReference[]> = {
     { name: "Stripe", src: "/logo-refs/wordmark/stripe.svg" },
     { name: "Disney", src: "/logo-refs/wordmark/disney.svg" },
     { name: "Oracle", src: "/logo-refs/wordmark/oracle.svg" },
-    { name: "Zara", src: "/logo-refs/wordmark/zara.svg" },
     { name: "Virgin", src: "/logo-refs/wordmark/virgin.svg" },
     { name: "Activision", src: "/logo-refs/wordmark/activision.svg" },
   ],
