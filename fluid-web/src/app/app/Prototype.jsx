@@ -1424,12 +1424,14 @@ const ALogoTypeCard = ({ type, index, selected, onClick }) => {
         transition:'border-color .15s, box-shadow .15s, transform .15s',
       }}
     >
-      <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-        {String(index + 1).padStart(2, '0')}
-      </span>
-      <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
-        {type.label}
-      </span>
+      <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+        <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+          {String(index + 1).padStart(2, '0')}
+        </span>
+        <span style={{fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.02em',lineHeight:1.1}}>
+          {type.label}
+        </span>
+      </div>
       {refs.length > 0 && (
         <div style={{height:78,padding:'0 2px'}}>
           <AMarkReferenceReel refs={refs} active={hot} maxHeight={58} showName={false}/>
