@@ -11,6 +11,10 @@ import {
   type LogoConfig,
   markTypeById,
   designStyleById,
+  normalizeMarkTypes,
+  normalizeStandaloneStyles,
+  selectionForAttempt,
+  logoConfigSignature,
 } from "@/lib/logo-styles";
 
 export const runtime = "nodejs";
@@ -46,16 +50,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing brandId." }, { status: 400 });
   }
 
-  // The Step 4 brief: mark type, visual language, and free-text direction.
+  // The brief: mark type(s), visual language, and free-text direction.
+  //
+  // The main wizard submits one mark_type. The standalone flow submits up to
+  // three mark_types and three standalone_styles, and the board rotates
+  // through them one concept at a time (see selectionForAttempt below).
   const rawConfig = (body.config ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  const config: LogoConfig = {
-    mark_type: markTypeById(str(rawConfig.mark_type))?.id ?? null,
+  const markTypes = normalizeMarkTypes(rawConfig.mark_types);
+  const standaloneStyles = normalizeStandaloneStyles(rawConfig.standalone_styles);
+  const singleType = markTypeById(str(rawConfig.mark_type))?.id ?? null;
+
+  const selection: LogoConfig = {
+    mark_type: singleType,
+    mark_types: markTypes.length ? markTypes : null,
     design_style: designStyleById(str(rawConfig.design_style))?.id ?? null,
     standalone_style: str(rawConfig.standalone_style).slice(0, 80) || null,
+    standalone_styles: standaloneStyles.length ? standaloneStyles : null,
     instructions: str(rawConfig.instructions).slice(0, 1000) || null,
   };
-  if (!config.mark_type) {
+  if (!markTypes.length && !singleType) {
     return NextResponse.json(
       { error: "Choose a logo type before sketching concepts." },
       { status: 400 },
@@ -157,14 +171,17 @@ export async function POST(request: Request) {
     }
 
     // A changed brief invalidates the prior board even if the client forgot to
-    // ask for a reset — concepts drawn under a different mark type or style
-    // don't belong on the same board.
+    // ask for a reset — concepts drawn under different types or styles don't
+    // belong on the same board.
+    //
+    // Compared by signature, not field by field: the standalone flow rotates
+    // `mark_type` through the client's selection on every call, so comparing
+    // that field directly wiped the board on each concept and the board could
+    // never grow past one.
     const priorConfig = (data.logo_config ?? null) as LogoConfig | null;
     const configChanged =
       priorConfig !== null &&
-      (priorConfig.mark_type !== config.mark_type ||
-        priorConfig.design_style !== config.design_style ||
-        priorConfig.standalone_style !== config.standalone_style);
+      logoConfigSignature(priorConfig) !== logoConfigSignature(selection);
     const reset = resetRequested || configChanged;
 
     // Regeneration bias: liked concepts inform the new one; every previously
@@ -174,6 +191,15 @@ export async function POST(request: Request) {
     const priorAll = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
     const prior = reset ? [] : priorAll;
     const liked = prior.filter((s) => likedIds.includes(s.id));
+
+    // Rotate through the selection based on how much of the board exists, so
+    // a run of "draw another" spreads across every type and style chosen.
+    const pick = selectionForAttempt(selection, prior.length);
+    const config: LogoConfig = {
+      ...selection,
+      mark_type: pick.mark_type ?? selection.mark_type ?? null,
+      standalone_style: pick.standalone_style ?? selection.standalone_style ?? null,
+    };
 
     // One design call plus one image render. This reserve was 170s back when
     // the route drew and rendered a full nine-up board; at that size it would
@@ -200,7 +226,10 @@ export async function POST(request: Request) {
       ...data,
       ...(research ? { research } : {}),
       creative_platform: platform,
-      logo_config: config,
+      // Persist the SELECTION, not the rotated pick — the next call needs the
+      // full selection to keep rotating, and the signature check above must
+      // compare like with like.
+      logo_config: selection,
       logo_sketches: sketches,
       logo_sketch_likes: reset ? [] : likedIds,
     };
