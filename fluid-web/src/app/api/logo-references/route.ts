@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // rules in one readable place instead of splitting them across SQL.
   let query = supabase
     .from("logo_references")
-    .select("name, mark_type, image_path, attributes, industry, sort_order")
+    .select("name, mark_type, image_path, attributes, industry, sort_order, aspect_ratio")
     .eq("is_active", true);
   if (types.length) query = query.in("mark_type", types);
 

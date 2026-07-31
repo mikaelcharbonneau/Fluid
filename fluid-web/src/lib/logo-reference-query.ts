@@ -16,6 +16,7 @@ export interface LogoReferenceRow {
   attributes: string[] | null;
   industry: string | null;
   sort_order: number;
+  aspect_ratio: number | string | null;
 }
 
 export interface RankedReference {
@@ -26,6 +27,19 @@ export interface RankedReference {
   attributes: string[];
   /** Attributes shared with the chosen visual direction. */
   matched: string[];
+  /**
+   * Image width / height. The masonry gallery uses it to reserve the right
+   * box before a lazily-loaded image arrives, so columns don't jump. Null
+   * when unknown — the card then falls back to natural sizing.
+   */
+  aspectRatio: number | null;
+}
+
+// Postgres numeric arrives as a string over the wire. Guard against a stored
+// 0 or a malformed value, which would collapse the card to zero height.
+function toAspectRatio(raw: number | string | null): number | null {
+  const n = typeof raw === "string" ? Number(raw) : raw;
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Each visual direction in Step 2 is described to the generators by a sentence
@@ -105,5 +119,6 @@ export function rankReferences(
     imageUrl: referenceImageUrl(s.row.image_path),
     attributes: s.attributes,
     matched: s.matched,
+    aspectRatio: toAspectRatio(s.row.aspect_ratio),
   }));
 }
