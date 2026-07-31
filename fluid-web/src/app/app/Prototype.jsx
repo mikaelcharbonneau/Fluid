@@ -1629,26 +1629,30 @@ const LogoReferenceContext = ({ label, value }) => (
 );
 
 const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
-  <article style={{
+  <article className="logo-reference-card" style={{
     background:'var(--bg-elev)',borderRadius:16,padding:12,
     boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : (disliked ? '0 0 0 2px var(--line-strong), var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)'),
-    display:'flex',flexDirection:'column',gap:10,
   }}>
+    {/* No fixed height: the card takes the image's own proportions, which is
+        what makes the gallery read as a collage rather than a grid. */}
     <div style={{
-      minHeight:148,borderRadius:10,background:'#fff',overflow:'hidden',
-      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',alignItems:'center',justifyContent:'center',
+      borderRadius:10,background:'#fff',overflow:'hidden',
+      boxShadow:'inset 0 0 0 1px var(--line)',marginBottom:10,
+      // Reserve the image's box up front so lazily-loaded artwork doesn't
+      // shove the masonry columns around as it arrives.
+      aspectRatio: reference.aspectRatio || undefined,
     }}>
       <img
         src={reference.imageUrl}
         alt={`${reference.name} — ${reference.markType} reference`}
         loading="lazy"
-        style={{width:'100%',height:148,objectFit:'contain',display:'block'}}
+        style={reference.aspectRatio ? {height:'100%',objectFit:'cover'} : undefined}
       />
     </div>
     {/* Why this reference is here: the attributes it shares with the chosen
         direction. Keeps the gallery legible rather than arbitrary. */}
     {reference.matched && reference.matched.length > 0 && (
-      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:8}}>
         {reference.matched.slice(0, 3).map((attr) => (
           <span key={attr} style={{
             fontFamily:'var(--font-mono)',fontSize:9.5,letterSpacing:'.02em',
@@ -1779,9 +1783,11 @@ const DirA_LogoReferences = () => {
         )}
 
         {references === null ? (
-          <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} style={{minHeight:200,borderRadius:16,background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)'}} />
+          <div className="logo-references-grid">
+            {/* Varied skeleton heights so the loading state previews the
+                collage rather than promising a uniform grid. */}
+            {[190, 250, 160, 220, 170, 240].map((h, i) => (
+              <div key={i} className="logo-reference-card" style={{height:h,borderRadius:16,background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)'}} />
             ))}
           </div>
         ) : references.length === 0 ? (
@@ -1792,7 +1798,7 @@ const DirA_LogoReferences = () => {
             No references match that combination yet. Try another style or logo type.
           </div>
         ) : (
-          <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+          <div className="logo-references-grid">
             {references.map((reference) => (
               <ALogoReferenceCard
                 key={reference.id}
