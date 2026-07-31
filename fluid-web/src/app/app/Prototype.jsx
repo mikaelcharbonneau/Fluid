@@ -1628,11 +1628,6 @@ const LogoReferenceContext = ({ label, value }) => (
   </div>
 );
 
-const LOGO_REFERENCE_PLACEHOLDERS = Array.from({ length: 9 }, (_, index) => ({
-  id: `reference-${String(index + 1).padStart(2, '0')}`,
-  label: `Reference ${String(index + 1).padStart(2, '0')}`,
-}));
-
 const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
   <article style={{
     background:'var(--bg-elev)',borderRadius:16,padding:12,
@@ -1640,23 +1635,41 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
     display:'flex',flexDirection:'column',gap:10,
   }}>
     <div style={{
-      minHeight:148,borderRadius:10,background:'var(--bg-sunken)',
+      minHeight:148,borderRadius:10,background:'#fff',overflow:'hidden',
       boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',alignItems:'center',justifyContent:'center',
-      fontFamily:'var(--font-mono)',fontSize:10,color:'var(--fg-4)',textTransform:'uppercase',letterSpacing:'.06em',
-    }}>Logo placeholder</div>
+    }}>
+      <img
+        src={reference.imageUrl}
+        alt={`${reference.name} — ${reference.markType} reference`}
+        loading="lazy"
+        style={{width:'100%',height:148,objectFit:'contain',display:'block'}}
+      />
+    </div>
+    {/* Why this reference is here: the attributes it shares with the chosen
+        direction. Keeps the gallery legible rather than arbitrary. */}
+    {reference.matched && reference.matched.length > 0 && (
+      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+        {reference.matched.slice(0, 3).map((attr) => (
+          <span key={attr} style={{
+            fontFamily:'var(--font-mono)',fontSize:9.5,letterSpacing:'.02em',
+            padding:'3px 6px',borderRadius:6,background:'rgba(253,121,71,.12)',color:'#B4441A',
+          }}>{attr}</span>
+        ))}
+      </div>
+    )}
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:13.5,color:'#000'}}>{reference.label}</span>
+      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:13.5,color:'#000',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reference.name}</span>
       <div style={{display:'inline-flex',gap:5}}>
         <button
           type="button" onClick={onLike} aria-pressed={liked} title={liked ? 'Unlike' : 'Like'}
-          aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.label}`}
+          aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.name}`}
           style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
         <button
           type="button" onClick={onDislike} aria-pressed={disliked} title={disliked ? 'Remove dislike' : 'Dislike'}
-          aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.label}`}
+          aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.name}`}
           style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v10"/><path d="M11 20h5.3a2 2 0 0 0 1.9-1.4l1.4-4.5A2 2 0 0 0 17.7 11H14l.6-3.2A2 2 0 0 0 12.6 5L7 10H4v10z"/></svg>
@@ -1681,6 +1694,30 @@ const DirA_LogoReferences = () => {
   const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
   const [dislikes, setDislikes] = React.useState(data.logo_reference_dislikes || []);
+  const [references, setReferences] = React.useState(null);
+  const [loadError, setLoadError] = React.useState('');
+
+  // Pull references that actually match the brief: the mark types chosen in
+  // Step 3, ranked against the visual directions chosen in Step 2. Delegating
+  // either ("Let Fluid choose") simply omits that filter.
+  const typesKey = aiChoosesType ? '' : selectedTypes.join(',');
+  const stylesKey = direction.mode === 'ai' ? 'fluid-choice' : selectedStyles.join(',');
+  React.useEffect(() => {
+    let cancelled = false;
+    setReferences(null); setLoadError('');
+    const params = new URLSearchParams({ limit: '12' });
+    if (typesKey) params.set('types', typesKey);
+    if (stylesKey) params.set('styles', stylesKey);
+    fetch('/api/logo-references?' + params.toString(), { cache: 'no-store' })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (cancelled) return;
+        if (!ok) { setLoadError(j.error || "Couldn't load references."); setReferences([]); return; }
+        setReferences(j.references || []);
+      })
+      .catch(() => { if (!cancelled) { setLoadError('Network error. Check your connection.'); setReferences([]); } });
+    return () => { cancelled = true; };
+  }, [typesKey, stylesKey]);
 
   const toggleLike = (id) => {
     const next = likes.includes(id) ? likes.filter((item) => item !== id) : [...likes, id];
@@ -1737,11 +1774,37 @@ const DirA_LogoReferences = () => {
           <LogoReferenceContext label="Type" value={typeLabel}/>
         </div>
 
-        <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
-          {LOGO_REFERENCE_PLACEHOLDERS.map((reference) => (
-            <ALogoReferenceCard key={reference.id} reference={reference} liked={likes.includes(reference.id)} disliked={dislikes.includes(reference.id)} onLike={() => toggleLike(reference.id)} onDislike={() => toggleDislike(reference.id)} />
-          ))}
-        </div>
+        {loadError && (
+          <div style={{fontSize:12.5,color:'var(--destructive)'}}>{loadError}</div>
+        )}
+
+        {references === null ? (
+          <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{minHeight:200,borderRadius:16,background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)'}} />
+            ))}
+          </div>
+        ) : references.length === 0 ? (
+          <div style={{
+            padding:'28px 20px',borderRadius:14,background:'var(--bg-sunken)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:13,color:'var(--fg-3)',textAlign:'center',
+          }}>
+            No references match that combination yet. Try another style or logo type.
+          </div>
+        ) : (
+          <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+            {references.map((reference) => (
+              <ALogoReferenceCard
+                key={reference.id}
+                reference={reference}
+                liked={likes.includes(reference.id)}
+                disliked={dislikes.includes(reference.id)}
+                onLike={() => toggleLike(reference.id)}
+                onDislike={() => toggleDislike(reference.id)}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </ALogoWizardLayout>
   );
