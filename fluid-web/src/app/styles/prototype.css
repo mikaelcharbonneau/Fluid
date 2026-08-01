@@ -276,6 +276,17 @@
     .logo-dock-copy { display: none; }
     .logo-wizard-dock button { margin-left: auto; }
     .logo-direction-grid { grid-template-columns: 1fr !important; }
+    .logo-style-card-with-preview { height: 276px !important; }
+    .logo-style-preview-layout {
+      grid-template-columns: 1fr !important;
+      grid-template-rows: 140px minmax(0, 1fr);
+      gap: 10px !important;
+    }
+    .logo-style-preview-copy {
+      padding: 0 5px 2px !important;
+      justify-content: flex-start !important;
+      gap: 6px !important;
+    }
     .logo-type-grid { grid-template-columns: 1fr !important; }
     .logo-references-grid { column-count: 1; }
     .logo-direction-toolbar { align-items: flex-start !important; flex-direction: column !important; }

@@ -1393,9 +1393,27 @@ const DirA_LogoBrief = () => {
 // wordmark, a mascot or an emblem, so the two steps never ask the same thing.
 // "Let Fluid choose" is handled by its own control, so it isn't a card here.
 const LOGO_STYLE_PLACEHOLDERS = [
-  { id: 'minimal',   label: 'Minimal',   blurb: 'Reduced to essentials. Space, restraint, nothing decorative.' },
-  { id: 'organic',   label: 'Organic',   blurb: 'Natural, flowing forms. Softened edges and living curves.' },
-  { id: 'futurist',  label: 'Futurist',  blurb: 'Forward-looking and engineered. Precision with an edge.' },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    description: 'Reduced to essentials. Space, restraint, nothing decorative.',
+    preview: __assets['logo-style-previews/minimal.png'],
+    previewBg: '#FBFAF7',
+  },
+  {
+    id: 'organic',
+    label: 'Organic',
+    description: 'Natural, flowing forms. Softened edges and living curves.',
+    preview: __assets['logo-style-previews/organic.png'],
+    previewBg: '#F4EFE3',
+  },
+  {
+    id: 'futurist',
+    label: 'Futurist',
+    description: 'Forward-looking and engineered. Precision with an edge.',
+    preview: __assets['logo-style-previews/futurist.png'],
+    previewBg: '#070B0F',
+  },
   { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
   { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
   { id: 'retro',     label: 'Retro',     blurb: 'Period reference. Warmth and nostalgia, deliberately dated.' },
@@ -1460,8 +1478,8 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
   );
 };
 
-// Standalone logo studio · Step 2 · Visual style. The cards are deliberately
-// neutral placeholders until the product's final visual-style set is defined.
+// Standalone logo studio · Step 2 · Visual style. Custom preview treatments
+// are introduced in reviewable groups while the remaining options stay neutral.
 const DirA_LogoDirection = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
@@ -1539,22 +1557,56 @@ const DirA_LogoDirection = () => {
                 type="button"
                 onClick={() => chooseStyle(style.id)}
                 aria-pressed={selected}
+                className={style.preview ? 'logo-style-card-with-preview' : undefined}
                 style={{
-                  minHeight:178,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  height:200,padding:style.preview ? 10 : 20,borderRadius:16,textAlign:'left',cursor:'pointer',
                   border:selected ? '2px solid #000' : '1px solid var(--line)',
                   background:selected ? '#fff' : 'var(--bg-elev)',
                   boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
-                  display:'flex',flexDirection:'column',justifyContent:'space-between',
-                  transition:'border-color .15s, box-shadow .15s, transform .15s',
+                  display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative',
+                  overflow:'hidden',transition:'border-color .15s, box-shadow .15s, transform .15s',
                 }}
               >
-                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000',letterSpacing:'-0.02em'}}>
-                  {style.label}
-                </span>
-                <span style={{fontSize:11.5,color:'var(--fg-3)',lineHeight:1.4}}>{style.blurb}</span>
+                {style.preview ? (
+                  <>
+                    <span style={{
+                      position:'absolute',top:13,left:16,fontFamily:'var(--font-mono)',fontSize:10.5,
+                      color:selected ? '#000' : 'var(--fg-4)',lineHeight:1,
+                    }}>{String(index + 1).padStart(2, '0')}</span>
+                    <div className="logo-style-preview-layout" style={{
+                      width:'100%',height:'100%',paddingTop:28,display:'grid',
+                      gridTemplateColumns:'minmax(0, 1.85fr) minmax(108px, .95fr)',gap:14,
+                    }}>
+                      <div className="logo-style-preview-image" style={{
+                        minWidth:0,minHeight:0,borderRadius:9,
+                        backgroundColor:style.previewBg,backgroundImage:`url("${style.preview}")`,
+                        backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',
+                        boxShadow:'inset 0 0 0 1px rgba(0,0,0,.10)',
+                      }}/>
+                      <div className="logo-style-preview-copy" style={{
+                        minWidth:0,padding:'4px 4px 4px 0',display:'flex',flexDirection:'column',
+                        alignItems:'flex-start',justifyContent:'center',gap:16,
+                      }}>
+                        <span style={{fontFamily:'var(--font-display)',fontSize:18,fontWeight:700,color:'#000',lineHeight:1.1}}>
+                          {style.label}
+                        </span>
+                        <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.45}}>
+                          {style.description}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000'}}>
+                      {style.label}
+                    </span>
+                    <span style={{fontSize:11.5,color:'var(--fg-3)',lineHeight:1.4}}>{style.blurb}</span>
+                  </>
+                )}
               </button>
             );
           })}
