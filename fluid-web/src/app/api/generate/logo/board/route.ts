@@ -287,8 +287,7 @@ export async function POST(request: Request) {
     await spendTokens(user.id, TOKEN_COST.asset);
 
     const board = [...prior, ...drawn];
-    const nextData = {
-      ...data,
+    const nextPatch = {
       creative_platform: platform,
       logo_board: board,
       logo_board_likes: priorLikes,
@@ -298,10 +297,7 @@ export async function POST(request: Request) {
         instructions: instructions || null,
       },
     };
-    const { error: saveError } = await supabase
-      .from("brands")
-      .update({ data: nextData })
-      .eq("id", brandId);
+    const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       console.error("Failed to save the sketch board:", saveError.message);
     }

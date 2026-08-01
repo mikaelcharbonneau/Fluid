@@ -140,10 +140,10 @@ export async function POST(request: Request) {
       // a retry doesn't pay for the whole search again. See the same guard in
       // /logo/research for why this ordering matters.
       if (research) {
-        const { error: cacheError } = await supabase
-          .from("brands")
-          .update({ data: { ...data, research } })
-          .eq("id", brandId);
+        const { error: cacheError } = await supabase.rpc("brands_merge_data", {
+          p_id: brandId,
+          p_patch: { research },
+        });
         if (cacheError) {
           console.error("Failed to cache research:", cacheError.message);
         }
@@ -231,8 +231,7 @@ export async function POST(request: Request) {
 
     // A reset board starts with a clean slate of likes; adding one more
     // concept to an existing board keeps whatever the client already liked.
-    const nextData = {
-      ...data,
+    const nextPatch = {
       ...(research ? { research } : {}),
       creative_platform: platform,
       // Persist the SELECTION, not the rotated pick — the next call needs the
@@ -242,10 +241,7 @@ export async function POST(request: Request) {
       logo_sketches: sketches,
       logo_sketch_likes: reset ? [] : likedIds,
     };
-    const { error: saveError } = await supabase
-      .from("brands")
-      .update({ data: nextData })
-      .eq("id", brandId);
+    const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       console.error("Failed to cache logo sketches:", saveError.message);
     }

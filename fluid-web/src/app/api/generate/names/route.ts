@@ -69,11 +69,12 @@ export async function POST(request: Request) {
   await spendTokens(user.id, TOKEN_COST.asset);
 
   // Cache onto the brand so resuming the wizard shows the same set.
-  const nextData = { ...(brand.data as Record<string, unknown>), names };
-  const { error: saveError } = await supabase
-    .from("brands")
-    .update({ data: nextData })
-    .eq("id", brandId);
+  // Only this route's own key, merged atomically — a full-blob write would
+  // discard whatever the client saved while this request was running.
+  const { error: saveError } = await supabase.rpc("brands_merge_data", {
+    p_id: brandId,
+    p_patch: { names },
+  });
   if (saveError) {
     // Non-fatal: the caller can still use the freshly generated names.
     console.error("Failed to cache generated names:", saveError.message);

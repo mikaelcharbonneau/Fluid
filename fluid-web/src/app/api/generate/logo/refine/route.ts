@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 import { getPlatform } from "@/lib/ai/platform";
 import type { LogoSketch } from "@/lib/ai/sketches";
-import { generateLogoFinalists } from "@/lib/ai/refine";
+import type { BoardSketch } from "@/lib/ai/sketch-board";
+import {
+  generateLogoFinalists,
+  type RefinableSketch,
+} from "@/lib/ai/refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { getLogoConfig } from "@/lib/logo-styles";
@@ -58,8 +62,19 @@ export async function POST(request: Request) {
 
   const data = (brand.data as Record<string, unknown>) ?? {};
   const platform = getPlatform(data);
-  const sketches = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
-  const liked = sketches.filter((s) => likedIds.includes(s.id));
+
+  // Concepts come from the board. `logo_sketches` is the older Phase-1 store,
+  // kept as a fallback so a brand part-way through that flow still refines —
+  // reading only it is what made this step unreachable for every board brand.
+  const board = (data.logo_board as BoardSketch[] | undefined) ?? [];
+  const legacy = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
+  const sketches: RefinableSketch[] = board.length ? board : legacy;
+
+  // Likes may arrive in the request or, when the client just wants to refine
+  // what is already marked, be read from the board's own stored likes.
+  const storedLikes = (data.logo_board_likes as string[] | undefined) ?? [];
+  const wanted = likedIds.length ? likedIds : storedLikes;
+  const liked = sketches.filter((s) => wanted.includes(s.id));
 
   if (!platform || sketches.length === 0) {
     return NextResponse.json(
@@ -69,7 +84,7 @@ export async function POST(request: Request) {
   }
   if (liked.length === 0) {
     return NextResponse.json(
-      { error: "Like at least one sketch to guide the refinement." },
+      { error: "Like at least one concept to guide the refinement." },
       { status: 400 },
     );
   }
@@ -97,7 +112,8 @@ export async function POST(request: Request) {
       name: chosenBrandName(brand),
       platform,
       liked,
-      styleContext: styleContext(brand),
+      // refine.ts prints the creative platform itself via platformLines().
+      styleContext: styleContext(brand, { omitPlatform: true }),
       config: getLogoConfig(data),
       paletteColors,
       clock,
@@ -108,10 +124,9 @@ export async function POST(request: Request) {
     // Persist the finalists, remember the likes that produced them, and mirror
     // into data.logos so the Brand Kit (Step 5), export, and brand cards keep
     // working unchanged.
-    const nextData = {
-      ...data,
+    const nextPatch = {
       logo_finalists: finalists,
-      logo_sketch_likes: likedIds,
+      logo_sketch_likes: wanted,
       logos: finalists.map((f) => ({
         name: f.name,
         descriptor: f.idea,
@@ -119,10 +134,7 @@ export async function POST(request: Request) {
         image_url: f.image_url,
       })),
     };
-    const { error: saveError } = await supabase
-      .from("brands")
-      .update({ data: nextData })
-      .eq("id", brandId);
+    const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       console.error("Failed to cache logo finalists:", saveError.message);
     }

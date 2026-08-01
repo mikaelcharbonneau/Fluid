@@ -104,10 +104,10 @@ export async function POST(request: Request) {
       // every retry re-ran (and re-paid for) the whole search from scratch and
       // never got any further. Persisting here is what makes a retry cheap.
       if (research) {
-        const { error: cacheError } = await supabase
-          .from("brands")
-          .update({ data: { ...data, research } })
-          .eq("id", brandId);
+        const { error: cacheError } = await supabase.rpc("brands_merge_data", {
+          p_id: brandId,
+          p_patch: { research },
+        });
         if (cacheError) {
           console.error("Failed to cache research:", cacheError.message);
         }
@@ -133,15 +133,11 @@ export async function POST(request: Request) {
       clock.lap("platform");
     }
 
-    const nextData = {
-      ...data,
+    const nextPatch = {
       ...(research ? { research } : {}),
       creative_platform: platform,
     };
-    const { error: saveError } = await supabase
-      .from("brands")
-      .update({ data: nextData })
-      .eq("id", brandId);
+    const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       // Not fatal — the client still gets the results for this run; they just
       // won't be cached, so the next run pays for them again.
