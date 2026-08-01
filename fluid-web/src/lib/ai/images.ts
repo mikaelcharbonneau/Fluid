@@ -14,6 +14,9 @@ const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const MODEL = "gpt-image-2";
 const BUCKET = "brand-assets";
 
+/** Exported so a prompt preview can report which model would receive it. */
+export const IMAGE_MODEL = MODEL;
+
 export interface RenderedImage {
   url: string; // public Supabase URL
   path: string; // storage path, for later deletion

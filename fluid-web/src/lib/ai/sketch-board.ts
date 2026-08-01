@@ -272,6 +272,22 @@ function buildUserPrompt(input: BoardBrief): string {
   return lines.filter(Boolean).join("\n");
 }
 
+// Exactly what generateSketchBoard would send, assembled without sending it.
+//
+// Prompt work is the substance of this feature and it is otherwise invisible:
+// the only way to judge whether a caption actually reached the designer, or
+// whether a slot's brief reads the way it was meant to, is to read the prompt.
+// Doing that by spending three tokens and waiting two minutes per look makes
+// iterating on wording prohibitively slow, so this returns the same strings the
+// real call would use and costs nothing.
+export function previewBoardPrompt(input: BoardBrief): {
+  system: string;
+  user: string;
+  model: string;
+} {
+  return { system: SYSTEM, user: buildUserPrompt(input), model: MODEL };
+}
+
 export interface ParsedConcept {
   slot: number | null;
   name: string;
