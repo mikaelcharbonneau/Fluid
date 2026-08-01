@@ -7,11 +7,7 @@ import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
-import {
-  readAxes,
-  type ReferenceTaste,
-  type LogoReferenceRow,
-} from "@/lib/logo-reference-query";
+import { loadReferenceTaste } from "@/lib/ai/reference-taste";
 import {
   type LogoConfig,
   markTypeById,
@@ -24,39 +20,6 @@ import {
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-// Step 4 records which catalogued references the client liked and disliked.
-// Look those rows up and reduce them to a taste signal for the generator.
-//
-// Best-effort: the reference gallery is an aid, so a failure here must not
-// stop a concept being drawn — it just means one less hint.
-async function loadReferenceTaste(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  data: Record<string, unknown>,
-): Promise<ReferenceTaste | null> {
-  const ids = (key: string) =>
-    Array.isArray(data[key]) ? (data[key] as unknown[]).filter((x): x is string => typeof x === "string") : [];
-  const likedPaths = ids("logo_reference_likes");
-  const dislikedPaths = ids("logo_reference_dislikes");
-  if (!likedPaths.length && !dislikedPaths.length) return null;
-
-  try {
-    const { data: rows } = await supabase
-      .from("logo_references")
-      .select("name, mark_type, image_path, attributes, industry, sort_order, aspect_ratio, refinement")
-      .in("image_path", [...likedPaths, ...dislikedPaths]);
-    const all = (rows ?? []) as LogoReferenceRow[];
-    if (!all.length) return null;
-
-    const taste = readAxes(
-      all.filter((r) => likedPaths.includes(r.image_path)),
-      all.filter((r) => dislikedPaths.includes(r.image_path)),
-    );
-    return taste.axes.length ? taste : null;
-  } catch {
-    return null;
-  }
-}
 
 // POST /api/generate/logo/sketches — Phase 1 of the logo studio: generate the
 // creative platform (once, cached) and ONE low-fidelity concept sketch. Body:
@@ -230,9 +193,9 @@ export async function POST(request: Request) {
     const prior = reset ? [] : priorAll;
     const liked = prior.filter((s) => likedIds.includes(s.id));
 
-    // Step 4 taste: what the client liked and disliked among real catalogued
-    // marks. Until now these were collected and dropped. Reduced to formal
-    // qualities rather than brand names — see summariseTaste.
+    // Step 4 taste: the refinement axes read off what the client liked and
+    // disliked among real catalogued marks. The marks themselves are never
+    // named to the model — only the positions their choices imply.
     const referenceTaste = await loadReferenceTaste(supabase, data);
 
     // Rotate through the selection based on how much of the board exists, so

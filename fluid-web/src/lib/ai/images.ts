@@ -46,14 +46,64 @@ export function logoImagePrompt(direction: string): string {
   ].join("\n");
 }
 
+// The divergence phase asks for the opposite of the above: a graphite croquis
+// on paper, not a finished flat mark. The client is choosing a DIRECTION, and a
+// polished render invites them to judge the execution — which does not exist
+// yet — instead of the idea.
+//
+// The tension to hold is "loose in the line, precise in the form". A sketch
+// that is genuinely rough is not a sketch, it is a broken mark: letterforms
+// still have to be spelled correctly and proportions still have to be
+// deliberate. Only the rendering is quick.
+export function pencilSketchPrompt(direction: string): string {
+  return [
+    `A designer's quick concept sketch of a logo, drawn by hand in a sketchbook.`,
+    `${direction.trim()}`,
+    ``,
+    `Rendering requirements — these are absolute:`,
+    `- GRAPHITE PENCIL on off-white paper. Visible pencil texture and paper`,
+    `  grain, slightly uneven line weight, the odd doubled or overshot stroke.`,
+    `- Monochrome graphite only — soft greys through to near-black. NO colour,`,
+    `  NO ink, NO marker, NO digital vector look, NO flat solid fills.`,
+    `- Drawn quickly and confidently, the way a designer thumbnails an idea.`,
+    `  Faint construction lines may stay visible. Solid areas are filled with`,
+    `  pencil shading or hatching, never a perfectly even tone.`,
+    `- The IDEA must still read unmistakably. Letterforms spelled correctly and`,
+    `  legible, proportions deliberate, shapes closed where they should close.`,
+    `  Loose in the line, precise in the form.`,
+    `- Plain off-white paper filling the frame. Nothing else.`,
+    `- The mark centered, occupying roughly 70% of the frame.`,
+    `- Viewed flat on. No desk, no hand, no pencil in shot, no cast shadow, no`,
+    `  torn or curled edges, no page border, no mockup, no scene.`,
+    `- No annotations, dimension lines, labels, captions, or signature.`,
+  ].join("\n");
+}
+
 // A render that hangs would otherwise stall until the whole function is killed
 // at maxDuration — taking the eight healthy concepts down with it. Capping each
 // request means a stuck one is dropped and the board still ships.
 const RENDER_TIMEOUT_MS = 120_000;
 
-// Generate one image. Returns raw PNG bytes.
-async function generatePng(prompt: string, quality: "low" | "medium" | "high"): Promise<Buffer> {
-  const res = await fetch(OPENAI_URL, {
+// A nine-up board fires nine renders at once, which is exactly the shape that
+// trips a per-minute image quota — and a 429 on three of nine would otherwise
+// hand the client a board with holes in it for no reason but timing. One
+// retry, backed off with jitter so the retries don't re-collide.
+//
+// Deliberately bounded at one: beyond that the caller is better served by a
+// short board now than a long wait for a full one, and the route has a
+// deadline of its own to respect.
+const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
+const RETRY_DELAY_MS = 4_000;
+
+function retryDelay(): number {
+  return RETRY_DELAY_MS + Math.floor(Math.random() * RETRY_DELAY_MS);
+}
+
+async function requestPng(
+  prompt: string,
+  quality: "low" | "medium" | "high",
+): Promise<Response> {
+  return fetch(OPENAI_URL, {
     method: "POST",
     signal: AbortSignal.timeout(RENDER_TIMEOUT_MS),
     headers: {
@@ -70,6 +120,15 @@ async function generatePng(prompt: string, quality: "low" | "medium" | "high"): 
       output_format: "png",
     }),
   });
+}
+
+// Generate one image. Returns raw PNG bytes.
+async function generatePng(prompt: string, quality: "low" | "medium" | "high"): Promise<Buffer> {
+  let res = await requestPng(prompt, quality);
+  if (!res.ok && RETRY_STATUSES.has(res.status)) {
+    await new Promise((resolve) => setTimeout(resolve, retryDelay()));
+    res = await requestPng(prompt, quality);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -109,17 +168,22 @@ export async function storeImage(
 
 // Render one logo concept and persist it. `slot` keeps paths unique and
 // human-readable: <brandId>/<phase>/<slot>.png
+//
+// `render` chooses the treatment: "vector" for a finished flat mark, "pencil"
+// for a divergence-phase croquis.
 export async function renderLogoImage(opts: {
   brandId: string;
   phase: string;
   slot: string;
   direction: string;
   quality?: "low" | "medium" | "high";
+  render?: "vector" | "pencil";
 }): Promise<RenderedImage> {
-  const bytes = await generatePng(
-    logoImagePrompt(opts.direction),
-    opts.quality ?? "medium",
-  );
+  const prompt =
+    opts.render === "pencil"
+      ? pencilSketchPrompt(opts.direction)
+      : logoImagePrompt(opts.direction);
+  const bytes = await generatePng(prompt, opts.quality ?? "medium");
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
 

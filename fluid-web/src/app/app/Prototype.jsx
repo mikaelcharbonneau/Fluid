@@ -9,6 +9,7 @@
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
+import { BOARD_SIZE, summariseBoardPlan } from "@/lib/logo-board";
 import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
@@ -2062,34 +2063,39 @@ const DirA_LogoSketches = () => {
   const requestTypes = aiChoosesType ? [AI_CHOICE] : chosenTypes;
   const briefReady = hasBrief && requestTypes.length > 0;
 
-  const [sketches, setSketches] = React.useState(data.logo_sketches || []);
-  const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
+  const [board, setBoard] = React.useState(data.logo_board || []);
+  const [likes, setLikes] = React.useState(data.logo_board_likes || []);
   const [loading, setLoading] = React.useState(false);
   const [stage, setStage] = React.useState('');
   const [error, setError] = React.useState('');
+  const [notice, setNotice] = React.useState('');
 
-  const persist = (nextSketches, nextLikes) => {
+  const persist = (nextBoard, nextLikes) => {
     setField('data', {
       ...((draft && draft.data) || {}),
-      logo_sketches: nextSketches,
-      logo_sketch_likes: nextLikes,
+      logo_board: nextBoard,
+      logo_board_likes: nextLikes,
     });
   };
 
-  // `fresh` starts a new board; otherwise the server appends one more concept
-  // and rotates to the next type/style in the selection.
+  // Exactly the plan the server will run — same function, same selections —
+  // so what the client is shown before spending can't drift from what arrives.
+  const plan = summariseBoardPlan(chosenStyles, requestTypes);
+
+  // `fresh` clears the board first; otherwise the nine new concepts are added
+  // to what's already pinned up.
   const draw = async ({ fresh = false } = {}) => {
     if (!brandId || loading || !briefReady) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setNotice('');
 
     // Research and the creative platform are their own request — both are
-    // cached on the brand, so this is a no-op after the first concept.
+    // cached on the brand, so this is a no-op after the first board.
     setStage('research');
     const pre = await apiResearchCategory(brandId);
     if (pre.error) console.warn('Research unavailable, drawing without it:', pre.error);
 
     setStage('draw');
-    const res = await apiGenerateLogoSketches(brandId, likes, {
+    const res = await apiGenerateLogoBoard(brandId, {
       mark_types: requestTypes,
       standalone_styles: chosenStyles,
       // The tagline is deliberately NOT sent as direction: Step 1 promises it
@@ -2100,9 +2106,14 @@ const DirA_LogoSketches = () => {
       setError(res.error);
     } else {
       const nextLikes = fresh ? [] : likes;
-      setSketches(res.sketches);
+      setBoard(res.board);
       setLikes(nextLikes);
-      persist(res.sketches, nextLikes);
+      persist(res.board, nextLikes);
+      // A render can fail on its own without taking the board down. Say so
+      // rather than letting the client count eight and wonder.
+      if (res.requested && res.drawn && res.drawn < res.requested) {
+        setNotice(`${res.drawn} of ${res.requested} sketches came back — a few renders didn’t finish. Draw nine more to fill the board out.`);
+      }
     }
     setStage('');
     setLoading(false);
@@ -2111,23 +2122,23 @@ const DirA_LogoSketches = () => {
   const toggleLike = (id) => {
     const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
     setLikes(next);
-    persist(sketches, next);
+    persist(board, next);
   };
 
   const toolBtn = {
     padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
     display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
   };
-  const busyLabel = stage === 'research' ? 'Studying the category…' : 'Drawing a concept…';
+  const busyLabel = stage === 'research' ? 'Studying the category…' : 'Sketching nine concepts…';
 
   return (
     <ALogoWizardLayout
       step={5}
       title="Explore concepts."
-      subtitle="Draw one concept at a time. Like the ones worth developing."
+      subtitle="Nine rough sketches at a time. Like the ones worth developing."
       dockCopy={likes.length
         ? `${likes.length} liked concept${likes.length === 1 ? '' : 's'} will carry into refinement.`
-        : 'Draw a concept, then like the ones worth developing.'}
+        : 'Sketch a board, then like the ones worth developing.'}
       nextLabel="Continue to refinement"
       onBack={() => navigate('logo-references')}
       onNext={() => { if (likes.length) makeToast('Refinement is the next step.'); }}
@@ -2137,7 +2148,7 @@ const DirA_LogoSketches = () => {
         <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
           <div>
             <div className="eyebrow" style={{color:'var(--fg-3)'}}>
-              Concepts{sketches.length ? ` · ${sketches.length} drawn` : ''}{likes.length ? ` · ${likes.length} liked` : ''}
+              Concepts{board.length ? ` · ${board.length} drawn` : ''}{likes.length ? ` · ${likes.length} liked` : ''}
             </div>
             <h3 id="logo-sketches-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
@@ -2145,7 +2156,7 @@ const DirA_LogoSketches = () => {
             }}>Build a board you actually like.</h3>
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {sketches.length > 0 && (
+            {board.length > 0 && (
               <button type="button" onClick={() => draw({ fresh: true })} disabled={loading || !briefReady}
                 style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
                   boxShadow:'inset 0 0 0 1px var(--line-strong)',
@@ -2157,26 +2168,35 @@ const DirA_LogoSketches = () => {
               style={{...toolBtn,background:'#0E0F12',color:'#fff',
                 cursor:loading || !briefReady ? 'default' : 'pointer',opacity:loading || !briefReady ? .5 : 1}}>
               <Sparkle size={12} color="#FDBA50"/>
-              {loading ? busyLabel : (sketches.length ? 'Draw another concept' : 'Draw the first concept')}
+              {loading ? busyLabel : (board.length ? `Sketch ${BOARD_SIZE} more` : `Sketch ${BOARD_SIZE} concepts`)}
             </button>
           </div>
         </div>
 
-        {/* What the concepts are being drawn from — visible so a surprising
-            result is traceable to the brief rather than mysterious. */}
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          <LogoReferenceContext
-            label="Type"
-            value={aiChoosesType
-              ? 'Fluid chooses'
-              : (chosenTypes.map((id) => (LOGO_TYPE_OPTIONS.find((t) => t.id === id) || {}).label).filter(Boolean).join(' · ') || 'None selected')}
-          />
-          <LogoReferenceContext
-            label="Style"
-            value={direction.mode === 'ai'
-              ? 'Fluid chooses'
-              : (chosenStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((s) => s.id === id) || {}).label).filter(Boolean).join(' · ') || 'None selected')}
-          />
+        {/* What the nine will be drawn from — visible so a surprising result is
+            traceable to the brief rather than mysterious. Each pairing is a
+            distinct direction: nothing on the board is a blend of two. */}
+        <div style={{
+          padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+          boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',
+          flexDirection:'column',gap:9,
+        }}>
+          <div style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.5}}>
+            Each press draws {BOARD_SIZE} sketches, split across your choices. Every
+            sketch sits in one style and one type — they’re separate directions to
+            compare, never blended together.
+          </div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {plan.map((p, i) => (
+              <span key={i} style={{
+                display:'inline-flex',alignItems:'center',gap:6,padding:'4px 9px',
+                borderRadius:99,background:'var(--bg-sunken)',fontSize:11,color:'var(--fg-2)',
+              }}>
+                <span style={{fontFamily:'var(--font-mono)',fontSize:10,color:'var(--fg-4)'}}>×{p.count}</span>
+                {p.styleName} · {p.typeName}
+              </span>
+            ))}
+          </div>
         </div>
 
         {!briefReady && (
@@ -2188,6 +2208,13 @@ const DirA_LogoSketches = () => {
               ? 'Choose at least one logo type before drawing concepts.'
               : 'Add a brand description in the brief before drawing concepts.'}
           </div>
+        )}
+
+        {notice && (
+          <div role="status" style={{
+            padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+          }}>{notice}</div>
         )}
 
         {error && (
@@ -2204,7 +2231,7 @@ const DirA_LogoSketches = () => {
           </div>
         )}
 
-        {sketches.length === 0 && !loading && briefReady && !error && (
+        {board.length === 0 && !loading && briefReady && !error && (
           <div style={{
             padding:'48px 24px',textAlign:'center',borderRadius:16,
             background:'var(--bg-elev)',boxShadow:'inset 0 0 0 1px var(--line)',
@@ -2212,30 +2239,35 @@ const DirA_LogoSketches = () => {
             <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:16,color:'#000'}}>
               Nothing drawn yet.
             </div>
-            <div style={{fontSize:12.5,color:'var(--fg-3)',marginTop:6,lineHeight:1.5,maxWidth:420,margin:'6px auto 0'}}>
-              Each concept is drawn on its own, so you only spend tokens on the
-              ones you ask for — stop as soon as a direction feels right.
+            <div style={{fontSize:12.5,color:'var(--fg-3)',marginTop:6,lineHeight:1.5,maxWidth:440,margin:'6px auto 0'}}>
+              These are rough pencil sketches, not finished logos — you’re choosing
+              an idea to develop, so don’t judge the drawing. Sketch a board, like
+              what interests you, and press again for nine more if nothing lands.
             </div>
           </div>
         )}
 
-        {(sketches.length > 0 || loading) && (
+        {(board.length > 0 || loading) && (
           <div className="home-grid-3" style={{display:'grid',gap:12}}>
-            {sketches.map((s) => (
+            {board.map((s) => (
               <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
             ))}
-            {loading && (
-              <div style={{
+            {loading && Array.from({ length: BOARD_SIZE }).map((_, i) => (
+              <div key={`pending-${i}`} style={{
                 background:'var(--bg-elev)',borderRadius:16,minHeight:196,
                 boxShadow:'inset 0 0 0 1px var(--line)',
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
-                  <Thinking/>
-                  <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>{busyLabel}</span>
-                </div>
+                {/* One spinner for the set, not nine — nine spinners read as
+                    nine separate waits when it is really one. */}
+                {i === 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>{busyLabel}</span>
+                  </div>
+                ) : null}
               </div>
-            )}
+            ))}
           </div>
         )}
       </section>
@@ -3599,9 +3631,12 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>
         <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{sketch.name}</div>
+        {/* Board sketches lead with the style world they were drawn in, since
+            that is what distinguishes one part of the board from another. The
+            main wizard's sketches have no world, and lead with the territory. */}
         <div style={{display:'flex', alignItems:'center', gap:6, marginTop:4, flexWrap:'wrap'}}>
-          <span style={{fontSize:9.5, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'2px 7px', borderRadius:99}}>{sketch.territory_name || sketch.territory}</span>
-          <span style={{fontSize:9.5, fontFamily:'var(--font-mono)', letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-4)'}}>{sketch.mark_type}</span>
+          <span style={{fontSize:9.5, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'2px 7px', borderRadius:99}}>{sketch.style_name || sketch.territory_name || sketch.territory}</span>
+          <span style={{fontSize:9.5, fontFamily:'var(--font-mono)', letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-4)'}}>{sketch.mark_type_name || sketch.mark_type}</span>
         </div>
       </div>
       <button onClick={onLike} aria-label={(liked ? 'Unlike ' : 'Like ') + sketch.name} style={{
@@ -7735,6 +7770,22 @@ async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
     return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
   } catch { return { error: 'Network error.' }; }
 }
+// Standalone logo flow · divergence — nine pencil croquis in one press,
+// distributed across the style × type pairings the client chose. Presses
+// append, so a board grows; `fresh` starts a new one.
+async function apiGenerateLogoBoard(brandId, config, fresh) {
+  try {
+    const r = await fetch('/api/generate/logo/board', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, config: config || {}, reset: !!fresh }),
+    });
+    const j = await r.json().catch(() => ({}));
+    signalBalanceChanged(j.code);
+    if (!r.ok) return { error: describeFailure(r, j, 'Sketching the board failed.'), code: j.code };
+    return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0 };
+  } catch { return { error: 'Network error.' }; }
+}
+
 // Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.
 async function apiRefineLogoSketches(brandId, likedIds) {
   try {
