@@ -8,11 +8,64 @@ import { loadReferenceTaste } from "@/lib/ai/reference-taste";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
-import { planBoard, BOARD_SIZE } from "@/lib/logo-board";
+import {
+  planBoard,
+  BOARD_SIZE,
+  MAX_REFERENCE_LIKES,
+  type LikedReference,
+} from "@/lib/logo-board";
+import { readCaption } from "@/lib/ai/caption-reference";
 import { normalizeMarkTypes, normalizeStandaloneStyles } from "@/lib/logo-styles";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+// The references the client liked in Step 4, as design briefs.
+//
+// Order is the client's own like order, and it is load-bearing: planBoard deals
+// references round-robin across the nine slots, so the first-liked reference
+// gets the first slot. Preserving it makes the board reproducible from the
+// client's point of view rather than shuffled by whatever order Postgres
+// returns rows in.
+//
+// Uncaptioned references are dropped rather than passed empty. Every liked
+// reference is promised a sketch, but a reference with no caption has nothing
+// to say — it would claim a slot and brief it with silence.
+async function loadLikedReferences(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  data: Record<string, unknown>,
+): Promise<LikedReference[]> {
+  const likedPaths = Array.isArray(data.logo_reference_likes)
+    ? (data.logo_reference_likes as unknown[])
+        .filter((x): x is string => typeof x === "string")
+        .slice(0, MAX_REFERENCE_LIKES)
+    : [];
+  if (!likedPaths.length) return [];
+
+  try {
+    const { data: rows } = await supabase
+      .from("logo_references")
+      .select("image_path, caption")
+      .in("image_path", likedPaths);
+
+    const byPath = new Map(
+      ((rows ?? []) as { image_path: string; caption: unknown }[]).map((r) => [
+        r.image_path,
+        r.caption,
+      ]),
+    );
+    const out: LikedReference[] = [];
+    for (const imagePath of likedPaths) {
+      const caption = readCaption(byPath.get(imagePath));
+      if (caption) out.push({ imagePath, caption });
+    }
+    return out;
+  } catch {
+    // The gallery is an aid. Losing it costs the board its briefs, not its
+    // existence.
+    return [];
+  }
+}
 
 // POST /api/generate/logo/board — the standalone logo flow's divergence step.
 //
@@ -115,8 +168,14 @@ export async function POST(request: Request) {
     const prior = reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
     const priorLikes = reset ? [] : ((data.logo_board_likes as string[] | undefined) ?? []);
 
-    const referenceTaste = await loadReferenceTaste(supabase, data);
-    const slots = planBoard(standaloneStyles, markTypes, BOARD_SIZE);
+    // Two readings of the same Step 4 picks, doing different jobs. The axes
+    // tune HOW every mark is drawn; the captions brief WHAT thinking each
+    // individual concept answers. They are complementary, not competing.
+    const [referenceTaste, likedReferences] = await Promise.all([
+      loadReferenceTaste(supabase, data),
+      loadLikedReferences(supabase, data),
+    ]);
+    const slots = planBoard(standaloneStyles, markTypes, likedReferences, BOARD_SIZE);
 
     clock.guard("draw the board", 200_000);
     const drawn = await generateSketchBoard({
@@ -163,6 +222,10 @@ export async function POST(request: Request) {
       board,
       drawn: drawn.length,
       requested: slots.length,
+      // How many of the client's likes actually briefed a concept. Below the
+      // number they liked means some of their picks aren't captioned yet, and
+      // the screen says so rather than quietly ignoring them.
+      briefed: likedReferences.length,
       research,
     });
   } catch (err) {

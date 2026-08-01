@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tagReferenceImage } from "@/lib/ai/tag-reference";
+import { captionReferenceImage } from "@/lib/ai/caption-reference";
 import { referenceImageUrl } from "@/lib/logo-reference-query";
 import { aspectRatioFrom } from "@/lib/image-size";
 
@@ -11,10 +12,16 @@ export const maxDuration = 300;
 const DEFAULT_BATCH = 10;
 const MAX_BATCH = 40;
 
-// POST /api/logo-references/tag — catalogue images that are in the storage
-// bucket but have no row yet.
+// POST /api/logo-references/tag — catalogue the reference library.
 //
-// Body: { limit?: number, dryRun?: boolean, prefix?: string }
+// Two modes:
+//   "new"     (default) images in the storage bucket with no row yet. Tags and
+//             captions them in one pass, so anything added from here on
+//             arrives complete.
+//   "caption" rows that predate captioning. Backfill only — attributes and
+//             refinement are left exactly as they are.
+//
+// Body: { mode?: "new" | "caption", limit?: number, dryRun?: boolean, prefix?: string }
 // Header: x-tagging-secret must match LOGO_TAGGING_SECRET.
 //
 // Gated on a shared secret as well as a session. Any signed-in user could
@@ -41,8 +48,9 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as {
-    limit?: unknown; dryRun?: unknown; prefix?: unknown;
+    mode?: unknown; limit?: unknown; dryRun?: unknown; prefix?: unknown;
   };
+  const mode = body.mode === "caption" ? "caption" : "new";
   const requested = Number(body.limit);
   const limit = Math.min(
     Math.max(Number.isFinite(requested) && requested > 0 ? requested : DEFAULT_BATCH, 1),
@@ -53,6 +61,17 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  return mode === "caption"
+    ? captionExisting(admin, { limit, dryRun, prefix })
+    : tagNew(admin, { limit, dryRun, prefix });
+}
+
+type Admin = ReturnType<typeof createAdminClient>;
+interface BatchOptions { limit: number; dryRun: boolean; prefix: string }
+
+// Mode "new" — bucket objects with no row yet. Tagged AND captioned in one
+// pass so nothing added from here on needs a backfill later.
+async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
   // Which bucket objects have no row yet. Done in SQL rather than by listing
   // the bucket so it stays a single query as the library grows.
   const { data: pending, error: pendingError } = await admin.rpc(
@@ -65,10 +84,13 @@ export async function POST(request: Request) {
 
   const paths = ((pending ?? []) as { image_path: string }[]).map((r) => r.image_path);
   if (!paths.length) {
-    return NextResponse.json({ tagged: 0, failed: 0, remaining: 0, results: [] });
+    return NextResponse.json({ mode: "new", tagged: 0, failed: 0, remaining: 0, results: [] });
   }
 
-  const results: { path: string; ok: boolean; name?: string; markType?: string; reason?: string }[] = [];
+  const results: {
+    path: string; ok: boolean; name?: string; markType?: string;
+    device?: string | null; reason?: string;
+  }[] = [];
 
   for (const path of paths) {
     const url = referenceImageUrl(path);
@@ -83,9 +105,13 @@ export async function POST(request: Request) {
 
       const tagged = await tagReferenceImage(url);
       if (!tagged) {
-        results.push({ path, ok: false, reason: "unusable response" });
+        results.push({ path, ok: false, reason: "unusable tag response" });
         continue;
       }
+
+      // A failed caption doesn't sink the row — it lands in the backfill queue
+      // like any pre-caption row, and the mark still works in the gallery.
+      const caption = await captionReferenceImage(url).catch(() => null);
 
       if (!dryRun) {
         const { error } = await admin.from("logo_references").insert({
@@ -99,6 +125,7 @@ export async function POST(request: Request) {
           // than half-filled, so it shows up as untagged instead of as a
           // confident "quiet, calm, cool, simple".
           refinement: tagged.refinement,
+          caption,
           notes: "auto-catalogued",
           is_active: true,
           sort_order: 0,
@@ -108,7 +135,10 @@ export async function POST(request: Request) {
           continue;
         }
       }
-      results.push({ path, ok: true, name: tagged.name, markType: tagged.markType });
+      results.push({
+        path, ok: true, name: tagged.name, markType: tagged.markType,
+        device: caption?.device ?? null,
+      });
     } catch (err) {
       results.push({
         path,
@@ -121,10 +151,92 @@ export async function POST(request: Request) {
   const { data: left } = await admin.rpc("logo_references_untagged_count", { p_prefix: prefix });
 
   return NextResponse.json({
+    mode: "new",
     dryRun,
     tagged: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
     remaining: typeof left === "number" ? left : null,
+    results,
+  });
+}
+
+// Mode "caption" — backfill rows that predate captioning. Touches only the
+// caption column; attributes, refinement and everything hand-corrected stay.
+async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
+  let query = admin
+    .from("logo_references")
+    .select("image_path")
+    .is("caption", null)
+    .eq("is_active", true)
+    .order("sort_order")
+    .limit(limit);
+  if (prefix) query = query.like("image_path", `${prefix}%`);
+
+  const { data: pending, error: pendingError } = await query;
+  if (pendingError) {
+    return NextResponse.json({ error: pendingError.message }, { status: 500 });
+  }
+
+  const paths = ((pending ?? []) as { image_path: string }[]).map((r) => r.image_path);
+  if (!paths.length) {
+    return NextResponse.json({ mode: "caption", captioned: 0, failed: 0, remaining: 0, results: [] });
+  }
+
+  const results: {
+    path: string; ok: boolean; device?: string | null;
+    technique?: string; concept?: string | null; reason?: string;
+  }[] = [];
+
+  for (const path of paths) {
+    try {
+      const caption = await captionReferenceImage(referenceImageUrl(path));
+      if (!caption) {
+        results.push({ path, ok: false, reason: "unusable caption response" });
+        continue;
+      }
+      if (!dryRun) {
+        const { error } = await admin
+          .from("logo_references")
+          .update({ caption, updated_at: new Date().toISOString() })
+          .eq("image_path", path);
+        if (error) {
+          results.push({ path, ok: false, reason: error.message });
+          continue;
+        }
+      }
+      // The full caption comes back on every row, because the only way to know
+      // whether a batch held its altitude is to read it.
+      results.push({
+        path, ok: true,
+        technique: caption.technique,
+        device: caption.device,
+        concept: caption.concept,
+      });
+    } catch (err) {
+      results.push({
+        path,
+        ok: false,
+        reason: err instanceof Error ? err.message.slice(0, 140) : "failed",
+      });
+    }
+  }
+
+  let remainingQuery = admin
+    .from("logo_references")
+    .select("image_path", { count: "exact", head: true })
+    .is("caption", null)
+    .eq("is_active", true);
+  if (prefix) remainingQuery = remainingQuery.like("image_path", `${prefix}%`);
+  const { count } = await remainingQuery;
+
+  return NextResponse.json({
+    mode: "caption",
+    dryRun,
+    captioned: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    // A dry run changes nothing, so the queue is unchanged too — say the
+    // number that will still be waiting rather than implying progress.
+    remaining: typeof count === "number" ? count : null,
     results,
   });
 }
