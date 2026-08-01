@@ -52,10 +52,14 @@ export interface SketchBrief {
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
   likedSketches?: LogoSketch[] | null; // bias regeneration toward these
-  // What the client liked and disliked in the Step 4 reference gallery,
-  // reduced to formal qualities (see summariseTaste — the marks themselves are
-  // real third-party logos and are deliberately never named to the model).
-  referenceTaste?: { prefer: string[]; avoid: string[] } | null;
+  // Refinement read off the Step 4 gallery: liking a reference votes for its
+  // position on each axis, so these are the slider values the client never had
+  // to set. Only axes their picks actually agreed on are present. The marks
+  // themselves are real third-party logos and are deliberately never named to
+  // the model.
+  referenceTaste?: {
+    axes: { axis: string; value: number; label: string; note: string }[];
+  } | null;
   avoidNames?: string[] | null; // previously shown concepts — don't repeat
   clock?: Clock | null; // phase timing, so the slow step shows up in the logs
 }
@@ -144,21 +148,24 @@ function buildUserPrompt(
       ),
     );
   }
-  // Taste demonstrated on real marks in the reference gallery. Expressed as
-  // qualities, never as the brands themselves, so this informs the drawing
-  // without inviting imitation of an existing logo.
+  // Refinement inferred from the reference gallery. Word AND number: the word
+  // is what the drawing has to answer to, the number gives it a degree.
+  //
+  // Axes the client's picks disagreed on are absent by design — silence means
+  // "no view", and must not be read as "balanced".
   const taste = input.referenceTaste;
-  if (taste && (taste.prefer.length || taste.avoid.length)) {
-    lines.push(``, `Browsing real logos, the client showed a consistent taste:`);
-    if (taste.prefer.length) {
-      lines.push(`- Drawn to marks that are: ${taste.prefer.join(", ")}.`);
-    }
-    if (taste.avoid.length) {
-      lines.push(`- Rejected marks that are: ${taste.avoid.join(", ")}.`);
-    }
+  if (taste && taste.axes.length) {
     lines.push(
-      `Let this steer the execution — it is evidence of taste, not a brief.`,
-      `The strategy still decides WHAT to draw; this shapes HOW it is drawn.`,
+      ``,
+      `Liking and rejecting real marks, the client landed here — these are the`,
+      `refinement dials they set by choosing, without being asked directly:`,
+      ...taste.axes.map(
+        (a) => `- ${a.axis}: ${a.label} (${a.value.toFixed(2)}) — ${a.note}.`,
+      ),
+      `Hold these across every concept. They tune HOW the mark is drawn; the`,
+      `strategy still decides WHAT it is, and the chosen style world still sets`,
+      `the frame. Any axis not listed is one they showed no preference on —`,
+      `treat it as free, not as neutral.`,
     );
   }
   const avoid = (input.avoidNames ?? []).filter(Boolean);

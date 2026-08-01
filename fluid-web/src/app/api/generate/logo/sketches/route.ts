@@ -8,7 +8,7 @@ import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
 import {
-  summariseTaste,
+  readAxes,
   type ReferenceTaste,
   type LogoReferenceRow,
 } from "@/lib/logo-reference-query";
@@ -43,16 +43,16 @@ async function loadReferenceTaste(
   try {
     const { data: rows } = await supabase
       .from("logo_references")
-      .select("name, mark_type, image_path, attributes, industry, sort_order, aspect_ratio")
+      .select("name, mark_type, image_path, attributes, industry, sort_order, aspect_ratio, refinement")
       .in("image_path", [...likedPaths, ...dislikedPaths]);
     const all = (rows ?? []) as LogoReferenceRow[];
     if (!all.length) return null;
 
-    const taste = summariseTaste(
+    const taste = readAxes(
       all.filter((r) => likedPaths.includes(r.image_path)),
       all.filter((r) => dislikedPaths.includes(r.image_path)),
     );
-    return taste.prefer.length || taste.avoid.length ? taste : null;
+    return taste.axes.length ? taste : null;
   } catch {
     return null;
   }
