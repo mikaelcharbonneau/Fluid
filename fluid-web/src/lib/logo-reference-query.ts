@@ -71,6 +71,52 @@ export function referenceImageUrl(imagePath: string): string {
   return `${SUPABASE_URL}/storage/v1/object/public/logo-references/${encoded}`;
 }
 
+export interface ReferenceTaste {
+  /** Qualities the client's likes converge on. */
+  prefer: string[];
+  /** Qualities their dislikes converge on, and their likes don't. */
+  avoid: string[];
+}
+
+// Turn Step 4's likes and dislikes into a taste signal the generators can use.
+//
+// Deliberately reduced to ATTRIBUTES rather than brand names. The references
+// are real third-party marks; naming them in a generation prompt ("the client
+// liked Kodak") invites imitation of a trademarked logo. The formal qualities
+// carry the same signal — what the client is drawn to — with none of that risk.
+//
+// An attribute the client both liked and disliked carries no signal, so it is
+// dropped from both lists rather than pulling in two directions at once.
+export function summariseTaste(
+  liked: readonly LogoReferenceRow[],
+  disliked: readonly LogoReferenceRow[],
+  limit = 6,
+): ReferenceTaste {
+  const tally = (rows: readonly LogoReferenceRow[]) => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      for (const attr of row.attributes ?? []) {
+        counts.set(attr, (counts.get(attr) ?? 0) + 1);
+      }
+    }
+    return counts;
+  };
+  const likedCounts = tally(liked);
+  const dislikedCounts = tally(disliked);
+
+  const rank = (counts: Map<string, number>, opposing: Map<string, number>) =>
+    [...counts.entries()]
+      .filter(([attr]) => !opposing.has(attr))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, limit)
+      .map(([attr]) => attr);
+
+  return {
+    prefer: rank(likedCounts, dislikedCounts),
+    avoid: rank(dislikedCounts, likedCounts),
+  };
+}
+
 // Rank rows against the chosen direction. Rows sharing more attributes with
 // the selection come first; ties keep the catalogue's own ordering so the
 // gallery is stable between visits.
