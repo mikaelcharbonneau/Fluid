@@ -41,12 +41,24 @@ export interface LogoFinalist {
   vector_url?: string;
 }
 
+/**
+ * A sketch that can be developed into a finalist.
+ *
+ * Board concepts carry the style world they were drawn in; the older Phase-1
+ * sketches do not. Optional rather than required so both flows fit, and so a
+ * brand part-way through the old flow still refines.
+ */
+export type RefinableSketch = LogoSketch & {
+  style_id?: string | null;
+  style_name?: string | null;
+};
+
 export interface RefineBrief {
   brandId: string;
   brief: string;
   name?: string | null;
   platform: CreativePlatform;
-  liked: LogoSketch[]; // ≥1
+  liked: RefinableSketch[]; // ≥1
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
   paletteColors?: string[] | null; // brand hexes for the finished marks
@@ -115,18 +127,30 @@ function commonContext(input: RefineBrief): string[] {
   return lines.filter((l) => l !== null && l !== undefined);
 }
 
-function tasteProfile(liked: LogoSketch[]): string[] {
+function tasteProfile(liked: RefinableSketch[]): string[] {
   return [
     ``,
     `The client's chosen directions (their demonstrated taste):`,
     ...liked.map(
       (s) =>
-        `- "${s.name}" [${s.territory_name} / ${s.mark_type}; ${s.attributes.join(", ")}]: ${s.idea}`,
+        `- "${s.name}" [${[s.style_name, s.territory_name, s.mark_type]
+          .filter(Boolean)
+          .join(" / ")}; ${s.attributes.join(", ")}]: ${s.idea}`,
     ),
   ];
 }
 
-function buildRefinePrompt(input: RefineBrief, chunk: LogoSketch[]): string {
+// The style worlds the client actually picked from, in the order they appear.
+function likedStyles(liked: RefinableSketch[]): string[] {
+  const seen: string[] = [];
+  for (const s of liked) {
+    const name = (s.style_name ?? "").trim();
+    if (name && !seen.includes(name)) seen.push(name);
+  }
+  return seen;
+}
+
+function buildRefinePrompt(input: RefineBrief, chunk: RefinableSketch[]): string {
   const lines = [
     ...commonContext(input),
     ...tasteProfile(input.liked),
@@ -136,8 +160,22 @@ function buildRefinePrompt(input: RefineBrief, chunk: LogoSketch[]): string {
     `idea — this is a refinement, not a re-invention. Apply proper`,
     `construction, optical correction, and the brand colors.`,
     ``,
+    // A concept was chosen from a board where every sketch sat in one named
+    // style world, so the world is part of what the client picked. Polishing a
+    // brutalist mark into a refined one answers a brief they did not give.
+    `Each concept below names the STYLE WORLD it was drawn in. Finish it inside`,
+    `that world. Construction quality goes up; the world does not move — a`,
+    `brutalist mark becomes a better brutalist mark, blunt and heavy, not a`,
+    `smoothed one. "Finished" means resolved, not polite.`,
+    ``,
     ...chunk.flatMap((s) => [
-      `CONCEPT "${s.name}" (${s.mark_type}; territory: ${s.territory_name}) — ${s.idea}`,
+      `CONCEPT "${s.name}" (${[
+        s.style_name ? `style world: ${s.style_name}` : "",
+        s.mark_type,
+        `territory: ${s.territory_name}`,
+      ]
+        .filter(Boolean)
+        .join("; ")}) — ${s.idea}`,
       `Its art direction: ${s.art}`,
       ``,
     ]),
@@ -148,6 +186,7 @@ function buildRefinePrompt(input: RefineBrief, chunk: LogoSketch[]): string {
 }
 
 function buildExpandPrompt(input: RefineBrief, count: number): string {
+  const styles = likedStyles(input.liked);
   const lines = [
     ...commonContext(input),
     ...tasteProfile(input.liked),
@@ -155,9 +194,19 @@ function buildExpandPrompt(input: RefineBrief, count: number): string {
     `YOUR TASK: design ${count} NEW finished marks that EXTEND the client's`,
     `demonstrated taste — same territories and formal qualities, genuinely new`,
     `ideas (not variations of the approved sketches). Set REFINES: NEW.`,
-    ``,
-    `Produce ${count} marks in the required format.`,
   ];
+  // New marks belong in the worlds the client chose from, not in a fourth one
+  // they never saw. Without this the expansion drifts toward a house style and
+  // the finished set reads as less varied than the board it came from.
+  if (styles.length) {
+    lines.push(
+      ``,
+      `Every new mark must sit in one of the style worlds the client chose`,
+      `from: ${styles.join(", ")}. Spread them across those worlds rather than`,
+      `settling into whichever is easiest to draw.`,
+    );
+  }
+  lines.push(``, `Produce ${count} marks in the required format.`);
   return lines.join("\n");
 }
 

@@ -86,8 +86,7 @@ export async function POST(request: Request) {
     const nextFinalists = finalists.map((f) =>
       f.id === conceptId ? { ...f, svg, vector_url: url } : f,
     );
-    const nextData = {
-      ...data,
+    const nextPatch = {
       logo_finalists: nextFinalists,
       logos: nextFinalists.map((f) => ({
         name: f.name,
@@ -96,10 +95,7 @@ export async function POST(request: Request) {
         image_url: f.image_url ?? null,
       })),
     };
-    const { error: saveError } = await supabase
-      .from("brands")
-      .update({ data: nextData })
-      .eq("id", brandId);
+    const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       console.error("Failed to cache vectorized logo:", saveError.message);
     }
