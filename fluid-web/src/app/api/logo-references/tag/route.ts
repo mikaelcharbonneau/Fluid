@@ -69,6 +69,19 @@ export async function POST(request: Request) {
 type Admin = ReturnType<typeof createAdminClient>;
 interface BatchOptions { limit: number; dryRun: boolean; prefix: string }
 
+// Is the bucket object actually there? HEAD, so a large image costs nothing to
+// check. A network failure answers "yes" deliberately: the caption call that
+// follows will fail too, and a transient blip must not be mistaken for a
+// deleted file and cost the row its is_active flag.
+async function objectExists(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    return res.status !== 404 && res.status !== 400;
+  } catch {
+    return true;
+  }
+}
+
 // Mode "new" — bucket objects with no row yet. Tagged AND captioned in one
 // pass so nothing added from here on needs a backfill later.
 async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
@@ -189,7 +202,34 @@ async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOpt
 
   for (const path of paths) {
     try {
-      const caption = await captionReferenceImage(referenceImageUrl(path));
+      const url = referenceImageUrl(path);
+
+      // Check the object is actually there before spending a vision call on
+      // it. A row whose file has been renamed or deleted would otherwise fail
+      // every batch forever: the queue is "caption is null ORDER BY
+      // sort_order", so the same dead rows return to the front of every run and
+      // the backfill never drains past them.
+      //
+      // Such a row is also a broken image in the Step 4 gallery, which filters
+      // on is_active alone — so it is deactivated here rather than merely
+      // skipped. Reversible, and `notes` records why, so re-uploading the file
+      // and flipping is_active back is a two-line fix.
+      if (!(await objectExists(url))) {
+        if (!dryRun) {
+          await admin
+            .from("logo_references")
+            .update({
+              is_active: false,
+              notes: `deactivated ${new Date().toISOString().slice(0, 10)}: image missing from storage`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("image_path", path);
+        }
+        results.push({ path, ok: false, reason: "image missing from storage — row deactivated" });
+        continue;
+      }
+
+      const caption = await captionReferenceImage(url);
       if (!caption) {
         results.push({ path, ok: false, reason: "unusable caption response" });
         continue;
