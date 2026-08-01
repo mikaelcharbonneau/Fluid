@@ -1394,7 +1394,12 @@ const DirA_LogoBrief = () => {
 // "Let Fluid choose" is handled by its own control, so it isn't a card here.
 const LOGO_STYLE_PLACEHOLDERS = [
   { id: 'minimal',   label: 'Minimal',   blurb: 'Reduced to essentials. Space, restraint, nothing decorative.' },
-  { id: 'organic',   label: 'Organic',   blurb: 'Natural, flowing forms. Softened edges and living curves.' },
+  {
+    id: 'organic',
+    label: 'Organic',
+    description: 'Soft forms, tactile color, natural rhythm.',
+    preview: __assets['logo-style-previews/organic.png'],
+  },
   { id: 'futurist',  label: 'Futurist',  blurb: 'Forward-looking and engineered. Precision with an edge.' },
   { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
   { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
@@ -1460,8 +1465,8 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
   );
 };
 
-// Standalone logo studio · Step 2 · Visual style. The cards are deliberately
-// neutral placeholders until the product's final visual-style set is defined.
+// Standalone logo studio · Step 2 · Visual style. Preview treatments are being
+// introduced one direction at a time while the remaining options stay neutral.
 const DirA_LogoDirection = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
@@ -1540,21 +1545,49 @@ const DirA_LogoDirection = () => {
                 onClick={() => chooseStyle(style.id)}
                 aria-pressed={selected}
                 style={{
-                  minHeight:178,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  height:238,padding:style.preview ? 0 : 20,borderRadius:16,textAlign:'left',cursor:'pointer',
                   border:selected ? '2px solid #000' : '1px solid var(--line)',
                   background:selected ? '#fff' : 'var(--bg-elev)',
                   boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
                   display:'flex',flexDirection:'column',justifyContent:'space-between',
-                  transition:'border-color .15s, box-shadow .15s, transform .15s',
+                  overflow:'hidden',transition:'border-color .15s, box-shadow .15s, transform .15s',
                 }}
               >
-                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000',letterSpacing:'-0.02em'}}>
-                  {style.label}
-                </span>
-                <span style={{fontSize:11.5,color:'var(--fg-3)',lineHeight:1.4}}>{style.blurb}</span>
+                {style.preview ? (
+                  <>
+                    <div style={{
+                      width:'100%',flex:1,minHeight:0,position:'relative',
+                      backgroundImage:`url("${style.preview}")`,backgroundSize:'cover',backgroundPosition:'center',
+                    }}>
+                      <span style={{
+                        position:'absolute',top:12,left:12,padding:'5px 7px',borderRadius:6,
+                        background:'rgba(255,255,255,.88)',backdropFilter:'blur(8px)',
+                        fontFamily:'var(--font-mono)',fontSize:10.5,color:'#111',lineHeight:1,
+                      }}>{String(index + 1).padStart(2, '0')}</span>
+                    </div>
+                    <div style={{
+                      width:'100%',padding:'13px 15px 14px',background:'#fff',
+                      display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,
+                    }}>
+                      <span style={{fontFamily:'var(--font-display)',fontSize:18,fontWeight:700,color:'#000',lineHeight:1.1}}>
+                        {style.label}
+                      </span>
+                      <span style={{maxWidth:132,fontSize:10.5,color:'var(--fg-3)',lineHeight:1.3,textAlign:'right'}}>
+                        {style.description}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000'}}>
+                      {style.label}
+                    </span>
+                    <span style={{fontSize:11.5,color:'var(--fg-3)',lineHeight:1.4}}>{style.blurb}</span>
+                  </>
+                )}
               </button>
             );
           })}
