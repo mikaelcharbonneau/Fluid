@@ -72,10 +72,18 @@ weight, contrast, spatial system. One or two sentences.
 
 DEVICE: the single ownable move that makes this mark itself, stated as a class
 of move a designer could apply to an unrelated brand. One sentence.
+
+It must be about the mark's DOMINANT element — the thing you would name first
+if describing the logo to someone over the phone. A real but incidental detail
+is not the device: if the mark is carried by a character and you write about
+the spacing of a dot in the wordmark beside it, the caption is wrong even
+though the observation is true.
+
 Write NONE if the mark has no device — if its interest lies entirely in
 execution rather than in an idea. Many perfectly good marks have no device, and
 a competent mark honestly labelled NONE is far more useful to us than an
-invented one. Do not reach.
+invented one. Reaching for a minor detail in order to have something to say is
+the specific failure NONE exists to prevent.
 
 CONCEPT: what the form is doing semantically — how the shape carries meaning.
 One sentence. Write NONE if the mark is purely formal.
