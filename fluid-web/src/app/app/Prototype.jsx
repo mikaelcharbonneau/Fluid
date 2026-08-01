@@ -1388,14 +1388,26 @@ const DirA_LogoBrief = () => {
   );
 };
 
+// Overall visual worlds, mirroring STANDALONE_STYLE_OPTIONS in logo-styles.ts.
+// Deliberately orthogonal to logo type: any of these can be drawn as a
+// wordmark, a mascot or an emblem, so the two steps never ask the same thing.
+// "Let Fluid choose" is handled by its own control, so it isn't a card here.
 const LOGO_STYLE_PLACEHOLDERS = [
-  { id: 'placeholder-01', label: 'Style 01' },
-  { id: 'placeholder-02', label: 'Style 02' },
-  { id: 'placeholder-03', label: 'Style 03' },
-  { id: 'placeholder-04', label: 'Style 04' },
-  { id: 'placeholder-05', label: 'Style 05' },
-  { id: 'placeholder-06', label: 'Style 06' },
+  { id: 'minimal',   label: 'Minimal',   blurb: 'Reduced to essentials. Space, restraint, nothing decorative.' },
+  { id: 'organic',   label: 'Organic',   blurb: 'Natural, flowing forms. Softened edges and living curves.' },
+  { id: 'futurist',  label: 'Futurist',  blurb: 'Forward-looking and engineered. Precision with an edge.' },
+  { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
+  { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
+  { id: 'retro',     label: 'Retro',     blurb: 'Period reference. Warmth and nostalgia, deliberately dated.' },
+  { id: 'bold',      label: 'Bold',      blurb: 'Heavy and confident. Built to dominate at any size.' },
+  { id: 'editorial', label: 'Editorial', blurb: 'Typographic and considered. Intelligent rather than opulent.' },
+  { id: 'corporate', label: 'Corporate', blurb: 'Stable and credible. Built to be trusted for decades.' },
+  { id: 'brutalist', label: 'Brutalist', blurb: 'Raw and stark. Anti-polish, industrial, unapologetic.' },
 ];
+
+// Holistic worlds contradict when blended — "Luxury + Playful" briefs two
+// incompatible identities. Two is a round to explore, not a mix.
+const MAX_LOGO_STYLES = 2;
 
 const LOGO_TYPE_OPTIONS = [
   { id: 'wordmark', label: 'Wordmark', description: 'The full brand name, set in distinctive type.' },
@@ -1465,8 +1477,8 @@ const DirA_LogoDirection = () => {
   const chooseStyle = (styleId) => {
     const next = selectedStyles.includes(styleId)
       ? selectedStyles.filter((id) => id !== styleId)
-      : (selectedStyles.length < 3 ? [...selectedStyles, styleId] : null);
-    if (!next) { makeToast('Choose up to three styles.'); return; }
+      : (selectedStyles.length < MAX_LOGO_STYLES ? [...selectedStyles, styleId] : null);
+    if (!next) { makeToast(`Choose up to ${MAX_LOGO_STYLES} styles — they're explored separately, not blended.`); return; }
     setField('data', {
       ...data,
       logo_direction: { mode: next.length ? 'manual' : null, style_ids: next, style_id: next[0] || null },
@@ -1486,8 +1498,8 @@ const DirA_LogoDirection = () => {
     <ALogoWizardLayout
       step={2}
       title="Pick a visual style."
-      subtitle="Choose up to three directions for the first round of logo concepts."
-      dockCopy="Choose up to three styles, or let Fluid make the call."
+      subtitle="Choose the visual world for the first round of logo concepts."
+      dockCopy="Pick a visual world — or two to explore — or let Fluid make the call."
       nextLabel="Continue to logo type"
       onBack={() => navigate('logo-brief')}
       onNext={continueToConcepts}
@@ -1500,7 +1512,7 @@ const DirA_LogoDirection = () => {
             <h3 id="logo-style-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
               color:'#000',letterSpacing:'-0.015em',
-            }}>Select up to three directions.</h3>
+            }}>Pick a world, or two to compare.</h3>
           </div>
           <button
             type="button"
@@ -1538,12 +1550,12 @@ const DirA_LogoDirection = () => {
                 }}
               >
                 <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-                  0{index + 1}
+                  {String(index + 1).padStart(2, '0')}
                 </span>
                 <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000',letterSpacing:'-0.02em'}}>
                   {style.label}
                 </span>
-                <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Placeholder</span>
+                <span style={{fontSize:11.5,color:'var(--fg-3)',lineHeight:1.4}}>{style.blurb}</span>
               </button>
             );
           })}

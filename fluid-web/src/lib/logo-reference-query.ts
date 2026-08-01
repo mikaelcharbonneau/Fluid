@@ -1,4 +1,5 @@
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { STANDALONE_STYLE_OPTIONS } from "@/lib/logo-styles";
 
 // The reference library lives in Supabase: rows in public.logo_references,
 // images in the public "logo-references" storage bucket. Every row carries a
@@ -42,26 +43,13 @@ function toAspectRatio(raw: number | string | null): number | null {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Each visual direction in Step 2 is described to the generators by a sentence
-// of guidance (STANDALONE_STYLE_GUIDANCE in logo-styles.ts). These are the
-// catalogued attributes that express the same qualities, so a direction can be
-// matched against real marks rather than only against prompt text.
-export const STYLE_ATTRIBUTES: Record<string, string[]> = {
-  // "reduced, geometric construction, crisp edges, generous negative space"
-  "placeholder-01": ["geometric", "minimal", "negative-space", "monoline", "symmetrical"],
-  // "expressive custom typography, one confident typographic gesture"
-  "placeholder-02": ["custom-letterform", "display", "ligature", "high-contrast", "script"],
-  // "organic, editorial: softened forms, tactile variation, warm but disciplined"
-  "placeholder-03": ["organic", "rounded", "warm", "hand-drawn", "serif"],
-  // "bold, high-contrast, strong scale shifts, assertive focal point"
-  "placeholder-04": ["heavy", "high-contrast", "angular", "blobby", "uppercase"],
-  // "understated premium: refined proportions, restrained detail, calm"
-  "placeholder-05": ["premium", "elegant", "light", "minimal", "serif"],
-  // "energetic modular system, clear movement, contemporary digital feel"
-  "placeholder-06": ["modular", "technical", "geometric", "gradient", "radial"],
-  // Delegated — deliberately no attribute filter, so the whole library is open.
-  "fluid-choice": [],
-};
+// Each visual direction carries the catalogued attributes it is built from, so
+// a style can be matched against real marks rather than only against prompt
+// text. Deriving this from the style definitions keeps the two in step: adding
+// a direction can't silently leave the gallery with nothing to show for it.
+export const STYLE_ATTRIBUTES: Record<string, string[]> = Object.fromEntries(
+  STANDALONE_STYLE_OPTIONS.map((s) => [s.id, s.attributes]),
+);
 
 // The union of attributes for the directions the client picked. An empty array
 // means "no attribute preference", which callers treat as no filter rather
