@@ -388,17 +388,6 @@ export const STANDALONE_STYLE_OPTIONS: StandaloneStyleOption[] = [
     attributes: ["retro", "warm", "arched", "outlined", "contained"],
   },
   {
-    id: "bold",
-    name: "Bold",
-    blurb: "Heavy and confident. Built to dominate at any size.",
-    guidance:
-      "BOLD: maximum presence, but still resolved. Heavy weight, tight spacing, " +
-      "strong scale contrast, one dominant focal point. Weight does the work, not " +
-      "detail, so it survives reduction. Distinct from BRUTALIST: this is polished " +
-      "and confident, not raw.",
-    attributes: ["heavy", "uppercase", "high-contrast", "condensed"],
-  },
-  {
     id: "editorial",
     name: "Editorial",
     blurb: "Typographic and considered. Intelligent rather than opulent.",
@@ -423,13 +412,19 @@ export const STANDALONE_STYLE_OPTIONS: StandaloneStyleOption[] = [
   {
     id: "brutalist",
     name: "Brutalist",
-    blurb: "Raw and stark. Anti-polish, industrial, unapologetic.",
+    blurb: "Raw and stark. Heavy, industrial, unapologetic.",
     guidance:
-      "BRUTALIST: deliberately unpolished. Stark contrast, blunt geometry, " +
-      "oversized or crudely cut forms, visible structure. Rejects refinement — no " +
-      "soft radii, no gradients, no charm. Monochrome and industrial. Distinct from " +
-      "BOLD: raw rather than resolved, though still controlled and intentional.",
-    attributes: ["heavy", "angular", "condensed", "modular", "technical"],
+      "BRUTALIST: maximum presence, deliberately unpolished. Heavy weight, stark " +
+      "contrast, blunt geometry, tight spacing, oversized or crudely cut forms " +
+      "with visible structure. Weight and scale do the work, never fine detail — " +
+      "so it survives reduction. Rejects refinement: no soft radii, no gradients, " +
+      "no charm. Monochrome and industrial, but controlled and intentional rather " +
+      "than careless.",
+    // Retuned: "modular" and "technical" pulled this toward FUTURIST — the
+    // matches were clean engineered geometry rather than anything raw. These are
+    // impact-and-starkness attributes, and they also carry the "make it bold"
+    // brief now that BOLD is gone (it was a weight dial, not a world).
+    attributes: ["heavy", "uppercase", "condensed", "high-contrast", "angular"],
   },
   {
     id: "fluid-choice",
