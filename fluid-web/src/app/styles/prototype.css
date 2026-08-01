@@ -226,14 +226,14 @@
      reading order is column-wise. That's right for a gallery you scan, and
      ranking still puts the strongest matches in the first positions. */
   .logo-references-grid {
-    column-count: 3;
-    column-gap: 12px;
+    column-count: 4;
+    column-gap: 10px;
   }
   .logo-reference-card {
     break-inside: avoid;
     -webkit-column-break-inside: avoid;
     page-break-inside: avoid;
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     display: inline-block;
     width: 100%;
   }
@@ -246,6 +246,9 @@
 
   /* Standalone logo brief: preserve the studio hierarchy while letting the
      progress, field grid, and dock reflow on compact screens. */
+  @media (max-width: 1240px) {
+    .logo-references-grid { column-count: 3; }
+  }
   @media (max-width: 1040px) {
     .logo-progress-label { display: none; }
     .logo-progress-line { width: 10px !important; }
