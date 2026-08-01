@@ -9,7 +9,7 @@
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
-import { BOARD_SIZE, summariseBoardPlan } from "@/lib/logo-board";
+import { BOARD_SIZE, MAX_REFERENCE_LIKES, summariseBoardPlan } from "@/lib/logo-board";
 import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
@@ -1960,8 +1960,16 @@ const DirA_LogoReferences = () => {
     return () => { cancelled = true; };
   }, [typesKey, stylesKey]);
 
+  // Likes are capped because every one of them is promised a sketch: the
+  // concept round deals the liked references across its nine slots, so a tenth
+  // like would be a promise the board has no room to keep.
   const toggleLike = (id) => {
-    const next = likes.includes(id) ? likes.filter((item) => item !== id) : [...likes, id];
+    const removing = likes.includes(id);
+    if (!removing && likes.length >= MAX_REFERENCE_LIKES) {
+      makeToast(`${MAX_REFERENCE_LIKES} is the limit — each one you like gets its own concept sketched. Unlike one to make room.`);
+      return;
+    }
+    const next = removing ? likes.filter((item) => item !== id) : [...likes, id];
     const nextDislikes = dislikes.filter((item) => item !== id);
     setLikes(next);
     setDislikes(nextDislikes);
@@ -1997,8 +2005,10 @@ const DirA_LogoReferences = () => {
     <ALogoWizardLayout
       step={4}
       title="Browse logo references."
-      subtitle="Like the existing logos that feel closest to the direction you want."
-      dockCopy={likes.length ? `${likes.length} liked reference${likes.length === 1 ? '' : 's'} will guide the sketch round.` : 'Like the references that feel most right.'}
+      subtitle="Like the existing logos that feel closest to the direction you want. Each one you like gets its own concept."
+      dockCopy={likes.length
+        ? `${likes.length} of ${MAX_REFERENCE_LIKES} liked — each gets at least one concept sketched.`
+        : `Like the references that feel most right. Up to ${MAX_REFERENCE_LIKES}.`}
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-type')}
       onNext={() => { if (likes.length) navigate('logo-sketches'); }}
@@ -2099,6 +2109,9 @@ const DirA_LogoSketches = () => {
   // Exactly the plan the server will run — same function, same selections —
   // so what the client is shown before spending can't drift from what arrives.
   const plan = summariseBoardPlan(chosenStyles, requestTypes);
+  const likedReferenceCount = Array.isArray(data.logo_reference_likes)
+    ? data.logo_reference_likes.length
+    : 0;
 
   // `fresh` clears the board first; otherwise the nine new concepts are added
   // to what's already pinned up.
@@ -2127,11 +2140,18 @@ const DirA_LogoSketches = () => {
       setBoard(res.board);
       setLikes(nextLikes);
       persist(res.board, nextLikes);
-      // A render can fail on its own without taking the board down. Say so
-      // rather than letting the client count eight and wonder.
+      // Two different shortfalls, and they're worth telling apart. A render
+      // that failed is a retry; a reference with no caption yet is a gap in
+      // the library that drawing again won't close.
+      const notices = [];
       if (res.requested && res.drawn && res.drawn < res.requested) {
-        setNotice(`${res.drawn} of ${res.requested} sketches came back — a few renders didn’t finish. Draw nine more to fill the board out.`);
+        notices.push(`${res.drawn} of ${res.requested} sketches came back — a few renders didn’t finish. Draw ${BOARD_SIZE} more to fill the board out.`);
       }
+      if (likedReferenceCount > 0 && res.briefed < likedReferenceCount) {
+        const missing = likedReferenceCount - res.briefed;
+        notices.push(`${missing} of your ${likedReferenceCount} liked reference${likedReferenceCount === 1 ? '' : 's'} ${missing === 1 ? "isn't" : "aren't"} catalogued in enough detail to brief a concept yet, so ${missing === 1 ? 'it was' : 'they were'} left out of this round.`);
+      }
+      setNotice(notices.join(' '));
     }
     setStage('');
     setLoading(false);
@@ -2203,6 +2223,7 @@ const DirA_LogoSketches = () => {
             Each press draws {BOARD_SIZE} sketches, split across your choices. Every
             sketch sits in one style and one type — they’re separate directions to
             compare, never blended together.
+            {likedReferenceCount > 0 && ` Each of the ${likedReferenceCount} reference${likedReferenceCount === 1 ? '' : 's'} you liked briefs at least one of them.`}
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {plan.map((p, i) => (
@@ -7800,7 +7821,7 @@ async function apiGenerateLogoBoard(brandId, config, fresh) {
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
     if (!r.ok) return { error: describeFailure(r, j, 'Sketching the board failed.'), code: j.code };
-    return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0 };
+    return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0 };
   } catch { return { error: 'Network error.' }; }
 }
 

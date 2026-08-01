@@ -18,8 +18,22 @@ import {
   type MarkTypeOption,
   type StandaloneStyleOption,
 } from "./logo-styles";
+import type { ReferenceCaption } from "./ai/caption-reference";
 
 export const BOARD_SIZE = 9;
+
+/**
+ * The reference gallery caps likes at BOARD_SIZE for a reason: every liked
+ * reference is promised at least one sketch, and that promise is only keepable
+ * while the likes fit on a board.
+ */
+export const MAX_REFERENCE_LIKES = BOARD_SIZE;
+
+/** A liked reference, reduced to what the board needs from it. */
+export interface LikedReference {
+  imagePath: string;
+  caption: ReferenceCaption;
+}
 
 export interface BoardSlot {
   /** 1-based position on this board. Stable within one press. */
@@ -28,6 +42,11 @@ export interface BoardSlot {
   style: StandaloneStyleOption | null;
   /** null when the client delegated the type. */
   markType: MarkTypeOption | null;
+  /**
+   * The liked reference whose design thinking this concept answers. Null when
+   * the client liked nothing, or when nothing they liked is captioned yet.
+   */
+  reference: LikedReference | null;
 }
 
 // Resolve the client's selection into the distinct worlds actually in play.
@@ -56,16 +75,29 @@ function resolveTypes(ids: readonly string[]): (MarkTypeOption | null)[] {
 
 // Lay the board out.
 //
-// Pairings are the cartesian product of worlds and types, ordered world-major
-// so a world's concepts sit together — that is how a designer pins a board up,
-// and it makes the comparison the client is being asked to make an easy one.
+// TWO INDEPENDENT DIMENSIONS have to be covered by the same nine slots.
 //
-// The nine slots are shared as evenly as the pairing count allows; remainders
-// go to the earliest pairings. Two worlds and three types gives 2·2·2·1·1·1,
-// one world and three types gives 3·3·3, one of each gives all nine.
+// Style × type comes from Steps 2 and 3 and is an explicit instruction, so
+// pairings are laid out first, world-major: a world's concepts sit together,
+// which is how a designer pins a board up and what makes the comparison easy
+// to read. Nine slots share out as evenly as the pairing count allows,
+// remainders to the earliest — 2·2·2·1·1·1 for two worlds and three types,
+// 3·3·3 for one world and three, all nine for one of each.
+//
+// Liked references are then dealt round-robin ACROSS that layout rather than
+// grouped alongside it. Every liked reference is promised a sketch, and since
+// likes are capped at nine, round-robin delivers that promise for any number
+// of them. Dealing across rather than in blocks also means one reference's
+// thinking gets tried against several different style/type pairings, which is
+// the more useful comparison — the same device answered two ways.
+//
+// A caption's device is deliberately written as a transferable class, not a
+// recipe, which is what lets it survive being paired with a mark type its
+// original had nothing to do with.
 export function planBoard(
   styleIds: readonly string[],
   typeIds: readonly string[],
+  references: readonly LikedReference[] = [],
   total = BOARD_SIZE,
 ): BoardSlot[] {
   const styles = resolveStyles(styleIds);
@@ -83,7 +115,13 @@ export function planBoard(
   pairings.forEach((pairing, i) => {
     const count = base + (i < remainder ? 1 : 0);
     for (let n = 0; n < count; n += 1) {
-      slots.push({ index: slots.length + 1, ...pairing });
+      slots.push({
+        index: slots.length + 1,
+        ...pairing,
+        reference: references.length
+          ? references[slots.length % references.length]
+          : null,
+      });
     }
   });
   return slots;
@@ -117,7 +155,7 @@ export function summariseBoardPlan(
   total = BOARD_SIZE,
 ): BoardPlanSummary[] {
   const out: BoardPlanSummary[] = [];
-  for (const slot of planBoard(styleIds, typeIds, total)) {
+  for (const slot of planBoard(styleIds, typeIds, [], total)) {
     const styleName = slotStyleName(slot);
     const typeName = slotTypeName(slot);
     const last = out[out.length - 1];

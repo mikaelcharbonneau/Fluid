@@ -19,6 +19,7 @@ import { renderLogoImage } from "./images";
 import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import { BOARD_SIZE, type BoardSlot, slotStyleName, slotTypeName } from "../logo-board";
+import { captionBrief } from "./caption-reference";
 import { MARK_TYPES, DESIGN_PRINCIPLES, ANTI_CLICHE, CRITIQUE_RUBRIC } from "./design";
 
 export interface BoardSketch {
@@ -35,6 +36,12 @@ export interface BoardSketch {
   idea: string; // one-line rationale
   art: string; // the art direction that produced the image
   image_url: string;
+  /**
+   * The liked reference whose design thinking this concept answers, by image
+   * path. Null when the slot had no brief. Kept so a client can see which of
+   * their picks produced what, and so refinement can trace it later.
+   */
+  reference_path: string | null;
 }
 
 export interface BoardBrief {
@@ -91,6 +98,27 @@ that concept must live wholly inside them:
   ideas — a different subject, structure or move, not the same concept redrawn.
 - Read every slot before writing any of them. Nine concepts that overlap are a
   failure even when each is individually decent.
+
+MOST SLOTS ALSO CARRY A DESIGN BRIEF read off a real mark the client liked.
+That brief is the single most important input you get, because it is the only
+one that says what makes a mark OWNABLE rather than merely correct.
+- Answer the DEVICE. It names a class of move — a kind of thinking, not a
+  shape. Apply that thinking to THIS brand's idea and let it produce a form
+  nobody has drawn before.
+- You are never shown the original mark and must not try to imagine it. The
+  brief is the whole of what you get, and reconstructing a specific existing
+  logo from it would be a failure, not a success.
+- A concept that ignores its slot's device is a wasted slot, however good it is
+  on its own terms.
+- Where a slot has no brief, the strategy alone decides — and the bar for an
+  ownable move is yours to meet unaided.
+
+THE BAR. A mark whose whole idea is a stock metaphor for its category is a
+failure: a checkmark for "done", a shield for "secure", a leaf for "green", a
+figure with arms raised for "people". The same goes for a plain letterform with
+nothing done to it — an initial set in a typeface is a placeholder, not a
+lettermark. Every concept needs one specific move you could point at and
+explain.
 
 Output EXACTLY one block per slot, in slot order, nothing else — no prose, no
 code fences, no commentary:
@@ -171,10 +199,34 @@ function buildUserPrompt(input: BoardBrief): string {
 
   lines.push(...legend(input.slots));
 
+  // Design briefs, read off the marks the client liked. Numbered and listed
+  // once, then referenced per slot: one reference usually covers two slots,
+  // and repeating a paragraph reads to the model as two separate instructions.
+  const briefIds = new Map<string, string>();
+  const briefLines: string[] = [];
+  for (const slot of input.slots) {
+    const ref = slot.reference;
+    if (!ref || briefIds.has(ref.imagePath)) continue;
+    const id = `B${briefIds.size + 1}`;
+    briefIds.set(ref.imagePath, id);
+    briefLines.push(`[${id}] ${captionBrief(ref.caption)}`);
+  }
+  if (briefLines.length) {
+    lines.push(
+      ``,
+      `DESIGN BRIEFS — each was read off a mark this client liked. They describe`,
+      `HOW a mark works, never which mark it was. Answer the thinking; do not`,
+      `try to picture the original:`,
+      ...briefLines,
+    );
+  }
+
   lines.push(``, `THE BOARD — ${input.slots.length} slots:`);
   for (const slot of input.slots) {
+    const id = slot.reference ? briefIds.get(slot.reference.imagePath) : null;
     lines.push(
-      `${slot.index}. ${slotStyleName(slot).toUpperCase()} · ${slotTypeName(slot).toUpperCase()}`,
+      `${slot.index}. ${slotStyleName(slot).toUpperCase()} · ${slotTypeName(slot).toUpperCase()}` +
+        (id ? ` · answering ${id}` : ` · no brief — strategy alone`),
     );
   }
 
@@ -353,6 +405,7 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
         idea: concept.idea,
         art: concept.art,
         image_url: img.url,
+        reference_path: slot.reference?.imagePath ?? null,
       };
       return sketch;
     }),
