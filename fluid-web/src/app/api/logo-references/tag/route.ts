@@ -7,10 +7,60 @@ import { referenceImageUrl } from "@/lib/logo-reference-query";
 import { aspectRatioFrom } from "@/lib/image-size";
 
 export const runtime = "nodejs";
+// 300 is the hard ceiling on Vercel's Hobby plan, and asking for more is not
+// harmless: the build succeeds and the *deployment* is then rejected with
+// invalid_max_duration, so the mistake surfaces as a red PR rather than as a
+// slow function. Raising this is a plan upgrade, not a code change.
 export const maxDuration = 300;
 
-const DEFAULT_BATCH = 10;
-const MAX_BATCH = 40;
+const DEFAULT_BATCH = 25;
+// Above what 300s can actually finish, deliberately. The deadline guard stops
+// the pool cleanly and reports stoppedOnTime, so asking for more than fits
+// costs nothing and gets the most out of each press — whereas capping at a
+// guess would leave the budget unspent whenever captions run quick.
+const MAX_BATCH = 250;
+
+// Images in flight at once. Captioning is almost entirely spent waiting on the
+// vision API, so running one at a time left the function idle for ~99% of its
+// life and made a 250-row library a fourteen-press chore.
+//
+// Six rather than more: the ceiling here is the account's per-minute token
+// budget, not anything local, and overshooting it converts a fast batch into a
+// slow one full of 429s.
+const CONCURRENCY = 6;
+
+// Stop starting new work with this much of the budget left. Whatever is already
+// in flight then has time to finish and be written, so the response reports real
+// numbers and the queue picks up cleanly next press — rather than the platform
+// killing the function mid-write and losing the lot.
+const DEADLINE_MARGIN_MS = 45_000;
+
+// Run `worker` over `items`, CONCURRENCY at a time, stopping early when the
+// clock runs out. Results come back in completion order; the caller sorts if it
+// cares. Anything not started is simply left in the queue.
+async function runPool<T, R>(
+  items: T[],
+  deadline: number,
+  worker: (item: T) => Promise<R>,
+): Promise<{ results: R[]; ranOut: boolean }> {
+  const results: R[] = [];
+  let next = 0;
+  let ranOut = false;
+
+  async function lane() {
+    for (;;) {
+      if (Date.now() > deadline) { ranOut = true; return; }
+      const i = next++;
+      if (i >= items.length) return;
+      results.push(await worker(items[i]));
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, items.length) }, lane),
+  );
+  return { results, ranOut };
+}
 
 // POST /api/logo-references/tag — catalogue the reference library.
 //
@@ -60,14 +110,20 @@ export async function POST(request: Request) {
   const prefix = typeof body.prefix === "string" ? body.prefix : "";
 
   const admin = createAdminClient();
+  const deadline = Date.now() + maxDuration * 1000 - DEADLINE_MARGIN_MS;
 
   return mode === "caption"
-    ? captionExisting(admin, { limit, dryRun, prefix })
-    : tagNew(admin, { limit, dryRun, prefix });
+    ? captionExisting(admin, { limit, dryRun, prefix, deadline })
+    : tagNew(admin, { limit, dryRun, prefix, deadline });
 }
 
 type Admin = ReturnType<typeof createAdminClient>;
-interface BatchOptions { limit: number; dryRun: boolean; prefix: string }
+interface BatchOptions {
+  limit: number;
+  dryRun: boolean;
+  prefix: string;
+  deadline: number;
+}
 
 // Is the bucket object actually there? HEAD, so a large image costs nothing to
 // check. A network failure answers "yes" deliberately: the caption call that
@@ -84,7 +140,10 @@ async function objectExists(url: string): Promise<boolean> {
 
 // Mode "new" — bucket objects with no row yet. Tagged AND captioned in one
 // pass so nothing added from here on needs a backfill later.
-async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
+async function tagNew(
+  admin: Admin,
+  { limit, dryRun, prefix, deadline }: BatchOptions,
+) {
   // Which bucket objects have no row yet. Done in SQL rather than by listing
   // the bucket so it stays a single query as the library grows.
   const { data: pending, error: pendingError } = await admin.rpc(
@@ -100,12 +159,15 @@ async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
     return NextResponse.json({ mode: "new", tagged: 0, failed: 0, remaining: 0, results: [] });
   }
 
-  const results: {
+  type TagResult = {
     path: string; ok: boolean; name?: string; markType?: string;
     device?: string | null; reason?: string;
-  }[] = [];
+  };
 
-  for (const path of paths) {
+  const { results, ranOut } = await runPool<string, TagResult>(
+    paths,
+    deadline,
+    async (path): Promise<TagResult> => {
     const url = referenceImageUrl(path);
     try {
       // Fetch once: the bytes give us the aspect ratio the masonry needs, and
@@ -117,10 +179,7 @@ async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
       } catch { /* dimensions are a nicety; tagging still stands */ }
 
       const tagged = await tagReferenceImage(url);
-      if (!tagged) {
-        results.push({ path, ok: false, reason: "unusable tag response" });
-        continue;
-      }
+      if (!tagged) return { path, ok: false, reason: "unusable tag response" };
 
       // A failed caption doesn't sink the row — it lands in the backfill queue
       // like any pre-caption row, and the mark still works in the gallery.
@@ -143,23 +202,20 @@ async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
           is_active: true,
           sort_order: 0,
         });
-        if (error) {
-          results.push({ path, ok: false, reason: error.message });
-          continue;
-        }
+        if (error) return { path, ok: false, reason: error.message };
       }
-      results.push({
+      return {
         path, ok: true, name: tagged.name, markType: tagged.markType,
         device: caption?.device ?? null,
-      });
+      };
     } catch (err) {
-      results.push({
+      return {
         path,
         ok: false,
         reason: err instanceof Error ? err.message.slice(0, 140) : "failed",
-      });
+      };
     }
-  }
+  });
 
   const { data: left } = await admin.rpc("logo_references_untagged_count", { p_prefix: prefix });
 
@@ -169,13 +225,19 @@ async function tagNew(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
     tagged: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
     remaining: typeof left === "number" ? left : null,
+    // True when the clock, not the queue, ended the run — so "remaining > 0"
+    // can be read as "press again" rather than "something is stuck".
+    stoppedOnTime: ranOut,
     results,
   });
 }
 
 // Mode "caption" — backfill rows that predate captioning. Touches only the
 // caption column; attributes, refinement and everything hand-corrected stay.
-async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOptions) {
+async function captionExisting(
+  admin: Admin,
+  { limit, dryRun, prefix, deadline }: BatchOptions,
+) {
   let query = admin
     .from("logo_references")
     .select("image_path")
@@ -195,12 +257,18 @@ async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOpt
     return NextResponse.json({ mode: "caption", captioned: 0, failed: 0, remaining: 0, results: [] });
   }
 
-  const results: {
+  type CaptionResult = {
     path: string; ok: boolean; device?: string | null;
     technique?: string; concept?: string | null; reason?: string;
-  }[] = [];
+  };
 
-  for (const path of paths) {
+  // Each row is written the moment its caption lands, not batched at the end.
+  // A run that dies partway then keeps everything it finished, and the queue
+  // simply serves the rest next time.
+  const { results, ranOut } = await runPool<string, CaptionResult>(
+    paths,
+    deadline,
+    async (path): Promise<CaptionResult> => {
     try {
       const url = referenceImageUrl(path);
 
@@ -225,41 +293,36 @@ async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOpt
             })
             .eq("image_path", path);
         }
-        results.push({ path, ok: false, reason: "image missing from storage — row deactivated" });
-        continue;
+        return { path, ok: false, reason: "image missing from storage — row deactivated" };
       }
 
       const caption = await captionReferenceImage(url);
       if (!caption) {
-        results.push({ path, ok: false, reason: "unusable caption response" });
-        continue;
+        return { path, ok: false, reason: "unusable caption response" };
       }
       if (!dryRun) {
         const { error } = await admin
           .from("logo_references")
           .update({ caption, updated_at: new Date().toISOString() })
           .eq("image_path", path);
-        if (error) {
-          results.push({ path, ok: false, reason: error.message });
-          continue;
-        }
+        if (error) return { path, ok: false, reason: error.message };
       }
       // The full caption comes back on every row, because the only way to know
       // whether a batch held its altitude is to read it.
-      results.push({
+      return {
         path, ok: true,
         technique: caption.technique,
         device: caption.device,
         concept: caption.concept,
-      });
+      };
     } catch (err) {
-      results.push({
+      return {
         path,
         ok: false,
         reason: err instanceof Error ? err.message.slice(0, 140) : "failed",
-      });
+      };
     }
-  }
+  });
 
   let remainingQuery = admin
     .from("logo_references")
@@ -277,6 +340,9 @@ async function captionExisting(admin: Admin, { limit, dryRun, prefix }: BatchOpt
     // A dry run changes nothing, so the queue is unchanged too — say the
     // number that will still be waiting rather than implying progress.
     remaining: typeof count === "number" ? count : null,
+    // True when the clock, not the queue, ended the run — so "remaining > 0"
+    // can be read as "press again" rather than "something is stuck".
+    stoppedOnTime: ranOut,
     results,
   });
 }
