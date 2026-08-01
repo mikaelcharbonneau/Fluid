@@ -156,6 +156,8 @@ export async function POST(request: Request) {
     // isn't written to brand.data until the end of this request.
     const ctx = styleContext(
       research ? { ...brand, data: { ...data, research } } : brand,
+      // The refine prompt prints the platform itself — see platformLines().
+      { omitPlatform: true },
     );
 
     let platform = getPlatform(data);

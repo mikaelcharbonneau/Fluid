@@ -114,10 +114,18 @@ function refineWords(r?: Step2["refine"]): string[] {
 
 // A human-readable summary of every Step 2 choice, for injection into prompts.
 // Returns "" when the user made no Step 2 picks.
-export function styleContext(brand: {
-  style_id?: string | null;
-  data?: unknown;
-}): string {
+//
+// `omitPlatform` is for callers that state the creative platform themselves.
+// The board prompt opens with it, and printing it again here read as two
+// separate instructions rather than one — repetition is emphasis to a model,
+// so the strategy was quietly outweighing the sections it is meant to inform.
+export function styleContext(
+  brand: {
+    style_id?: string | null;
+    data?: unknown;
+  },
+  opts: { omitPlatform?: boolean } = {},
+): string {
   const s2 = getStep2(brand.data);
   const lines: string[] = [];
   // Decisions the client delegated. These are collected separately and stated
@@ -181,8 +189,10 @@ export function styleContext(brand: {
   const research = researchContext(brand.data);
   if (research) lines.push("", research);
 
-  const platform = platformContext(brand.data);
-  if (platform) lines.push("", platform);
+  if (!opts.omitPlatform) {
+    const platform = platformContext(brand.data);
+    if (platform) lines.push("", platform);
+  }
 
   return lines.join("\n");
 }

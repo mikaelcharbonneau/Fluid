@@ -184,7 +184,7 @@ export async function POST(request: Request) {
       name: brandName,
       platform,
       slots,
-      styleContext: styleContext(brand),
+      styleContext: styleContext(brand, { omitPlatform: true }),
       instructions: instructions || null,
       nameMeaning:
         typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
@@ -217,8 +217,16 @@ export async function POST(request: Request) {
         slot: s.slot,
         name: s.name,
         model: IMAGE_MODEL,
+        // Split, because only one of these two is worth iterating on. `art` is
+        // what the designer wrote for this concept and is different every time;
+        // the rest is a fixed rendering instruction identical across all nine.
+        // Reading them merged makes the boilerplate look like output.
+        art: s.art,
         prompt: pencilSketchPrompt(s.art),
       })),
+      // The fixed wrapper, shown once with the ART slot marked, so it is
+      // obvious how little of each render prompt is actually about the concept.
+      renderTemplate: pencilSketchPrompt("{{ART}}"),
     });
   }
 
@@ -228,7 +236,10 @@ export async function POST(request: Request) {
     // without it — but it is never generated here, because nine renders need
     // every second of the budget this route has.
     const research = getResearch(data);
-    const ctx = styleContext(brand);
+    // The board prompt states the creative platform itself, so styleContext
+    // must not state it again. (Where it feeds generateCreativePlatform below,
+    // there is no platform yet to omit.)
+    const ctx = styleContext(brand, { omitPlatform: true });
 
     let platform = getPlatform(data);
     if (!platform) {
