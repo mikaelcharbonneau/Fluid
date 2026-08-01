@@ -1393,14 +1393,24 @@ const DirA_LogoBrief = () => {
 // wordmark, a mascot or an emblem, so the two steps never ask the same thing.
 // "Let Fluid choose" is handled by its own control, so it isn't a card here.
 const LOGO_STYLE_PLACEHOLDERS = [
-  { id: 'minimal',   label: 'Minimal',   blurb: 'Reduced to essentials. Space, restraint, nothing decorative.' },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    description: 'Essential geometry, exact spacing, quiet contrast.',
+    preview: __assets['logo-style-previews/minimal.png'],
+  },
   {
     id: 'organic',
     label: 'Organic',
-    description: 'Soft forms, tactile color, natural rhythm.',
+    description: 'Grown contours, tactile material, natural rhythm.',
     preview: __assets['logo-style-previews/organic.png'],
   },
-  { id: 'futurist',  label: 'Futurist',  blurb: 'Forward-looking and engineered. Precision with an edge.' },
+  {
+    id: 'futurist',
+    label: 'Futurist',
+    description: 'Engineered form, luminous depth, precise detail.',
+    preview: __assets['logo-style-previews/futurist.png'],
+  },
   { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
   { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
   { id: 'retro',     label: 'Retro',     blurb: 'Period reference. Warmth and nostalgia, deliberately dated.' },
@@ -1465,8 +1475,8 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
   );
 };
 
-// Standalone logo studio · Step 2 · Visual style. Preview treatments are being
-// introduced one direction at a time while the remaining options stay neutral.
+// Standalone logo studio · Step 2 · Visual style. Custom preview treatments
+// are introduced in reviewable groups while the remaining options stay neutral.
 const DirA_LogoDirection = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
@@ -1557,7 +1567,7 @@ const DirA_LogoDirection = () => {
                   <>
                     <div style={{
                       width:'100%',flex:1,minHeight:0,position:'relative',
-                      backgroundImage:`url("${style.preview}")`,backgroundSize:'cover',backgroundPosition:'center',
+                      backgroundImage:`url("${style.preview}")`,backgroundSize:'cover',backgroundPosition:'center 35%',
                     }}>
                       <span style={{
                         position:'absolute',top:12,left:12,padding:'5px 7px',borderRadius:6,
