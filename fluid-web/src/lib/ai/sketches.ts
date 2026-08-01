@@ -37,7 +37,7 @@ export interface LogoSketch {
   name: string; // concept name, e.g. "Ledger stripe"
   territory: string; // territory key from the platform
   territory_name: string;
-  mark_type: string; // wordmark | lettermark | letterform | pictorial | abstract | mascot | emblem | combination | dynamic
+  mark_type: string; // wordmark | lettermark | pictorial | abstract | mascot | emblem | combination | dynamic
   attributes: string[]; // formal attributes, e.g. ["geometric", "bold", "structural"]
   idea: string; // one-line rationale
   art: string; // the art direction that produced the image
@@ -62,7 +62,7 @@ const MODEL = "claude-opus-4-8";
 // client hasn't fixed one), so a run of regenerations still spreads across the
 // taxonomy instead of clustering on abstract symbols.
 const TYPE_GROUPS: { label: string; types: string }[] = [
-  { label: "typographic", types: "wordmark, lettermark, or letterform marks" },
+  { label: "typographic", types: "wordmark or lettermark marks" },
   { label: "figurative", types: "pictorial, abstract, or mascot marks" },
   { label: "structural", types: "combination, emblem, or dynamic marks" },
 ];

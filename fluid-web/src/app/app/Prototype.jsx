@@ -3583,18 +3583,12 @@ const MARK_TYPE_PREVIEW = {
       <text x="60" y="38" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="26" letterSpacing="-1.2" fill={INK}>FORMA</text>
     </svg>
   ),
-  // Two initials, tightly interlocked. It must not show a single letter: that
-  // is a letterform, and the count is the whole distinction between the two.
+  // Interlocked initials. Single-letter marks belong to this type too, but the
+  // monogram is the clearer preview — a lone letter reads as a letterform, and
+  // a bare "R" beside the wordmark card would be hard to tell apart from type.
   lettermark: (
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <text x="60" y="44" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="38" letterSpacing="-5" fill={INK}>FM</text>
-    </svg>
-  ),
-  // One oversized letter with no container — the bare letter is the whole
-  // distinction from a lettermark, which is a monogram of two or more.
-  letterform: (
-    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
-      <text x="60" y="48" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="46" letterSpacing="-2" fill={INK}>R</text>
     </svg>
   ),
   pictorial: (
@@ -3605,7 +3599,7 @@ const MARK_TYPE_PREVIEW = {
   ),
   abstract: (
     // Two offset rounded squares — layered, geometric, and (unlike a circle
-    // beside a stem) impossible to misread as a letterform.
+    // beside a stem) impossible to misread as a letter.
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <rect x="40" y="9" width="30" height="30" rx="9" fill="none" stroke={INK} strokeWidth="4"/>
       <rect x="53" y="22" width="30" height="30" rx="9" fill={INK}/>
