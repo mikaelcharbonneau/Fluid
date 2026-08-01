@@ -1396,20 +1396,23 @@ const LOGO_STYLE_PLACEHOLDERS = [
   {
     id: 'minimal',
     label: 'Minimal',
-    description: 'Essential geometry, exact spacing, quiet contrast.',
+    description: 'Reduced to essentials. Space, restraint, nothing decorative.',
     preview: __assets['logo-style-previews/minimal.png'],
+    previewBg: '#FBFAF7',
   },
   {
     id: 'organic',
     label: 'Organic',
-    description: 'Grown contours, tactile material, natural rhythm.',
+    description: 'Natural, flowing forms. Softened edges and living curves.',
     preview: __assets['logo-style-previews/organic.png'],
+    previewBg: '#F4EFE3',
   },
   {
     id: 'futurist',
     label: 'Futurist',
-    description: 'Engineered form, luminous depth, precise detail.',
+    description: 'Forward-looking and engineered. Precision with an edge.',
     preview: __assets['logo-style-previews/futurist.png'],
+    previewBg: '#070B0F',
   },
   { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
   { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
@@ -1554,37 +1557,43 @@ const DirA_LogoDirection = () => {
                 type="button"
                 onClick={() => chooseStyle(style.id)}
                 aria-pressed={selected}
+                className={style.preview ? 'logo-style-card-with-preview' : undefined}
                 style={{
-                  height:238,padding:style.preview ? 0 : 20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  height:200,padding:style.preview ? 10 : 20,borderRadius:16,textAlign:'left',cursor:'pointer',
                   border:selected ? '2px solid #000' : '1px solid var(--line)',
                   background:selected ? '#fff' : 'var(--bg-elev)',
                   boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
-                  display:'flex',flexDirection:'column',justifyContent:'space-between',
+                  display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative',
                   overflow:'hidden',transition:'border-color .15s, box-shadow .15s, transform .15s',
                 }}
               >
                 {style.preview ? (
                   <>
-                    <div style={{
-                      width:'100%',flex:1,minHeight:0,position:'relative',
-                      backgroundImage:`url("${style.preview}")`,backgroundSize:'cover',backgroundPosition:'center 35%',
+                    <span style={{
+                      position:'absolute',top:13,left:16,fontFamily:'var(--font-mono)',fontSize:10.5,
+                      color:selected ? '#000' : 'var(--fg-4)',lineHeight:1,
+                    }}>{String(index + 1).padStart(2, '0')}</span>
+                    <div className="logo-style-preview-layout" style={{
+                      width:'100%',height:'100%',paddingTop:28,display:'grid',
+                      gridTemplateColumns:'minmax(0, 1.85fr) minmax(108px, .95fr)',gap:14,
                     }}>
-                      <span style={{
-                        position:'absolute',top:12,left:12,padding:'5px 7px',borderRadius:6,
-                        background:'rgba(255,255,255,.88)',backdropFilter:'blur(8px)',
-                        fontFamily:'var(--font-mono)',fontSize:10.5,color:'#111',lineHeight:1,
-                      }}>{String(index + 1).padStart(2, '0')}</span>
-                    </div>
-                    <div style={{
-                      width:'100%',padding:'13px 15px 14px',background:'#fff',
-                      display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,
-                    }}>
-                      <span style={{fontFamily:'var(--font-display)',fontSize:18,fontWeight:700,color:'#000',lineHeight:1.1}}>
-                        {style.label}
-                      </span>
-                      <span style={{maxWidth:132,fontSize:10.5,color:'var(--fg-3)',lineHeight:1.3,textAlign:'right'}}>
-                        {style.description}
-                      </span>
+                      <div className="logo-style-preview-image" style={{
+                        minWidth:0,minHeight:0,borderRadius:9,
+                        backgroundColor:style.previewBg,backgroundImage:`url("${style.preview}")`,
+                        backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',
+                        boxShadow:'inset 0 0 0 1px rgba(0,0,0,.10)',
+                      }}/>
+                      <div className="logo-style-preview-copy" style={{
+                        minWidth:0,padding:'4px 4px 4px 0',display:'flex',flexDirection:'column',
+                        alignItems:'flex-start',justifyContent:'center',gap:16,
+                      }}>
+                        <span style={{fontFamily:'var(--font-display)',fontSize:18,fontWeight:700,color:'#000',lineHeight:1.1}}>
+                          {style.label}
+                        </span>
+                        <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.45}}>
+                          {style.description}
+                        </span>
+                      </div>
                     </div>
                   </>
                 ) : (
