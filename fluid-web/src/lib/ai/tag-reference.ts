@@ -62,11 +62,23 @@ export const ATTRIBUTE_GROUPS: { axis: string; terms: string[] }[] = [
 
 export const ATTRIBUTE_VOCABULARY: string[] = ATTRIBUTE_GROUPS.flatMap((g) => g.terms);
 
+// Refinement axes, 0..1. Step 4 replaces style sliders with a like/dislike
+// gallery: liking a mark averages the client toward its values, so these have
+// to be a real reading of the artwork, not a restatement of its attributes.
+//
+// Deliberately independent of the nine style worlds in Step 2 — a Minimal mark
+// can be quiet or bold — so they refine within a world rather than duplicating
+// the choice of world.
+export const REFINEMENT_AXES = ["boldness", "energy", "warmth", "detail"] as const;
+export type RefinementAxis = (typeof REFINEMENT_AXES)[number];
+export type Refinement = Record<RefinementAxis, number>;
+
 export interface TaggedReference {
   name: string;
   markType: string;
   attributes: string[];
   industry: string | null;
+  refinement: Refinement | null;
 }
 
 const INDUSTRIES = [
@@ -112,8 +124,19 @@ single flat colour is genuinely a defining trait of the design.
 INDUSTRY: one of ${INDUSTRIES.join(", ")} — or null if it is not obvious from
 the mark alone. Do not guess from the brand name.
 
+REFINEMENT: place the mark on each axis, 0 to 1, to two decimals. Judge the
+artwork itself, and use the full range — a set of marks that all score near 0.5
+carries no information. These are independent of each other: a mark can be bold
+and calm, or quiet and energetic.
+
+- boldness  0 = quiet, light, understated · 1 = heavy, dominant, high presence
+- energy    0 = still, settled, symmetrical · 1 = kinetic, diagonal, in motion
+- warmth    0 = cool, clinical, precise · 1 = warm, soft, human, approachable
+- detail    0 = one reduced gesture · 1 = intricate, many parts, richly built
+
 Reply with ONLY a JSON object, no prose and no code fence:
-{"name":"...","mark_type":"...","attributes":["...","..."],"industry":null}`;
+{"name":"...","mark_type":"...","attributes":["...","..."],"industry":null,
+ "refinement":{"boldness":0.0,"energy":0.0,"warmth":0.0,"detail":0.0}}`;
 }
 
 // Parse defensively and filter against the closed sets. A model answer that
@@ -148,7 +171,23 @@ export function parseTagResponse(raw: string): TaggedReference | null {
   const rawIndustry = parsed.industry == null ? "" : String(parsed.industry).trim().toLowerCase();
   const industry = INDUSTRIES.includes(rawIndustry) ? rawIndustry : null;
 
-  return { name, markType, attributes, industry };
+  // Axes are all-or-nothing: a partial reading would silently average the
+  // client toward 0 on whichever axis went missing, which is a real answer
+  // ("very quiet") rather than an absent one. Better to store none.
+  const rawRefinement = parsed.refinement as Record<string, unknown> | undefined;
+  let refinement: Refinement | null = null;
+  if (rawRefinement && typeof rawRefinement === "object") {
+    const values = {} as Refinement;
+    const complete = REFINEMENT_AXES.every((axis) => {
+      const n = Number(rawRefinement[axis]);
+      if (!Number.isFinite(n)) return false;
+      values[axis] = Math.min(1, Math.max(0, Math.round(n * 100) / 100));
+      return true;
+    });
+    if (complete) refinement = values;
+  }
+
+  return { name, markType, attributes, industry, refinement };
 }
 
 // Catalogue one image. Throws on transport failure so the caller can record

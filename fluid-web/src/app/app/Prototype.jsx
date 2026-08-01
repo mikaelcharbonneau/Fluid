@@ -1203,6 +1203,8 @@ const DirA_LogoBrief = () => {
   const name = (draft && (draft.name_choice || resolveBrandName(draft))) || '';
   const brief = (draft && draft.brief) || '';
   const tagline = String(data.logo_tagline || '');
+  const nameMeaning = String(data.logo_name_meaning || '');
+  const audience = (draft && draft.audience) || '';
   const competitors = ((draft && draft.competitors) || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
   const [compInput, setCompInput] = React.useState('');
@@ -1214,6 +1216,7 @@ const DirA_LogoBrief = () => {
     setField('name', value);
   };
   const setTagline = (value) => setField('data', { ...data, logo_tagline: value });
+  const setNameMeaning = (value) => setField('data', { ...data, logo_name_meaning: value });
   const addCompetitor = (raw) => {
     const value = String(raw || '').trim().replace(/,+$/, '').trim();
     if (!value) return;
@@ -1284,7 +1287,32 @@ const DirA_LogoBrief = () => {
           </div>
         </AFieldCard>
 
-        <AFieldCard n="02" title="Brand description" meta={`${String(brief).length} / 800`}>
+        {/* Where the name comes from. The single biggest lever on pictorial and
+            abstract marks: without it the studio has to guess what to draw, and
+            "Cadence" is musical rhythm, cycling cadence, or speech pattern. */}
+        <AFieldCard n="02" title="What the name means" optional meta={`${String(nameMeaning).length} / 300`}>
+          <div style={{
+            background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+            padding:'16px 18px',
+          }}>
+            <textarea
+              value={nameMeaning}
+              onChange={(e) => setNameMeaning(e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={300}
+              aria-label="What the name means or where it comes from"
+              placeholder="Named for the rhythm a team finds when it stops sprinting — a steady, repeatable beat rather than a race."
+              rows={2}
+              style={{
+                width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:17,fontWeight:500,
+                color:'#000',lineHeight:1.45,minHeight:52,
+              }}
+            />
+          </div>
+        </AFieldCard>
+
+        <AFieldCard n="03" title="Brand description" meta={`${String(brief).length} / 800`}>
           <div style={{
             position:'relative',background:'var(--bg)',borderRadius:14,
             boxShadow:'inset 0 0 0 1px var(--line)',padding:'18px 18px 14px',
@@ -1320,8 +1348,37 @@ const DirA_LogoBrief = () => {
           </div>
         </AFieldCard>
 
+        {/* Who it's for. Sets the register entirely — the same fintech gets a
+            different mark for enterprise CFOs than for 22-year-olds. */}
+        <AFieldCard n="04" title="Target audience" optional meta={`${String(audience).length} / 300`}>
+          <div style={{
+            background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+            padding:'16px 18px',
+          }}>
+            <textarea
+              value={audience}
+              onChange={(e) => setField('audience', e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={300}
+              aria-label="Target audience"
+              placeholder="Solo founders and two-person teams in their first year — allergic to process, but quietly worried they're drifting."
+              rows={2}
+              style={{
+                width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:17,fontWeight:500,
+                color:'#000',lineHeight:1.45,minHeight:52,
+              }}
+            />
+            <div className="logo-assist-row" style={{display:'flex',alignItems:'center',gap:8,marginTop:12,paddingTop:12,borderTop:'1px dashed var(--line)'}}>
+              <button type="button" onClick={() => runAssist('audience')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('audience') ? .5 : 1}}>
+                <Sparkle size={11}/> {busy('audience') ? 'Thinking…' : 'Suggest an audience'}
+              </button>
+            </div>
+          </div>
+        </AFieldCard>
+
         <div className="logo-brief-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-          <AFieldCard n="03" title="Competitors" optional>
+          <AFieldCard n="05" title="Competitors" optional>
             <div style={{
               background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
               padding:14,display:'flex',flexDirection:'column',gap:12,minHeight:124,
@@ -1357,7 +1414,7 @@ const DirA_LogoBrief = () => {
             </div>
           </AFieldCard>
 
-          <AFieldCard n="04" title="Tagline" optional meta={`${String(tagline).length} / 120`}>
+          <AFieldCard n="06" title="Tagline" optional meta={`${String(tagline).length} / 120`}>
             <div style={{
               background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
               padding:'14px 16px',display:'flex',flexDirection:'column',gap:10,minHeight:124,
@@ -1680,6 +1737,85 @@ const DirA_LogoType = () => {
   );
 };
 
+// Mirrors readAxes() in logo-reference-query.ts. Step 4 is a slider the client
+// never touches: liking a mark votes for its axis positions. Showing the result
+// keeps that legible — and is how someone notices if it read them wrong.
+const AXIS_POLES = {
+  boldness: ['quiet', 'bold'],
+  energy:   ['calm', 'energetic'],
+  warmth:   ['cool', 'warm'],
+  detail:   ['simple', 'detailed'],
+};
+const AXIS_MIN_SAMPLES = 2;
+const AXIS_MAX_SPREAD = 0.30;
+const AXIS_REJECTION_PUSH = 0.5;
+
+function readRefinementAxes(liked, disliked) {
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = (xs) => xs.length < 2 ? 0 : Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
+  const values = (rows, axis) => rows
+    .map((r) => Number((r.refinement || {})[axis]))
+    .filter((n) => Number.isFinite(n))
+    .map((n) => Math.min(1, Math.max(0, n)));
+
+  const out = [];
+  for (const axis of Object.keys(AXIS_POLES)) {
+    const L = values(liked, axis), D = values(disliked, axis);
+    if (L.length < AXIS_MIN_SAMPLES || sd(L) > AXIS_MAX_SPREAD) continue;
+    const preferred = mean(L);
+    const push = (D.length >= AXIS_MIN_SAMPLES && sd(D) <= AXIS_MAX_SPREAD)
+      ? AXIS_REJECTION_PUSH * (preferred - mean(D)) : 0;
+    const value = Math.min(1, Math.max(0, preferred + push));
+    const [low, high] = AXIS_POLES[axis];
+    const label = value < 0.2 ? `very ${low}` : value < 0.4 ? `leaning ${low}`
+      : value <= 0.6 ? 'balanced' : value <= 0.8 ? high : `very ${high}`;
+    out.push({ axis, value, label, low, high });
+  }
+  return out;
+}
+
+// The readout. Axes the picks disagreed on are absent on purpose — silence
+// means "no view", so we say that rather than showing a misleading midpoint.
+const ARefinementReadout = ({ axes, sampled }) => {
+  if (!sampled) return null;
+  return (
+    <div style={{
+      padding:'14px 16px',borderRadius:14,background:'var(--bg-elev)',
+      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',flexDirection:'column',gap:10,
+    }}>
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
+        <span className="eyebrow" style={{color:'var(--fg-3)'}}>What your picks suggest</span>
+        <span style={{fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>
+          set by choosing, not by sliders
+        </span>
+      </div>
+      {axes.length === 0 ? (
+        <div style={{fontSize:12.5,color:'var(--fg-3)',lineHeight:1.5}}>
+          Not enough of a pattern yet — like a few more, or a few that feel
+          similar to each other, and a direction will show up here.
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:9}}>
+          {axes.map(({ axis, value, label, low, high }) => (
+            <div key={axis} style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{flex:'0 0 92px',fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>{low}</span>
+              <div style={{flex:1,height:4,borderRadius:99,background:'var(--bg-sunken)',position:'relative'}}>
+                <div style={{
+                  position:'absolute',left:`${value * 100}%`,top:'50%',
+                  width:10,height:10,borderRadius:99,background:'#FD7947',
+                  transform:'translate(-50%,-50%)',transition:'left .2s',
+                }}/>
+              </div>
+              <span style={{flex:'0 0 92px',fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)',textAlign:'right'}}>{high}</span>
+              <span style={{flex:'0 0 96px',fontSize:11.5,fontWeight:700,color:'#000'}}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LogoReferenceContext = ({ label, value }) => (
   <div style={{
     display:'inline-flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:8,
@@ -1768,6 +1904,21 @@ const DirA_LogoReferences = () => {
   const [references, setReferences] = React.useState(null);
   const [loadError, setLoadError] = React.useState('');
 
+  // What the picks imply, computed from the references already on screen so it
+  // updates the instant something is liked — no round trip.
+  const byId = React.useMemo(() => {
+    const m = new Map();
+    (references || []).forEach((r) => m.set(r.id, r));
+    return m;
+  }, [references]);
+  const derivedAxes = React.useMemo(
+    () => readRefinementAxes(
+      likes.map((id) => byId.get(id)).filter(Boolean),
+      dislikes.map((id) => byId.get(id)).filter(Boolean),
+    ),
+    [likes, dislikes, byId],
+  );
+
   // Pull references that actually match the brief: the mark types chosen in
   // Step 3, ranked against the visual directions chosen in Step 2. Delegating
   // either ("Let Fluid choose") simply omits that filter.
@@ -1848,6 +1999,8 @@ const DirA_LogoReferences = () => {
         {loadError && (
           <div style={{fontSize:12.5,color:'var(--destructive)'}}>{loadError}</div>
         )}
+
+        <ARefinementReadout axes={derivedAxes} sampled={likes.length + dislikes.length} />
 
         {references === null ? (
           <div className="logo-references-grid">

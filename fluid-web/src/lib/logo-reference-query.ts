@@ -18,6 +18,7 @@ export interface LogoReferenceRow {
   industry: string | null;
   sort_order: number;
   aspect_ratio: number | string | null;
+  refinement: Record<string, unknown> | null;
 }
 
 export interface RankedReference {
@@ -34,6 +35,8 @@ export interface RankedReference {
    * when unknown — the card then falls back to natural sizing.
    */
   aspectRatio: number | null;
+  /** Axis positions, so the client can show what a set of picks implies. */
+  refinement: Record<string, unknown> | null;
 }
 
 // Postgres numeric arrives as a string over the wire. Guard against a stored
@@ -71,49 +74,125 @@ export function referenceImageUrl(imagePath: string): string {
   return `${SUPABASE_URL}/storage/v1/object/public/logo-references/${encoded}`;
 }
 
-export interface ReferenceTaste {
-  /** Qualities the client's likes converge on. */
-  prefer: string[];
-  /** Qualities their dislikes converge on, and their likes don't. */
-  avoid: string[];
+// ── Refinement axes ───────────────────────────────────────────────────
+//
+// Step 4 is a slider the client never touches. Each reference carries a
+// position on every axis; liking a mark votes for its values, disliking votes
+// against, and the aggregate is the refinement they would otherwise have had
+// to dial in by hand.
+
+export const AXES = ["boldness", "energy", "warmth", "detail"] as const;
+export type Axis = (typeof AXES)[number];
+
+// Poles, and the wording used to describe a position to the generators. A bare
+// number means nothing to an image model — "bold (0.75)" does.
+export const AXIS_POLES: Record<Axis, { low: string; high: string; note: string }> = {
+  boldness: { low: "quiet", high: "bold", note: "weight, scale and presence" },
+  energy: { low: "calm", high: "energetic", note: "stillness versus motion" },
+  warmth: { low: "cool", high: "warm", note: "clinical precision versus approachability" },
+  detail: { low: "simple", high: "detailed", note: "one reduced gesture versus richer construction" },
+};
+
+export interface AxisReading {
+  axis: Axis;
+  value: number; // 0..1
+  label: string; // "bold", "leaning quiet", "balanced"…
+  note: string;
 }
 
-// Turn Step 4's likes and dislikes into a taste signal the generators can use.
+export interface ReferenceTaste {
+  /** Axes where the client's picks actually agree. Unreliable axes are absent. */
+  axes: AxisReading[];
+  /** How many likes and dislikes the reading is built from. */
+  sampled: { liked: number; disliked: number };
+  /** True when every contributing reference still carries placeholder values. */
+  placeholder: boolean;
+}
+
+// How far a dislike pushes away from itself, relative to the gap between what
+// was liked and what was rejected. Liking bold marks AND rejecting quiet ones
+// is a stronger signal than liking bold alone — the client has said it twice.
+const REJECTION_PUSH = 0.5;
+
+// Below this many samples on an axis there is nothing to read: one like is a
+// data point, not a preference.
+const MIN_SAMPLES = 2;
+
+// Spread above which the likes are judged to disagree with each other. A client
+// who liked marks at 0.1 and 0.9 has told us they do not care about that axis,
+// and inventing 0.5 would be false precision presented as a finding.
+const MAX_SPREAD = 0.30;
+
+function mean(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+function stdev(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = mean(xs);
+  return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+}
+
+function describe(axis: Axis, value: number): string {
+  const { low, high } = AXIS_POLES[axis];
+  if (value < 0.2) return `very ${low}`;
+  if (value < 0.4) return `leaning ${low}`;
+  if (value <= 0.6) return "balanced";
+  if (value <= 0.8) return high;
+  return `very ${high}`;
+}
+
+function axisValues(rows: readonly LogoReferenceRow[], axis: Axis): number[] {
+  return rows
+    .map((r) => {
+      const raw = (r.refinement ?? {})[axis];
+      const n = typeof raw === "string" ? Number(raw) : raw;
+      return typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : null;
+    })
+    .filter((n): n is number => n !== null);
+}
+
+// Read the client's refinement preferences off what they liked and disliked.
 //
-// Deliberately reduced to ATTRIBUTES rather than brand names. The references
-// are real third-party marks; naming them in a generation prompt ("the client
-// liked Kodak") invites imitation of a trademarked logo. The formal qualities
-// carry the same signal — what the client is drawn to — with none of that risk.
-//
-// An attribute the client both liked and disliked carries no signal, so it is
-// dropped from both lists rather than pulling in two directions at once.
-export function summariseTaste(
+// An axis is only reported when the likes genuinely agree on it. Reporting a
+// weak average as a confident position is worse than saying nothing: it would
+// steer the mark on a dimension the client never expressed a view about.
+export function readAxes(
   liked: readonly LogoReferenceRow[],
   disliked: readonly LogoReferenceRow[],
-  limit = 6,
 ): ReferenceTaste {
-  const tally = (rows: readonly LogoReferenceRow[]) => {
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      for (const attr of row.attributes ?? []) {
-        counts.set(attr, (counts.get(attr) ?? 0) + 1);
-      }
-    }
-    return counts;
-  };
-  const likedCounts = tally(liked);
-  const dislikedCounts = tally(disliked);
+  const axes: AxisReading[] = [];
 
-  const rank = (counts: Map<string, number>, opposing: Map<string, number>) =>
-    [...counts.entries()]
-      .filter(([attr]) => !opposing.has(attr))
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, limit)
-      .map(([attr]) => attr);
+  for (const axis of AXES) {
+    const likedValues = axisValues(liked, axis);
+    const dislikedValues = axisValues(disliked, axis);
+    if (likedValues.length < MIN_SAMPLES) continue;
+    if (stdev(likedValues) > MAX_SPREAD) continue;
 
+    const preferred = mean(likedValues);
+    // Only push away from dislikes when they themselves agree — a scattered
+    // set of dislikes says nothing about direction.
+    const push =
+      dislikedValues.length >= MIN_SAMPLES && stdev(dislikedValues) <= MAX_SPREAD
+        ? REJECTION_PUSH * (preferred - mean(dislikedValues))
+        : 0;
+
+    const value = Math.min(1, Math.max(0, preferred + push));
+    axes.push({
+      axis,
+      value: Math.round(value * 100) / 100,
+      label: describe(axis, value),
+      note: AXIS_POLES[axis].note,
+    });
+  }
+
+  const contributing = [...liked, ...disliked];
   return {
-    prefer: rank(likedCounts, dislikedCounts),
-    avoid: rank(dislikedCounts, likedCounts),
+    axes,
+    sampled: { liked: liked.length, disliked: disliked.length },
+    placeholder:
+      contributing.length > 0 &&
+      contributing.every((r) => (r.refinement ?? {})._placeholder === true),
   };
 }
 
@@ -154,5 +233,6 @@ export function rankReferences(
     attributes: s.attributes,
     matched: s.matched,
     aspectRatio: toAspectRatio(s.row.aspect_ratio),
+    refinement: s.row.refinement ?? null,
   }));
 }

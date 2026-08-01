@@ -95,6 +95,10 @@ export async function POST(request: Request) {
           attributes: tagged.attributes,
           industry: tagged.industry,
           aspect_ratio: aspectRatio,
+          // Absent when the model's reading was incomplete — left null rather
+          // than half-filled, so it shows up as untagged instead of as a
+          // confident "quiet, calm, cool, simple".
+          refinement: tagged.refinement,
           notes: "auto-catalogued",
           is_active: true,
           sort_order: 0,
