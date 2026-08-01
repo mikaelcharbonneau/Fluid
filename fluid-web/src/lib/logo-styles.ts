@@ -44,26 +44,19 @@ export const MARK_TYPE_OPTIONS: MarkTypeOption[] = [
     id: "lettermark",
     name: "Lettermarks",
     blurb: "The initials, built as a monogram.",
+    // Single-letter marks live here too. They were briefly split out as their
+    // own "letterform" type, but the distinction is one a client shouldn't have
+    // to make on a card — both briefs are "build the mark from the initials".
     guidance:
-      "LETTERMARK: the brand's initials as the mark — a monogram of TWO OR MORE " +
-      "letters. The ownable move lives in the relationship between them: how they " +
-      "interlock, share a stroke, nest, or mirror. Build them on one consistent " +
-      "geometry so they read as a single designed unit, not letters set side by " +
-      "side. No accompanying symbol, no full name. If the brand has only one " +
-      "initial available, treat it as a letterform instead.",
-  },
-  {
-    id: "letterform",
-    name: "Letterforms",
-    blurb: "A single letter, pushed well past type.",
-    guidance:
-      "LETTERFORM: ONE single letter — the brand's initial — as the entire mark, " +
-      "drawn far past ordinary typography. Exactly one letter: no second " +
-      "initial, no symbol, no name. Take the letter's skeleton and do something " +
-      "specific and structural to it (extend a stem, cut or rotate a counter, " +
-      "reweight one axis, fuse a join). It must still read unmistakably as that " +
-      "letter — a form so abstracted the letter is lost is an abstract mark, not " +
-      "a letterform.",
+      "LETTERMARK: the brand's initials as the mark — one letter or several, no " +
+      "full name and no accompanying symbol. With TWO OR MORE letters the " +
+      "ownable move lives in the relationship between them: how they interlock, " +
+      "share a stroke, nest, or mirror; build them on one consistent geometry so " +
+      "they read as a single designed unit rather than letters set side by side. " +
+      "With a SINGLE letter, push it well past ordinary typography — extend a " +
+      "stem, cut or rotate a counter, reweight one axis, fuse a join — while " +
+      "keeping it unmistakably that letter. A form so abstracted the letter is " +
+      "lost has become an abstract mark.",
   },
   {
     id: "pictorial",

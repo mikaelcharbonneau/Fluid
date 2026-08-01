@@ -37,7 +37,7 @@ export interface LogoSketch {
   name: string; // concept name, e.g. "Ledger stripe"
   territory: string; // territory key from the platform
   territory_name: string;
-  mark_type: string; // wordmark | lettermark | letterform | pictorial | abstract | mascot | emblem | combination | dynamic
+  mark_type: string; // wordmark | lettermark | pictorial | abstract | mascot | emblem | combination | dynamic
   attributes: string[]; // formal attributes, e.g. ["geometric", "bold", "structural"]
   idea: string; // one-line rationale
   art: string; // the art direction that produced the image
@@ -52,6 +52,10 @@ export interface SketchBrief {
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
   likedSketches?: LogoSketch[] | null; // bias regeneration toward these
+  // What the client liked and disliked in the Step 4 reference gallery,
+  // reduced to formal qualities (see summariseTaste — the marks themselves are
+  // real third-party logos and are deliberately never named to the model).
+  referenceTaste?: { prefer: string[]; avoid: string[] } | null;
   avoidNames?: string[] | null; // previously shown concepts — don't repeat
   clock?: Clock | null; // phase timing, so the slow step shows up in the logs
 }
@@ -62,7 +66,7 @@ const MODEL = "claude-opus-4-8";
 // client hasn't fixed one), so a run of regenerations still spreads across the
 // taxonomy instead of clustering on abstract symbols.
 const TYPE_GROUPS: { label: string; types: string }[] = [
-  { label: "typographic", types: "wordmark, lettermark, or letterform marks" },
+  { label: "typographic", types: "wordmark or lettermark marks" },
   { label: "figurative", types: "pictorial, abstract, or mascot marks" },
   { label: "structural", types: "combination, emblem, or dynamic marks" },
 ];
@@ -138,6 +142,23 @@ function buildUserPrompt(
       ...liked.map(
         (s) => `- "${s.name}" (${s.mark_type}; ${s.attributes.join(", ")}): ${s.idea}`,
       ),
+    );
+  }
+  // Taste demonstrated on real marks in the reference gallery. Expressed as
+  // qualities, never as the brands themselves, so this informs the drawing
+  // without inviting imitation of an existing logo.
+  const taste = input.referenceTaste;
+  if (taste && (taste.prefer.length || taste.avoid.length)) {
+    lines.push(``, `Browsing real logos, the client showed a consistent taste:`);
+    if (taste.prefer.length) {
+      lines.push(`- Drawn to marks that are: ${taste.prefer.join(", ")}.`);
+    }
+    if (taste.avoid.length) {
+      lines.push(`- Rejected marks that are: ${taste.avoid.join(", ")}.`);
+    }
+    lines.push(
+      `Let this steer the execution — it is evidence of taste, not a brief.`,
+      `The strategy still decides WHAT to draw; this shapes HOW it is drawn.`,
     );
   }
   const avoid = (input.avoidNames ?? []).filter(Boolean);
