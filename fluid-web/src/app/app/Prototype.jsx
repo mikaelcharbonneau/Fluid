@@ -1399,10 +1399,9 @@ const LOGO_STYLE_PLACEHOLDERS = [
   { id: 'luxury',    label: 'Luxury',    blurb: 'Refined and premium. High contrast, generous space, restraint.' },
   { id: 'playful',   label: 'Playful',   blurb: 'Energetic and informal. Rounded, colourful, full of character.' },
   { id: 'retro',     label: 'Retro',     blurb: 'Period reference. Warmth and nostalgia, deliberately dated.' },
-  { id: 'bold',      label: 'Bold',      blurb: 'Heavy and confident. Built to dominate at any size.' },
   { id: 'editorial', label: 'Editorial', blurb: 'Typographic and considered. Intelligent rather than opulent.' },
   { id: 'corporate', label: 'Corporate', blurb: 'Stable and credible. Built to be trusted for decades.' },
-  { id: 'brutalist', label: 'Brutalist', blurb: 'Raw and stark. Anti-polish, industrial, unapologetic.' },
+  { id: 'brutalist', label: 'Brutalist', blurb: 'Raw and stark. Heavy, industrial, unapologetic.' },
 ];
 
 // Holistic worlds contradict when blended — "Luxury + Playful" briefs two
