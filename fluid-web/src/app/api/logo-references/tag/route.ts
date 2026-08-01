@@ -7,13 +7,17 @@ import { referenceImageUrl } from "@/lib/logo-reference-query";
 import { aspectRatioFrom } from "@/lib/image-size";
 
 export const runtime = "nodejs";
-// Long, because a backfill is measured in hundreds of images and the point of
-// this route is that it finishes without being nursed. Vercel clamps this to
-// whatever the plan actually allows, so asking for more than the account can
-// give is harmless.
-export const maxDuration = 800;
+// 300 is the hard ceiling on Vercel's Hobby plan, and asking for more is not
+// harmless: the build succeeds and the *deployment* is then rejected with
+// invalid_max_duration, so the mistake surfaces as a red PR rather than as a
+// slow function. Raising this is a plan upgrade, not a code change.
+export const maxDuration = 300;
 
 const DEFAULT_BATCH = 25;
+// Above what 300s can actually finish, deliberately. The deadline guard stops
+// the pool cleanly and reports stoppedOnTime, so asking for more than fits
+// costs nothing and gets the most out of each press — whereas capping at a
+// guess would leave the budget unspent whenever captions run quick.
 const MAX_BATCH = 250;
 
 // Images in flight at once. Captioning is almost entirely spent waiting on the
