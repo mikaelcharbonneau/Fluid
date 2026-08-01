@@ -1630,14 +1630,15 @@ const LogoReferenceContext = ({ label, value }) => (
 
 const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
   <article className="logo-reference-card" style={{
-    background:'var(--bg-elev)',borderRadius:16,padding:12,
+    background:'var(--bg-elev)',borderRadius:13,padding:8,
     boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : (disliked ? '0 0 0 2px var(--line-strong), var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)'),
+    opacity: disliked ? 0.55 : 1, transition:'opacity .15s',
   }}>
     {/* No fixed height: the card takes the image's own proportions, which is
         what makes the gallery read as a collage rather than a grid. */}
     <div style={{
-      borderRadius:10,background:'#fff',overflow:'hidden',
-      boxShadow:'inset 0 0 0 1px var(--line)',marginBottom:10,
+      borderRadius:8,background:'#fff',overflow:'hidden',
+      boxShadow:'inset 0 0 0 1px var(--line)',marginBottom:7,
       // Reserve the image's box up front so lazily-loaded artwork doesn't
       // shove the masonry columns around as it arrives.
       aspectRatio: reference.aspectRatio || undefined,
@@ -1652,31 +1653,34 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
     {/* Why this reference is here: the attributes it shares with the chosen
         direction. Keeps the gallery legible rather than arbitrary. */}
     {reference.matched && reference.matched.length > 0 && (
-      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:8}}>
-        {reference.matched.slice(0, 3).map((attr) => (
+      <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+        {reference.matched.slice(0, 2).map((attr) => (
           <span key={attr} style={{
-            fontFamily:'var(--font-mono)',fontSize:9.5,letterSpacing:'.02em',
-            padding:'3px 6px',borderRadius:6,background:'rgba(253,121,71,.12)',color:'#B4441A',
+            fontFamily:'var(--font-mono)',fontSize:8.5,letterSpacing:'.02em',
+            padding:'2px 5px',borderRadius:5,background:'rgba(253,121,71,.12)',color:'#B4441A',
           }}>{attr}</span>
         ))}
       </div>
     )}
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:13.5,color:'#000',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reference.name}</span>
+      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:12,color:'#000',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reference.name}</span>
       <div style={{display:'inline-flex',gap:5}}>
         <button
           type="button" onClick={onLike} aria-pressed={liked} title={liked ? 'Unlike' : 'Like'}
           aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.name}`}
-          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+          style={{flex:'0 0 26px',width:26,height:26,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
         <button
           type="button" onClick={onDislike} aria-pressed={disliked} title={disliked ? 'Remove dislike' : 'Dislike'}
           aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.name}`}
-          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+          style={{flex:'0 0 26px',width:26,height:26,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v10"/><path d="M11 20h5.3a2 2 0 0 0 1.9-1.4l1.4-4.5A2 2 0 0 0 17.7 11H14l.6-3.2A2 2 0 0 0 12.6 5L7 10H4v10z"/></svg>
+          {/* A real thumbs-DOWN. The previous path drew the palm at y=10–20
+              with the thumb rising to y=5 — i.e. a thumbs-up on the Dislike
+              button, so both controls read as positive. */}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V3"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
         </button>
       </div>
     </div>
@@ -1709,7 +1713,7 @@ const DirA_LogoReferences = () => {
   React.useEffect(() => {
     let cancelled = false;
     setReferences(null); setLoadError('');
-    const params = new URLSearchParams({ limit: '12' });
+    const params = new URLSearchParams({ limit: '16' });
     if (typesKey) params.set('types', typesKey);
     if (stylesKey) params.set('styles', stylesKey);
     fetch('/api/logo-references?' + params.toString(), { cache: 'no-store' })
@@ -1786,7 +1790,7 @@ const DirA_LogoReferences = () => {
           <div className="logo-references-grid">
             {/* Varied skeleton heights so the loading state previews the
                 collage rather than promising a uniform grid. */}
-            {[190, 250, 160, 220, 170, 240].map((h, i) => (
+            {[190, 250, 160, 220, 170, 240, 200, 150].map((h, i) => (
               <div key={i} className="logo-reference-card" style={{height:h,borderRadius:16,background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)'}} />
             ))}
           </div>
