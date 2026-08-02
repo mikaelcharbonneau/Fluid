@@ -1,22 +1,23 @@
-// Phase 2 · Convergence — high-fidelity finalists from the liked sketches.
+// Phase 2 · Convergence — high-fidelity finalists from ONE chosen concept.
 //
 // Two-stage studio process:
-//   1. REFINE: every liked croquis is developed into finished vector marks —
-//      same underlying geometry, now with proper construction, optical
-//      correction, and the brand's palette. A concept drawn more than once
-//      comes back as different resolutions of that idea, never a new one.
+//   1. REFINE: the chosen croquis is developed into the requested number of
+//      finished marks — same underlying geometry, now with proper
+//      construction, optical correction, and the colours the client specified
+//      for each version. Versions are different resolutions of one idea, never
+//      new ideas.
 //   2. CRITIQUE: a creative-director pass scores each mark against the studio
 //      rubric and ranks them, attaching the verdict shown on every card.
 //
-// There used to be an EXPAND stage between them, inventing marks alongside the
-// client's picks so the critique could cull down to nine. It was the wrong
-// trade twice over: someone who liked one concept got eight marks they never
-// chose, and the invention was most of the work that pushed this route past
-// its deadline. Refinement now only resolves what was actually picked, so
-// nothing is culled and nothing is invented.
+// Two stages have been removed on the way here, and both removals were the
+// same lesson. There was an EXPAND stage that invented marks alongside the
+// client's picks so a critique could cull down to nine — so liking one concept
+// bought eight marks nobody chose. Then refinement still developed every liked
+// concept at once, which is divergence in convergence's clothing. It now takes
+// a single concept and a brief, and draws exactly what was asked for.
 //
-// Generation is chunked into parallel calls of ≤4 marks each to keep individual
-// responses fast and reliable.
+// One call produces all the versions (there are at most MAX_REFINE_VERSIONS of
+// them), which keeps them aware of each other and genuinely distinct.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
@@ -24,7 +25,7 @@ import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import type { LogoSketch } from "./sketches";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
-import { refinedMarkCount } from "../logo-board";
+import type { RefineVersion } from "../logo-refine";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -42,6 +43,8 @@ export interface LogoFinalist {
   score: number; // 0–100 from the critique pass
   refines: string | null; // name of the source concept, or null if new
   art: string; // the art direction that produced the image
+  version: number; // which requested version this mark answers, 1-based
+  colors: string[]; // the colours the client specified for that version
   image_url: string; // rendered PNG in Supabase storage
   svg?: string; // filled in later, when the client vectorizes their pick
   vector_url?: string;
@@ -69,7 +72,8 @@ export type RefinableSketch = LogoSketch & {
  */
 export interface FinalistPlan {
   v: number; // composition version — see PLAN_VERSION
-  liked_ids: string[]; // the picks this plan was designed from
+  concept_id: string; // the one concept this plan develops
+  versions: RefineVersion[]; // the brief it was designed against
   pool: Candidate[];
   verdicts: Verdict[];
 }
@@ -77,21 +81,23 @@ export interface FinalistPlan {
 /**
  * Bumped whenever what belongs in a plan changes.
  *
- * v1 plans were a pool of 11 that was mostly marks the client never picked, so
- * resuming one would render the very thing this stage stopped producing. A
- * plan from an older version is discarded and redesigned rather than reused.
+ * v1 plans were a pool of 11 that was mostly marks the client never picked.
+ * v2 plans developed every liked concept, before the brief narrowed to one
+ * concept with colours chosen per version. Resuming either would render
+ * something the client did not ask for, so an older plan is discarded and the
+ * marks are designed again.
  */
-export const PLAN_VERSION = 2;
+export const PLAN_VERSION = 3;
 
 export interface RefineBrief {
   brandId: string;
   brief: string;
   name?: string | null;
   platform: CreativePlatform;
-  liked: RefinableSketch[]; // ≥1
+  concept: RefinableSketch; // the single concept being developed
+  versions: RefineVersion[]; // 1..MAX_REFINE_VERSIONS, each with its colours
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
-  paletteColors?: string[] | null; // brand hexes for the finished marks
   clock?: Clock | null; // phase timing, so the slow step shows up in the logs
   // A plan from an earlier attempt that ran out of time. Present means the
   // design stages are skipped and this run goes straight to rendering.
@@ -102,22 +108,6 @@ export interface RefineBrief {
 }
 
 const MODEL = "claude-opus-4-8";
-const CHUNK = 4; // marks per generation call
-
-/**
- * Spread the finished marks across the liked concepts.
- *
- * Every pick gets developed at least once — a mark the client chose is never
- * dropped to hit the target — so liking more than REFINED_MARK_COUNT concepts
- * widens the set rather than culling it. Remainders go to the earliest picks.
- */
-export function planVariants(likedCount: number): number[] {
-  if (likedCount <= 0) return [];
-  const total = refinedMarkCount(likedCount);
-  const base = Math.floor(total / likedCount);
-  const extra = total % likedCount;
-  return Array.from({ length: likedCount }, (_, i) => base + (i < extra ? 1 : 0));
-}
 
 const DESIGNER_SYSTEM = `You are a senior identity designer at Fluid, a brand
 studio operating at the level of Pentagram or Wolff Olins. You are in the
@@ -137,13 +127,15 @@ fences:
 
 ===CONCEPT===
 NAME: <concept name>
+VERSION: <the version number this mark answers>
 TYPE: <one mark-type key>
 REFINES: <name of the concept this develops, or NEW>
 IDEA: <one sentence: the concept and the idea it expresses>
 ART: <a precise art-direction brief for the finished mark: exact forms, their
-arrangement, proportion, stroke weight, and colour (use the brand colours by
-hex). Write it so an illustrator could execute it exactly. Describe ONLY the
-mark — never the background, framing, or rendering style.>`;
+arrangement, proportion, stroke weight, and colour. Name every colour by the
+exact hex given for that version and say which element takes which. Write it so
+an illustrator could execute it exactly. Describe ONLY the mark — never the
+background, framing, or rendering style.>`;
 
 function platformLines(p: CreativePlatform): string[] {
   return [
@@ -167,79 +159,81 @@ function commonContext(input: RefineBrief): string[] {
   if (configCtx) {
     lines.push(``, `THE CLIENT'S BRIEF — these choices are mandatory:`, configCtx);
   }
-  const palette = (input.paletteColors ?? []).filter(Boolean);
-  if (palette.length) {
-    lines.push(``, `Brand colors (use purposefully — 1 or 2 per mark): ${palette.join(", ")}`);
-  }
+  // Colours are deliberately NOT stated here. The client sets them per version,
+  // so a shared "brand colours" line would either duplicate or contradict the
+  // per-version instruction, and a contradiction is how a mark comes back in a
+  // colour nobody asked for.
   const ctx = (input.styleContext ?? "").trim();
   if (ctx) lines.push(``, `The user's design choices so far:`, ctx);
   return lines.filter((l) => l !== null && l !== undefined);
 }
 
-function tasteProfile(liked: RefinableSketch[]): string[] {
+function conceptProfile(s: RefinableSketch): string[] {
   return [
     ``,
-    `The client's chosen directions (their demonstrated taste):`,
-    ...liked.map(
-      (s) =>
-        `- "${s.name}" [${[s.style_name, s.territory_name, s.mark_type]
-          .filter(Boolean)
-          .join(" / ")}; ${s.attributes.join(", ")}]: ${s.idea}`,
-    ),
+    `THE CONCEPT THE CLIENT CHOSE — this is the only idea in play:`,
+    `- "${s.name}" [${[s.style_name, s.territory_name, s.mark_type]
+      .filter(Boolean)
+      .join(" / ")}; ${s.attributes.join(", ")}]: ${s.idea}`,
+    `Its art direction as sketched: ${s.art}`,
   ];
 }
 
-// The style worlds the client actually picked from, in the order they appear.
-/** A liked sketch and how many finished resolutions of it to draw. */
-interface VariantJob {
-  sketch: RefinableSketch;
-  count: number;
-}
-
-function buildRefinePrompt(input: RefineBrief, chunk: VariantJob[]): string {
-  const total = chunk.reduce((n, j) => n + j.count, 0);
+function buildRefinePrompt(input: RefineBrief): string {
+  const s = input.concept;
+  const total = input.versions.length;
   const lines = [
     ...commonContext(input),
-    ...tasteProfile(input.liked),
+    ...conceptProfile(s),
     ``,
-    `YOUR TASK: develop the approved sketches below into ${total} finished`,
-    `mark${total === 1 ? "" : "s"}. Stay faithful to each sketch's core geometry`,
-    `and idea — this is a refinement, not a re-invention. Apply proper`,
-    `construction, optical correction, and the brand colors.`,
+    `YOUR TASK: develop that one concept into ${total} finished`,
+    `mark${total === 1 ? "" : "s"}. Stay faithful to its core geometry and idea —`,
+    `this is a refinement, not a re-invention. Apply proper construction and`,
+    `optical correction.`,
     ``,
     // A concept was chosen from a board where every sketch sat in one named
     // style world, so the world is part of what the client picked. Polishing a
     // brutalist mark into a refined one answers a brief they did not give.
-    `Each concept below names the STYLE WORLD it was drawn in. Finish it inside`,
-    `that world. Construction quality goes up; the world does not move — a`,
-    `brutalist mark becomes a better brutalist mark, blunt and heavy, not a`,
-    `smoothed one. "Finished" means resolved, not polite.`,
+    s.style_name
+      ? `The concept was drawn in the ${s.style_name} style world. Finish it inside that world.`
+      : `Finish the concept inside the style world it was drawn in.`,
+    `Construction quality goes up; the world does not move — a brutalist mark`,
+    `becomes a better brutalist mark, blunt and heavy, not a smoothed one.`,
+    `"Finished" means resolved, not polite.`,
     ``,
-    // The client asked for their concept, so every mark here develops one. When
-    // a concept is drawn more than once the copies must differ in resolution —
-    // otherwise the extra slots come back as the same mark and the choice at
-    // the end is not a choice.
-    `Where a concept is to be drawn more than once, each version must be a`,
-    `genuinely different RESOLUTION of that same idea — vary the construction,`,
-    `weight, proportion, counter-shapes or how the elements are joined. Never a`,
-    `new idea, never a recolour of the same drawing. Someone comparing them`,
-    `should see one concept resolved several convincing ways.`,
-    ``,
-    ...chunk.flatMap((j) => [
-      `CONCEPT "${j.sketch.name}" (${[
-        j.sketch.style_name ? `style world: ${j.sketch.style_name}` : "",
-        j.sketch.mark_type,
-        `territory: ${j.sketch.territory_name}`,
-      ]
-        .filter(Boolean)
-        .join("; ")}) — ${j.sketch.idea}`,
-      `Its art direction: ${j.sketch.art}`,
-      `Draw ${j.count} version${j.count === 1 ? "" : "s"} of this concept.`,
-      ``,
-    ]),
-    `Produce ${total} marks in the required format, with REFINES set to the`,
-    `exact sketch name each one develops. Give each version its own NAME.`,
   ];
+
+  if (total > 1) {
+    // Without this the versions come back as one drawing in several colourways,
+    // which is not a choice. Colour is the client's decision; the differences
+    // the studio is being paid for are structural.
+    lines.push(
+      `The ${total} versions are different RESOLUTIONS of this one idea. Vary`,
+      `the construction, weight, proportion, counter-shapes, and how the`,
+      `elements are joined. Never a new idea. Colour alone is NOT a version —`,
+      `the palettes below are given, so two marks that differ only in colour`,
+      `count as one and waste a slot. Someone comparing them should see one`,
+      `concept resolved ${total} convincing ways.`,
+      ``,
+    );
+  }
+
+  lines.push(
+    `The client has specified the colours for each version. Use exactly these`,
+    `— no others, no tints or shades that are not listed — and say in the ART`,
+    `which element takes which hex. Where a version lists more than one colour,`,
+    `the first is the primary.`,
+    ``,
+    ...input.versions.flatMap((v, i) => [
+      `VERSION ${i + 1} — colours: ${v.colors.join(", ")}${
+        v.colors.length === 1 ? " (a single-colour mark)" : ""
+      }`,
+    ]),
+    ``,
+    `Produce exactly ${total} mark${total === 1 ? "" : "s"} in the required`,
+    `format, one per version, with VERSION set to its number and REFINES set to`,
+    `"${s.name}". Give each version its own NAME.`,
+  );
   return lines.join("\n");
 }
 
@@ -296,6 +290,8 @@ export interface Candidate {
   idea: string;
   refines: string | null;
   art: string;
+  version: number; // 1-based; which requested version this mark answers
+  colors: string[]; // the colours that version asked for
 }
 
 function extractCandidates(text: string, fallbackTerritory: string): Candidate[] {
@@ -306,6 +302,7 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
     const art = seg.match(/ART:\s*([\s\S]+?)(?=\n[A-Z]{3,}:|$)/i)?.[1]?.trim() ?? "";
     if (!art) continue;
     const refinesRaw = seg.match(/REFINES:\s*(.+)/i)?.[1]?.trim() ?? "NEW";
+    const versionRaw = Number(seg.match(/VERSION:\s*(\d+)/i)?.[1]);
     out.push({
       name: seg.match(/NAME:\s*(.+)/i)?.[1]?.trim() || "Concept",
       territory: fallbackTerritory,
@@ -314,37 +311,11 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
       idea: seg.match(/IDEA:\s*(.+)/i)?.[1]?.trim() ?? "",
       refines: /^new$/i.test(refinesRaw) ? null : refinesRaw,
       art,
+      // Filled in by the caller, which knows what was actually asked for.
+      version: Number.isFinite(versionRaw) ? versionRaw : 0,
+      colors: [],
     });
   }
-  return out;
-}
-
-/**
- * Split the work so no single call has to produce more than `size` marks.
- *
- * Groups are measured in marks, not concepts: one concept asked for four ways
- * is a full call on its own, and a concept needing more than `size` versions is
- * split across calls rather than overloading one response.
- */
-function chunkJobs(jobs: VariantJob[], size: number): VariantJob[][] {
-  const out: VariantJob[][] = [];
-  let group: VariantJob[] = [];
-  let used = 0;
-  for (const job of jobs) {
-    let left = job.count;
-    while (left > 0) {
-      if (used === size) {
-        out.push(group);
-        group = [];
-        used = 0;
-      }
-      const take = Math.min(left, size - used);
-      group.push({ sketch: job.sketch, count: take });
-      used += take;
-      left -= take;
-    }
-  }
-  if (group.length) out.push(group);
   return out;
 }
 
@@ -354,12 +325,14 @@ export async function generateLogoFinalists(
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not configured.");
   }
-  if (input.liked.length === 0) {
-    throw new Error("At least one liked sketch is required.");
+  if (!input.concept) {
+    throw new Error("A concept is required.");
+  }
+  if (input.versions.length === 0) {
+    throw new Error("At least one version is required.");
   }
   const client = new Anthropic();
-  const defaultTerritory = input.liked[0].territory;
-  const likedIds = input.liked.map((s) => s.id);
+  const defaultTerritory = input.concept.territory;
 
   const call = async (system: string, prompt: string, maxTokens: number) => {
     const response = await client.messages.create({
@@ -375,59 +348,40 @@ export async function generateLogoFinalists(
       .join("\n");
   };
 
-  // Stages 1–3: think up the marks and rank them. Everything here is text, and
-  // together it was overrunning the budget before rendering could start.
+  // Both stages are text, and together they were overrunning the budget before
+  // rendering could start — which is why the result is cached before the
+  // renders begin.
   const design = async (): Promise<FinalistPlan> => {
-    // 1. Develop the liked concepts, and nothing else. Every finished mark
-    // resolves a concept the client actually chose — the studio no longer
-    // invents marks alongside them, which is what the client was asking for
-    // and what made this stage slow enough to miss the deadline.
-    const variants = planVariants(input.liked.length);
-    const work: VariantJob[] = input.liked.map((sketch, i) => ({
-      sketch,
-      count: variants[i],
-    }));
-    const jobs = chunkJobs(work, CHUNK).map(async (group) => {
-      const text = await call(
-        DESIGNER_SYSTEM,
-        buildRefinePrompt(input, group),
-        12000,
-      );
-      const cands = extractCandidates(text, defaultTerritory);
-      // Carry territory/type metadata over from the source sketch when traceable.
-      return cands.map((c) => {
-        const src = group.find(
-          (j) => j.sketch.name.toLowerCase() === (c.refines ?? "").toLowerCase(),
-        );
-        return src
-          ? {
-              ...c,
-              territory: src.sketch.territory,
-              mark_type: c.mark_type || src.sketch.mark_type,
-            }
-          : c;
-      });
-    });
-
-    const settled = await Promise.allSettled(jobs);
+    // 1. Develop the chosen concept into the requested versions. One call: at
+    // most MAX_REFINE_VERSIONS marks, and they have to differ from each other,
+    // which only works if one response writes them all.
+    const text = await call(DESIGNER_SYSTEM, buildRefinePrompt(input), 12000);
     input.clock?.lap("refine");
+
     const pool: Candidate[] = [];
     const seen = new Set<string>();
-    for (const result of settled) {
-      if (result.status !== "fulfilled") continue;
-      for (const c of result.value) {
-        let name = c.name;
-        let suffix = 2;
-        while (seen.has(name.toLowerCase())) name = `${c.name} ${suffix++}`;
-        seen.add(name.toLowerCase());
-        pool.push({ ...c, name });
-      }
+    const parsed = extractCandidates(text, defaultTerritory);
+    for (const [i, c] of parsed.entries()) {
+      // Trust the stated version when it names one we asked for; otherwise fall
+      // back to the order it came in. Either way the colours attached are the
+      // ones the client specified, never whatever the model wrote in the ART.
+      const stated = c.version >= 1 && c.version <= input.versions.length ? c.version : 0;
+      const version = stated || Math.min(i + 1, input.versions.length);
+      let name = c.name;
+      let suffix = 2;
+      while (seen.has(name.toLowerCase())) name = `${c.name} ${suffix++}`;
+      seen.add(name.toLowerCase());
+      pool.push({
+        ...c,
+        name,
+        version,
+        colors: input.versions[version - 1].colors,
+        territory: input.concept.territory,
+        mark_type: c.mark_type || input.concept.mark_type,
+        refines: input.concept.name,
+      });
     }
     if (pool.length === 0) {
-      const firstError = settled.find(
-        (r): r is PromiseRejectedResult => r.status === "rejected",
-      );
-      if (firstError) throw firstError.reason;
       throw new Error("The studio returned no usable marks.");
     }
 
@@ -456,7 +410,13 @@ export async function generateLogoFinalists(
     }
     input.clock?.lap("critique");
 
-    return { v: PLAN_VERSION, liked_ids: likedIds, pool, verdicts };
+    return {
+      v: PLAN_VERSION,
+      concept_id: input.concept.id,
+      versions: input.versions,
+      pool,
+      verdicts,
+    };
   };
 
   // A cached plan means an earlier attempt designed these marks and then ran
@@ -473,25 +433,22 @@ export async function generateLogoFinalists(
   const { pool, verdicts } = plan;
 
   const verdictFor = new Map(verdicts.map((v) => [v.name.toLowerCase(), v]));
-  const ranked = [...pool].sort((a, b) => {
-    const va = verdictFor.get(a.name.toLowerCase())?.score ?? 50;
-    const vb = verdictFor.get(b.name.toLowerCase())?.score ?? 50;
-    return vb - va;
-  });
 
-  // Sized from the picks, not from a fixed 9: slicing to a constant would drop
-  // a concept the client chose whenever they liked more than the target.
-  const targetCount = refinedMarkCount(input.liked.length);
+  // Presented in the order the client asked for them, not in the critique's
+  // preferred order. They numbered the versions and chose each one's colours,
+  // so version 2 should be the second card; the critique's opinion belongs in
+  // the note on the card, not in a reshuffle of their brief.
+  const ordered = [...pool].sort((a, b) => a.version - b.version);
 
-  // Render the survivors in parallel at high quality. One failed render drops
-  // that mark rather than losing the whole (paid) board.
+  // Render in parallel at high quality. One failed render drops that mark
+  // rather than losing the whole (paid) set.
   //
   // A resumed run starts the clock fresh with the design work already cached,
   // so it reaches this guard with the whole budget intact — which is the point
   // of caching the plan.
   input.clock?.guard("render the finished marks", 150_000);
   const rendered = await Promise.allSettled(
-    ranked.slice(0, targetCount).map(async (c, i) => {
+    ordered.slice(0, input.versions.length).map(async (c, i) => {
       const id = `fin_${Date.now().toString(36)}_${i + 1}`;
       const img = await renderLogoImage({
         brandId: input.brandId,
@@ -511,6 +468,8 @@ export async function generateLogoFinalists(
         score: v?.score ?? 50,
         refines: c.refines,
         art: c.art,
+        version: c.version,
+        colors: c.colors,
         image_url: img.url,
       } as LogoFinalist;
     }),

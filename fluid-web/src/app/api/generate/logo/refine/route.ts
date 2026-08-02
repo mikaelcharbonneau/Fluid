@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
+import { styleContext } from "@/lib/ai/step2";
 import { getPlatform } from "@/lib/ai/platform";
 import type { LogoSketch } from "@/lib/ai/sketches";
 import type { BoardSketch } from "@/lib/ai/sketch-board";
@@ -10,6 +10,7 @@ import {
   type FinalistPlan,
   type RefinableSketch,
 } from "@/lib/ai/refine";
+import { parseVersions, sameVersions } from "@/lib/logo-refine";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { getLogoConfig } from "@/lib/logo-styles";
@@ -18,10 +19,10 @@ import { startClock } from "@/lib/ai/budget";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// POST /api/generate/logo/refine — Phase 2 of the logo studio: develop the
-// liked sketches into finished vectors, several resolutions per concept, and
-// run the creative-director critique to rank them.
-// Body: { brandId: string, likedIds: string[] }.
+// POST /api/generate/logo/refine — Phase 2 of the logo studio: develop ONE
+// chosen concept into the versions the client briefed, each in the colours
+// they specified, then run the creative-director critique for the notes.
+// Body: { brandId: string, conceptId: string, versions: [{ colors: string[] }] }.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -33,14 +34,24 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as {
     brandId?: unknown;
-    likedIds?: unknown;
+    conceptId?: unknown;
+    versions?: unknown;
   };
   const brandId = typeof body.brandId === "string" ? body.brandId : "";
-  const likedIds = Array.isArray(body.likedIds)
-    ? body.likedIds.filter((x): x is string => typeof x === "string")
-    : [];
+  const conceptId = typeof body.conceptId === "string" ? body.conceptId : "";
   if (!brandId) {
     return NextResponse.json({ error: "Missing brandId." }, { status: 400 });
+  }
+
+  // Colours are the client's decision, so a malformed brief is refused rather
+  // than repaired — inventing one would put a colour on their logo that they
+  // never chose.
+  const versions = parseVersions(body.versions);
+  if (!versions) {
+    return NextResponse.json(
+      { error: "Choose how many versions you want and set the colours for each." },
+      { status: 400 },
+    );
   }
 
   const { data: brand, error: loadError } = await supabase
@@ -72,21 +83,26 @@ export async function POST(request: Request) {
   const legacy = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
   const sketches: RefinableSketch[] = board.length ? board : legacy;
 
-  // Likes may arrive in the request or, when the client just wants to refine
-  // what is already marked, be read from the board's own stored likes.
+  // Refinement develops exactly one concept. The request names it; a brand
+  // whose brief was saved earlier falls back to that, and a single liked
+  // concept is unambiguous enough to use on its own.
+  const storedChoice = typeof data.logo_refine_concept === "string"
+    ? data.logo_refine_concept
+    : "";
   const storedLikes = (data.logo_board_likes as string[] | undefined) ?? [];
-  const wanted = likedIds.length ? likedIds : storedLikes;
-  const liked = sketches.filter((s) => wanted.includes(s.id));
+  const wantedId =
+    conceptId || storedChoice || (storedLikes.length === 1 ? storedLikes[0] : "");
+  const concept = sketches.find((s) => s.id === wantedId) ?? null;
 
   if (!platform || sketches.length === 0) {
     return NextResponse.json(
-      { error: "Sketch concepts first, then refine the ones you like." },
+      { error: "Sketch concepts first, then refine the one you want." },
       { status: 400 },
     );
   }
-  if (liked.length === 0) {
+  if (!concept) {
     return NextResponse.json(
-      { error: "Like at least one concept to guide the refinement." },
+      { error: "Choose the one concept you want refined." },
       { status: 400 },
     );
   }
@@ -98,25 +114,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Brand colors: prefer the generated palette, fall back to the Step 2 pick.
-  const palette = data.palette as { colors?: { hex?: string }[] } | undefined;
-  const paletteColors =
-    palette?.colors?.map((c) => c.hex).filter((h): h is string => !!h) ??
-    paletteBasis(getStep2(data)) ??
-    undefined;
-
   const clock = startClock("logo/refine", 270_000);
 
   // A plan cached by an attempt that ran out of time rendering. Reusable only
-  // when the same picks produced it under the same composition — change what
-  // you liked, or ship a version that composes the set differently, and the
-  // marks get designed again rather than resumed into something stale.
+  // when it answers the same brief — same concept, same versions, same colours,
+  // same composition. Change any of those and the marks are designed again
+  // rather than resumed into something the client did not ask for.
   const cachedPlan = data.logo_finalist_plan as FinalistPlan | undefined;
   const reusable =
     !!cachedPlan &&
     cachedPlan.v === PLAN_VERSION &&
-    [...(cachedPlan.liked_ids ?? [])].sort().join(" ") ===
-      [...liked.map((s) => s.id)].sort().join(" ");
+    cachedPlan.concept_id === concept.id &&
+    sameVersions(cachedPlan.versions ?? [], versions);
   const plan = reusable ? cachedPlan : null;
 
   try {
@@ -125,11 +134,11 @@ export async function POST(request: Request) {
       brief: String(brand.brief),
       name: chosenBrandName(brand),
       platform,
-      liked,
+      concept,
+      versions,
       // refine.ts prints the creative platform itself via platformLines().
       styleContext: styleContext(brand, { omitPlatform: true }),
       config: getLogoConfig(data),
-      paletteColors,
       clock,
       plan,
       // Cached the moment the thinking is done, so a run killed while
@@ -150,7 +159,10 @@ export async function POST(request: Request) {
     // working unchanged.
     const nextPatch = {
       logo_finalists: finalists,
-      logo_sketch_likes: wanted,
+      // The brief that produced them, so the screen can show what was asked
+      // for and a later run can tell whether anything changed.
+      logo_refine_concept: concept.id,
+      logo_refine_versions: versions,
       // The marks are rendered, so the plan has nothing left to resume.
       logo_finalist_plan: null,
       logos: finalists.map((f) => ({
