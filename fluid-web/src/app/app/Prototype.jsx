@@ -1103,7 +1103,7 @@ const DirA_Step1_Brief = () => {
 // Reference-browsing and concept-drawing are separate steps, so the reference
 // gallery is no longer labelled "Concepts". Total is derived from this list —
 // the header used to hard-code "of 5".
-const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Export'];
+const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Refine', 'Export'];
 
 const ALogoProgress = ({ activeStep = 1 }) => {
   const steps = LOGO_STEPS;
@@ -2179,7 +2179,7 @@ const DirA_LogoSketches = () => {
         : 'Sketch a board, then like the ones worth developing.'}
       nextLabel="Continue to refinement"
       onBack={() => navigate('logo-references')}
-      onNext={() => { if (likes.length) makeToast('Refinement is the next step.'); }}
+      onNext={() => { if (likes.length) navigate('logo-refine'); }}
       nextDisabled={likes.length === 0}
     >
       <section aria-labelledby="logo-sketches-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
@@ -2303,6 +2303,207 @@ const DirA_LogoSketches = () => {
                   <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
                     <Thinking/>
                     <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>{busyLabel}</span>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </ALogoWizardLayout>
+  );
+};
+
+// Standalone logo studio · Step 6 · Refinement. The board is divergence; this
+// is convergence. One press develops every liked concept into a finished mark,
+// tops the pool up with new work in the same direction, and runs the critique
+// that culls it back to nine. It is a single charge, so nothing runs until the
+// client asks for it — the same rule the board screen follows.
+const DirA_LogoRefine = () => {
+  const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+  const brandId = draft && draft.id;
+
+  const board = Array.isArray(data.logo_board) ? data.logo_board : [];
+  const likeIds = Array.isArray(data.logo_board_likes) ? data.logo_board_likes : [];
+  const liked = board.filter((s) => likeIds.includes(s.id));
+
+  const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [vectorizing, setVectorizing] = React.useState('');
+  const chosen = (draft && draft.logo_choice) || null;
+
+  // Unliking here drops a concept from the set before it is paid for, which is
+  // the last chance to change your mind. It writes back to the board's own
+  // likes, so the two screens never disagree about what was chosen.
+  const unlike = (id) => {
+    setField('data', {
+      ...((draft && draft.data) || {}),
+      logo_board_likes: likeIds.filter((x) => x !== id),
+    });
+  };
+
+  const refine = async () => {
+    if (!brandId || loading || liked.length === 0) return;
+    setLoading(true); setError('');
+    const res = await apiRefineLogoSketches(brandId, likeIds);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setFinalists(res.finalists);
+      // The server has already merged these onto the brand. Mirroring them into
+      // the local draft keeps the screen correct if the client steps away and
+      // comes back before the next refresh lands.
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        logo_finalists: res.finalists,
+        logo_sketch_likes: likeIds,
+        logos: res.finalists.map((f) => ({
+          name: f.name, descriptor: f.idea, svg: f.svg || '', image_url: f.image_url,
+        })),
+      });
+    }
+    setLoading(false);
+  };
+
+  // Choosing a mark is also what commissions the real vector. Cached
+  // server-side, so re-picking one already traced costs nothing.
+  const choose = async (f) => {
+    setField('logo_choice', f.name);
+    if (f.svg || vectorizing) return;
+    setVectorizing(f.id); setError('');
+    const res = await apiVectorizeLogo(brandId, f.id);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
+      setFinalists(next);
+      setField('data', {
+        ...((draft && draft.data) || {}),
+        logo_finalists: next,
+        logos: next.map((x) => ({
+          name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url,
+        })),
+      });
+    }
+    setVectorizing('');
+  };
+
+  const done = finalists.length > 0;
+  const dockCopy = done
+    ? (chosen ? `${chosen} is your mark. Assemble the kit when you're ready.` : 'Pick the mark you want and the studio will trace it into vectors.')
+    : (liked.length
+        ? `${liked.length} liked concept${liked.length === 1 ? '' : 's'} ready to develop.`
+        : 'Go back and like at least one concept first.');
+
+  const toolBtn = {
+    padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
+    display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
+  };
+
+  return (
+    <ALogoWizardLayout
+      step={6}
+      title={done ? 'Choose the mark.' : 'Refine what you liked.'}
+      subtitle={done
+        ? 'Nine finished marks, developed from your picks and ranked by the studio’s critique.'
+        : 'The studio develops your picks into finished marks, draws more in the same direction, then critiques the pool down to nine.'}
+      dockCopy={dockCopy}
+      nextLabel="Assemble Brand Kit"
+      onBack={() => navigate('logo-sketches')}
+      onNext={() => { if (chosen) navigate('step5'); }}
+      nextDisabled={!chosen}
+    >
+      <section aria-labelledby="logo-refine-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+              Refinement{liked.length ? ` · ${liked.length} liked` : ''}{finalists.length ? ` · ${finalists.length} finalists` : ''}
+            </div>
+            <h3 id="logo-refine-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>{done ? 'The studio’s nine best.' : 'Develop the ideas worth finishing.'}</h3>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button type="button" onClick={refine} disabled={loading || liked.length === 0}
+              style={{...toolBtn,background:'#0E0F12',color:'#fff',
+                cursor:loading || liked.length === 0 ? 'default' : 'pointer',
+                opacity:loading || liked.length === 0 ? .5 : 1}}>
+              <Sparkle size={12} color="#FDBA50"/>
+              {loading ? 'Refining and critiquing…' : (done ? 'Refine again' : `Refine ${liked.length} concept${liked.length === 1 ? '' : 's'}`)}
+            </button>
+          </div>
+        </div>
+
+        {liked.length === 0 && (
+          <div role="status" style={{
+            padding:'14px 16px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>Refinement works from the concepts you liked, and none are marked yet.</span>
+            <button type="button" onClick={() => navigate('logo-sketches')} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Back to the board</button>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>{error}</span>
+            <button type="button" onClick={refine} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Try again</button>
+          </div>
+        )}
+
+        {/* What is going in, shown before the client spends. The concepts that
+            seed the refinement are exactly the ones marked on the board. */}
+        {!done && liked.length > 0 && (
+          <>
+            <div style={{
+              padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+              boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',lineHeight:1.5,
+            }}>
+              These {liked.length === 1 ? 'is the concept' : `are the ${liked.length} concepts`} the studio will
+              develop. It also draws new marks in the same direction so the critique has more than your picks to
+              choose between — which is why nine come back, not {liked.length}.
+            </div>
+            <div className="home-grid-3" style={{display:'grid',gap:12}}>
+              {liked.map((s) => (
+                <ASketchCard key={s.id} sketch={s} liked onLike={() => unlike(s.id)} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {(done || loading) && (
+          <div className="home-grid-3" style={{display:'grid',gap:12}}>
+            {finalists.map((f) => (
+              <AFinalistCard key={f.id} f={f} sel={chosen === f.name}
+                busy={vectorizing === f.id} onClick={() => choose(f)} />
+            ))}
+            {loading && !done && Array.from({ length: BOARD_SIZE }).map((_, i) => (
+              <div key={`pending-${i}`} style={{
+                background:'var(--bg-elev)',borderRadius:16,minHeight:210,
+                boxShadow:'inset 0 0 0 1px var(--line)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>
+                {/* One spinner for the set: refinement is a single pass, and
+                    nine spinners would read as nine separate waits. */}
+                {i === 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>Refining, expanding and critiquing…</span>
                   </div>
                 ) : null}
               </div>
@@ -6742,7 +6943,7 @@ PR.useContext = React.useContext;
 // All known routes. Determines whether a route string is valid.
 const ROUTES = [
   'home', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
-  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches',
+  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches', 'logo-refine',
 ];
 
 // Left rail label → route.  The rail labels are rendered by the existing
@@ -6772,6 +6973,7 @@ const ROUTE_META = {
   'logo-type':    { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'logo-references': { activeNav: 'brands',  breadcrumb: ['Brands', 'Logo studio'] },
   'logo-sketches': { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-refine':  { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'step1':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step2':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step3':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
@@ -6922,7 +7124,7 @@ function RouterProvider({ children }) {
   const routeRef = React.useRef(route);
   PR.useEffect(() => { routeRef.current = route; }, [route]);
 
-  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','logo-sketches','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
+  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','logo-sketches','logo-refine','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
 
   const navigate = PR.useCallback((next) => {
     if (!ROUTES.includes(next)) return;
@@ -7562,6 +7764,7 @@ const SCREEN_FOR_ROUTE = {
   'logo-type':    () => <DirA_LogoType />,
   'logo-references': () => <DirA_LogoReferences />,
   'logo-sketches': () => <DirA_LogoSketches />,
+  'logo-refine':  () => <DirA_LogoRefine />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Style />,
   'step3':        () => <DirA_Step3_Name />,
@@ -7599,6 +7802,7 @@ function QuickJump() {
     { id: 'logo-type',    label: 'Logo · 3 Type' },
     { id: 'logo-references', label: 'Logo · 4 References' },
     { id: 'logo-sketches', label: 'Logo · 5 Concepts' },
+    { id: 'logo-refine',  label: 'Logo · 6 Refine' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Style' },
     { id: 'step3',        label: 'Wizard · 3 Name' },
@@ -8043,7 +8247,7 @@ function BrandDraftProvider({ children }) {
   // Clear the draft whenever we leave a creation flow, so each new project
   // begins fresh (resume re-selects an explicit saved draft).
   React.useEffect(() => {
-    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches'].includes(route)) setDraft(null);
+    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches', 'logo-refine'].includes(route)) setDraft(null);
   }, [route]);
 
   // Create the correct kind of draft when either brief screen opens.
