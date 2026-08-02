@@ -29,6 +29,22 @@ export const BOARD_SIZE = 9;
  */
 export const MAX_REFERENCE_LIKES = BOARD_SIZE;
 
+/**
+ * How many finished marks refinement returns.
+ *
+ * The board diverges — nine unrelated directions. Refinement converges: it
+ * resolves the concepts the client actually picked and invents nothing
+ * alongside them. Liking one concept gets it drawn four ways; liking more than
+ * four widens the set rather than dropping a pick, so this is a floor, not a
+ * cap. It lives here so the screen and the studio quote the same number.
+ */
+export const REFINED_MARK_COUNT = 4;
+
+/** How many finished marks `likedCount` picks will produce. */
+export function refinedMarkCount(likedCount: number): number {
+  return Math.max(REFINED_MARK_COUNT, likedCount);
+}
+
 /** A liked reference, reduced to what the board needs from it. */
 export interface LikedReference {
   imagePath: string;
