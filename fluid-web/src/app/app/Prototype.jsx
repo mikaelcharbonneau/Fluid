@@ -9,7 +9,13 @@
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
-import { BOARD_SIZE, MAX_REFERENCE_LIKES, refinedMarkCount, summariseBoardPlan } from "@/lib/logo-board";
+import { BOARD_SIZE, MAX_REFERENCE_LIKES, summariseBoardPlan } from "@/lib/logo-board";
+import {
+  MAX_REFINE_VERSIONS,
+  MAX_VERSION_COLORS,
+  defaultVersionPalettes,
+  normaliseHex,
+} from "@/lib/logo-refine";
 import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
@@ -2175,8 +2181,8 @@ const DirA_LogoSketches = () => {
       title="Explore concepts."
       subtitle="Nine rough sketches at a time. Like the ones worth developing."
       dockCopy={likes.length
-        ? `${likes.length} liked concept${likes.length === 1 ? '' : 's'} will carry into refinement.`
-        : 'Sketch a board, then like the ones worth developing.'}
+        ? `${likes.length} concept${likes.length === 1 ? '' : 's'} saved. You'll choose ${likes.length === 1 ? 'it' : 'one of them'} to refine next.`
+        : 'Sketch a board, then like the ones worth keeping.'}
       nextLabel="Continue to refinement"
       onBack={() => navigate('logo-references')}
       onNext={() => { if (likes.length) navigate('logo-refine'); }}
@@ -2314,11 +2320,89 @@ const DirA_LogoSketches = () => {
   );
 };
 
+// One version's palette: the colours this version of the mark will be drawn in.
+// The first swatch is the primary — the studio is told so — which is why the
+// order is editable rather than a set.
+const AVersionPalette = ({ index, colors, onChange, disabled }) => {
+  const setColor = (i, value) => {
+    const next = [...colors];
+    next[i] = value;
+    onChange(next);
+  };
+  const remove = (i) => onChange(colors.filter((_, j) => j !== i));
+  const add = () => onChange([...colors, '#000000']);
+
+  return (
+    <div style={{
+      padding:'12px 13px',borderRadius:12,background:'var(--bg-elev)',
+      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',
+      flexDirection:'column',gap:10,
+    }}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <span style={{
+          fontSize:9.5,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase',
+          color:'var(--fg-2)',background:'var(--bg-sunken)',padding:'3px 8px',borderRadius:99,
+        }}>Version {index + 1}</span>
+        {colors.length < MAX_VERSION_COLORS && (
+          <button type="button" onClick={add} disabled={disabled} style={{
+            padding:'4px 9px',borderRadius:8,background:'transparent',color:'var(--fg-2)',
+            boxShadow:'inset 0 0 0 1px var(--line-strong)',fontSize:11,fontWeight:600,
+            border:0,cursor:disabled ? 'default' : 'pointer',opacity:disabled ? .5 : 1,
+          }}>Add colour</button>
+        )}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:7}}>
+        {colors.map((c, i) => (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+            <input
+              type="color"
+              value={c}
+              disabled={disabled}
+              onChange={(e) => setColor(i, e.target.value)}
+              aria-label={`Version ${index + 1} colour ${i + 1}`}
+              style={{
+                width:30,height:30,padding:0,border:0,borderRadius:8,
+                background:'transparent',cursor:disabled ? 'default' : 'pointer',flex:'0 0 30px',
+              }}
+            />
+            <input
+              type="text"
+              value={c}
+              disabled={disabled}
+              spellCheck={false}
+              onChange={(e) => setColor(i, e.target.value)}
+              aria-label={`Version ${index + 1} colour ${i + 1} hex`}
+              style={{
+                flex:1,minWidth:0,padding:'6px 9px',borderRadius:8,border:0,
+                boxShadow:'inset 0 0 0 1px var(--line)',background:'var(--bg-sunken)',
+                fontFamily:'var(--font-mono)',fontSize:11.5,color:'var(--fg-1)',
+              }}
+            />
+            {i === 0
+              ? <span style={{fontSize:10,color:'var(--fg-4)',flex:'0 0 auto'}}>primary</span>
+              : (
+                <button type="button" onClick={() => remove(i)} disabled={disabled}
+                  aria-label={`Remove colour ${i + 1} from version ${index + 1}`}
+                  style={{
+                    flex:'0 0 24px',width:24,height:24,borderRadius:99,border:0,
+                    background:'var(--bg-sunken)',color:'var(--fg-3)',fontSize:13,
+                    cursor:disabled ? 'default' : 'pointer',lineHeight:1,
+                  }}>×</button>
+              )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Standalone logo studio · Step 6 · Refinement. The board is divergence; this
-// is convergence. One press develops every liked concept into a finished mark,
-// tops the pool up with new work in the same direction, and runs the critique
-// that culls it back to nine. It is a single charge, so nothing runs until the
-// client asks for it — the same rule the board screen follows.
+// is convergence, and convergence means committing. The client briefs it: ONE
+// concept off the board, how many versions of it they want, and the colours
+// each version is drawn in. Liking stays unlimited — the board is a shelf — but
+// only one concept comes through this door. It is a single charge, so nothing
+// runs until the brief is complete and the client asks for it.
 const DirA_LogoRefine = () => {
   const { draft, setField } = useBrandDraft();
   const { navigate } = useRouter();
@@ -2329,26 +2413,79 @@ const DirA_LogoRefine = () => {
   const likeIds = Array.isArray(data.logo_board_likes) ? data.logo_board_likes : [];
   const liked = board.filter((s) => likeIds.includes(s.id));
 
+  // The brand's own colours seed the version palettes when it has any; with no
+  // palette saved the defaults are obvious placeholders the client will replace.
+  const brandColors = React.useMemo(() => {
+    const p = data.palette;
+    const fromPalette = Array.isArray(p && p.colors)
+      ? p.colors.map((c) => c && c.hex).filter(Boolean)
+      : [];
+    return fromPalette;
+  }, [data.palette]);
+
+  // A single liked concept needs no choosing. More than one, and the client
+  // picks — refinement develops exactly one.
+  const [conceptId, setConceptId] = React.useState(
+    data.logo_refine_concept || (liked.length === 1 ? liked[0].id : ''),
+  );
+  const concept = liked.find((s) => s.id === conceptId) || null;
+
+  const [versions, setVersions] = React.useState(() => {
+    const saved = Array.isArray(data.logo_refine_versions) ? data.logo_refine_versions : null;
+    return saved && saved.length ? saved : defaultVersionPalettes(2, brandColors);
+  });
+
   const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [vectorizing, setVectorizing] = React.useState('');
   const chosen = (draft && draft.logo_choice) || null;
 
-  // Unliking here drops a concept from the set before it is paid for, which is
-  // the last chance to change your mind. It writes back to the board's own
-  // likes, so the two screens never disagree about what was chosen.
-  const unlike = (id) => {
+  const persistBrief = (nextConceptId, nextVersions) => {
     setField('data', {
       ...((draft && draft.data) || {}),
-      logo_board_likes: likeIds.filter((x) => x !== id),
+      logo_refine_concept: nextConceptId,
+      logo_refine_versions: nextVersions,
     });
   };
 
+  const pickConcept = (id) => {
+    setConceptId(id);
+    persistBrief(id, versions);
+  };
+
+  // Changing the count keeps the palettes already set and only fills or trims
+  // the tail, so raising it from 2 to 3 doesn't discard the two you tuned.
+  const setVersionCount = (n) => {
+    const count = Math.min(MAX_REFINE_VERSIONS, Math.max(1, n));
+    const filled = defaultVersionPalettes(count, brandColors);
+    const next = Array.from({ length: count }, (_, i) => versions[i] || filled[i]);
+    setVersions(next);
+    persistBrief(conceptId, next);
+  };
+
+  const setVersionColors = (i, colors) => {
+    const next = versions.map((v, j) => (j === i ? { colors } : v));
+    setVersions(next);
+    persistBrief(conceptId, next);
+  };
+
+  // Every version must carry at least one colour we can hand a renderer. The
+  // hex fields are free text while you type, so a half-typed "#0e0" blocks the
+  // button rather than silently shipping a colour nobody chose.
+  const briefReady = !!concept
+    && versions.length > 0
+    && versions.every((v) => (v.colors || []).some((c) => !!normaliseHex(c)));
+
   const refine = async () => {
-    if (!brandId || loading || liked.length === 0) return;
+    if (!brandId || loading || !briefReady) return;
     setLoading(true); setError('');
-    const res = await apiRefineLogoSketches(brandId, likeIds);
+    // Send only the colours that parse, in order, so a stray keystroke in a
+    // hex field can't reach the studio.
+    const clean = versions.map((v) => ({
+      colors: (v.colors || []).map(normaliseHex).filter(Boolean),
+    }));
+    const res = await apiRefineLogoSketches(brandId, concept.id, clean);
     if (res.error) {
       setError(res.error);
     } else {
@@ -2359,7 +2496,8 @@ const DirA_LogoRefine = () => {
       setField('data', {
         ...((draft && draft.data) || {}),
         logo_finalists: res.finalists,
-        logo_sketch_likes: likeIds,
+        logo_refine_concept: concept.id,
+        logo_refine_versions: clean,
         logos: res.finalists.map((f) => ({
           name: f.name, descriptor: f.idea, svg: f.svg || '', image_url: f.image_url,
         })),
@@ -2392,14 +2530,16 @@ const DirA_LogoRefine = () => {
   };
 
   const done = finalists.length > 0;
-  // Quoted from the same helper the studio plans with, so the screen can't
-  // promise a number the refinement won't return.
-  const markCount = refinedMarkCount(liked.length);
+  const markCount = versions.length;
   const dockCopy = done
     ? (chosen ? `${chosen} is your mark. Assemble the kit when you're ready.` : 'Pick the mark you want and the studio will trace it into vectors.')
-    : (liked.length
-        ? `${liked.length} liked concept${liked.length === 1 ? '' : 's'} ready to develop.`
-        : 'Go back and like at least one concept first.');
+    : (liked.length === 0
+        ? 'Go back and like at least one concept first.'
+        : !concept
+          ? 'Choose the one concept you want refined.'
+          : briefReady
+            ? `“${concept.name}” in ${markCount} version${markCount === 1 ? '' : 's'}, ready to draw.`
+            : 'Every version needs at least one colour.');
 
   const toolBtn = {
     padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
@@ -2409,10 +2549,10 @@ const DirA_LogoRefine = () => {
   return (
     <ALogoWizardLayout
       step={6}
-      title={done ? 'Choose the mark.' : 'Refine what you liked.'}
+      title={done ? 'Choose the mark.' : 'Brief the refinement.'}
       subtitle={done
-        ? 'Finished marks, developed from your picks and ranked by the studio’s critique.'
-        : `The studio resolves what you liked into ${markCount} finished mark${markCount === 1 ? '' : 's'} — different constructions of your idea, not new ones.`}
+        ? 'Your finished marks, with the studio’s note on each.'
+        : 'Pick the one concept to develop, how many versions you want, and the colours each version is drawn in.'}
       dockCopy={dockCopy}
       nextLabel="Assemble Brand Kit"
       onBack={() => navigate('logo-sketches')}
@@ -2423,20 +2563,24 @@ const DirA_LogoRefine = () => {
         <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
           <div>
             <div className="eyebrow" style={{color:'var(--fg-3)'}}>
-              Refinement{liked.length ? ` · ${liked.length} liked` : ''}{finalists.length ? ` · ${finalists.length} finalists` : ''}
+              Refinement{liked.length ? ` · ${liked.length} liked` : ''}{finalists.length ? ` · ${finalists.length} finished` : ''}
             </div>
             <h3 id="logo-refine-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
               color:'#000',letterSpacing:'-0.015em',
-            }}>{done ? 'The studio’s nine best.' : 'Develop the ideas worth finishing.'}</h3>
+            }}>{done ? 'Your finished marks.' : 'One concept, resolved your way.'}</h3>
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <button type="button" onClick={refine} disabled={loading || liked.length === 0}
+            <button type="button" onClick={refine} disabled={loading || !briefReady}
               style={{...toolBtn,background:'#0E0F12',color:'#fff',
-                cursor:loading || liked.length === 0 ? 'default' : 'pointer',
-                opacity:loading || liked.length === 0 ? .5 : 1}}>
+                cursor:loading || !briefReady ? 'default' : 'pointer',
+                opacity:loading || !briefReady ? .5 : 1}}>
               <Sparkle size={12} color="#FDBA50"/>
-              {loading ? 'Refining and critiquing…' : (done ? 'Refine again' : `Refine ${liked.length} concept${liked.length === 1 ? '' : 's'}`)}
+              {loading
+                ? 'Drawing and critiquing…'
+                : (done
+                    ? 'Refine again'
+                    : `Refine ${markCount} version${markCount === 1 ? '' : 's'}`)}
             </button>
           </div>
         </div>
@@ -2469,22 +2613,107 @@ const DirA_LogoRefine = () => {
           </div>
         )}
 
-        {/* What is going in, shown before the client spends. The concepts that
-            seed the refinement are exactly the ones marked on the board. */}
+        {/* The brief, in the order the decisions are made: which concept, how
+            many versions of it, and what each version is drawn in. */}
         {!done && liked.length > 0 && (
           <>
-            <div style={{
-              padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
-              boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',lineHeight:1.5,
-            }}>
-              {liked.length === 1
-                ? `This is the concept the studio will develop. It comes back as ${markCount} finished marks — the same idea resolved ${markCount} ways, varying construction, weight and proportion. Nothing new is invented alongside it.`
-                : `These are the ${liked.length} concepts the studio will develop, coming back as ${markCount} finished marks between them. Every one resolves a concept you picked — nothing new is invented alongside them.`}
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                1 · The concept{liked.length > 1 ? ' — pick one' : ''}
+              </div>
+              <div style={{
+                padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+                boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',
+                lineHeight:1.5,marginBottom:12,
+              }}>
+                {liked.length > 1
+                  ? `You have ${liked.length} concepts saved. Refinement develops one of them — converging means committing to an idea and seeing it resolved properly. The rest stay liked on the board for later.`
+                  : 'This is the concept the studio will develop. Every mark that comes back is a resolution of it — nothing new is invented alongside it.'}
+              </div>
+              <div className="home-grid-3" style={{display:'grid',gap:12}}>
+                {liked.map((s) => {
+                  const sel = s.id === conceptId;
+                  return (
+                    <div
+                      key={s.id}
+                      role="radio"
+                      aria-checked={sel}
+                      tabIndex={0}
+                      onClick={() => pickConcept(s.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickConcept(s.id); }
+                      }}
+                      style={{
+                        borderRadius:18,cursor:'pointer',
+                        boxShadow: sel ? '0 0 0 2px #000' : 'none',
+                        opacity: sel || !concept ? 1 : .55,
+                        transition:'opacity .15s ease',
+                      }}
+                    >
+                      <ASketchCard sketch={s} liked={sel} onLike={() => pickConcept(s.id)} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="home-grid-3" style={{display:'grid',gap:12}}>
-              {liked.map((s) => (
-                <ASketchCard key={s.id} sketch={s} liked onLike={() => unlike(s.id)} />
-              ))}
+
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                2 · How many versions
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {Array.from({ length: MAX_REFINE_VERSIONS }, (_, i) => i + 1).map((n) => {
+                  const sel = versions.length === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setVersionCount(n)}
+                      disabled={loading}
+                      aria-pressed={sel}
+                      style={{
+                        padding:'9px 16px',borderRadius:10,border:0,fontSize:12.5,fontWeight:600,
+                        background: sel ? '#0E0F12' : 'var(--bg-elev)',
+                        color: sel ? '#fff' : 'var(--fg-2)',
+                        boxShadow: sel ? 'none' : 'inset 0 0 0 1px var(--line)',
+                        cursor: loading ? 'default' : 'pointer',
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+                <span style={{fontSize:11,color:'var(--fg-4)',alignSelf:'center',lineHeight:1.4}}>
+                  Each version is a different construction of the same idea — weight,
+                  proportion, how the parts join. Four is the most one pass will draw.
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                3 · Colours for each version
+              </div>
+              <div style={{
+                padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+                boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',
+                lineHeight:1.5,marginBottom:12,
+              }}>
+                The studio draws each version in exactly these colours and no others.
+                The first is the primary.
+                {brandColors.length === 0 && ' This brand has no palette saved yet, so these are starting points — change them to whatever you want.'}
+              </div>
+              <div className="home-grid-3" style={{display:'grid',gap:12}}>
+                {versions.map((v, i) => (
+                  <AVersionPalette
+                    key={i}
+                    index={i}
+                    colors={v.colors || []}
+                    disabled={loading}
+                    onChange={(colors) => setVersionColors(i, colors)}
+                  />
+                ))}
+              </div>
             </div>
           </>
         )}
@@ -2501,12 +2730,14 @@ const DirA_LogoRefine = () => {
                 boxShadow:'inset 0 0 0 1px var(--line)',
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                {/* One spinner for the set: refinement is a single pass, and
-                    nine spinners would read as nine separate waits. */}
+                {/* One spinner for the set: refinement is a single pass, and a
+                    spinner per slot would read as separate waits. */}
                 {i === 0 ? (
                   <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
                     <Thinking/>
-                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>Refining, expanding and critiquing…</span>
+                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>
+                      Drawing {markCount} version{markCount === 1 ? '' : 's'} of “{concept ? concept.name : 'your concept'}”…
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -3903,8 +4134,17 @@ const AFinalistCard = ({ f, sel, busy, onClick }) => (
     display:'flex', flexDirection:'column', gap:10,
   }}>
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
-        {f.svg ? 'Vector ready' : f.refines ? 'From your pick' : 'New direction'}
+      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase', display:'inline-flex', alignItems:'center', gap:6}}>
+        {f.version ? `Version ${f.version}` : (f.refines ? 'From your pick' : 'New direction')}
+        {f.svg && ' · vector ready'}
+        {/* The colours this version was briefed with, so a mark drawn in the
+            wrong palette is visible without opening the art direction. */}
+        {Array.isArray(f.colors) && f.colors.map((c) => (
+          <span key={c} title={c} style={{
+            width:9, height:9, borderRadius:99, background:c,
+            boxShadow:'inset 0 0 0 1px rgba(0,0,0,.18)', display:'inline-block',
+          }}/>
+        ))}
       </span>
       {busy
         ? <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:10, fontWeight:600, color:'var(--fg-2)'}}><Thinking/> tracing</span>
@@ -8032,12 +8272,13 @@ async function apiGenerateLogoBoard(brandId, config, fresh) {
   } catch { return { error: 'Network error.' }; }
 }
 
-// Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.
-async function apiRefineLogoSketches(brandId, likedIds) {
+// Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,
+// each in the colours the client set for it.
+async function apiRefineLogoSketches(brandId, conceptId, versions) {
   try {
     const r = await fetch('/api/generate/logo/refine', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
+      body: JSON.stringify({ brandId, conceptId, versions: versions || [] }),
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
