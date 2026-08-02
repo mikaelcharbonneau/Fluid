@@ -53,6 +53,20 @@ export type RefinableSketch = LogoSketch & {
   style_name?: string | null;
 };
 
+/**
+ * Everything the design stages produce, before a single pixel is rendered.
+ *
+ * Thinking up the marks and rendering them are both slow, and together they
+ * overran the function's budget. The plan is cached the moment the critique
+ * lands, so a run that dies during rendering resumes from here instead of
+ * paying for the same thinking twice.
+ */
+export interface FinalistPlan {
+  liked_ids: string[]; // the picks this plan was designed from
+  pool: Candidate[];
+  verdicts: Verdict[];
+}
+
 export interface RefineBrief {
   brandId: string;
   brief: string;
@@ -63,6 +77,12 @@ export interface RefineBrief {
   config?: LogoConfig | null; // the client's Step 4 brief
   paletteColors?: string[] | null; // brand hexes for the finished marks
   clock?: Clock | null; // phase timing, so the slow step shows up in the logs
+  // A plan from an earlier attempt that ran out of time. Present means the
+  // design stages are skipped and this run goes straight to rendering.
+  plan?: FinalistPlan | null;
+  // Called once the design stages finish, so the caller can cache the plan
+  // before the risky part starts.
+  onPlan?: (plan: FinalistPlan) => Promise<void> | void;
 }
 
 const MODEL = "claude-opus-4-8";
@@ -224,7 +244,7 @@ Respond with ONLY a JSON array, best candidate first, one entry per candidate:
 designer's verdict: what works, what to watch>"}]
 Include EVERY candidate. No prose, no code fences.`;
 
-interface Verdict {
+export interface Verdict {
   name: string;
   score: number;
   note: string;
@@ -255,7 +275,7 @@ function extractVerdicts(text: string): Verdict[] {
   }
 }
 
-interface Candidate {
+export interface Candidate {
   name: string;
   territory: string;
   mark_type: string;
@@ -302,6 +322,7 @@ export async function generateLogoFinalists(
   }
   const client = new Anthropic();
   const defaultTerritory = input.liked[0].territory;
+  const likedIds = input.liked.map((s) => s.id);
 
   const call = async (system: string, prompt: string, maxTokens: number) => {
     const response = await client.messages.create({
@@ -317,80 +338,100 @@ export async function generateLogoFinalists(
       .join("\n");
   };
 
-  // 1+2. Refine all liked sketches + expand the pool past 9, all in parallel,
-  // chunked so no single call produces more than CHUNK marks.
-  const expandCount = Math.max(0, POOL_TARGET - input.liked.length);
-  const jobs: Promise<Candidate[]>[] = [
-    ...chunk(input.liked, CHUNK).map(async (group) => {
-      const text = await call(
-        DESIGNER_SYSTEM,
-        buildRefinePrompt(input, group),
-        12000,
-      );
-      const cands = extractCandidates(text, defaultTerritory);
-      // Carry territory/type metadata over from the source sketch when traceable.
-      return cands.map((c) => {
-        const src = group.find(
-          (s) => s.name.toLowerCase() === (c.refines ?? "").toLowerCase(),
+  // Stages 1–3: think up the marks and rank them. Everything here is text, and
+  // together it was overrunning the budget before rendering could start.
+  const design = async (): Promise<FinalistPlan> => {
+    // 1+2. Refine all liked sketches + expand the pool past 9, all in parallel,
+    // chunked so no single call produces more than CHUNK marks.
+    const expandCount = Math.max(0, POOL_TARGET - input.liked.length);
+    const jobs: Promise<Candidate[]>[] = [
+      ...chunk(input.liked, CHUNK).map(async (group) => {
+        const text = await call(
+          DESIGNER_SYSTEM,
+          buildRefinePrompt(input, group),
+          12000,
         );
-        return src
-          ? { ...c, territory: src.territory, mark_type: c.mark_type || src.mark_type }
-          : c;
-      });
-    }),
-    ...chunk(Array.from({ length: expandCount }), CHUNK).map(async (group) => {
-      const text = await call(
-        DESIGNER_SYSTEM,
-        buildExpandPrompt(input, group.length),
-        12000,
-      );
-      return extractCandidates(text, defaultTerritory);
-    }),
-  ];
+        const cands = extractCandidates(text, defaultTerritory);
+        // Carry territory/type metadata over from the source sketch when traceable.
+        return cands.map((c) => {
+          const src = group.find(
+            (s) => s.name.toLowerCase() === (c.refines ?? "").toLowerCase(),
+          );
+          return src
+            ? { ...c, territory: src.territory, mark_type: c.mark_type || src.mark_type }
+            : c;
+        });
+      }),
+      ...chunk(Array.from({ length: expandCount }), CHUNK).map(async (group) => {
+        const text = await call(
+          DESIGNER_SYSTEM,
+          buildExpandPrompt(input, group.length),
+          12000,
+        );
+        return extractCandidates(text, defaultTerritory);
+      }),
+    ];
 
-  const settled = await Promise.allSettled(jobs);
-  input.clock?.lap("refine+expand");
-  const pool: Candidate[] = [];
-  const seen = new Set<string>();
-  for (const result of settled) {
-    if (result.status !== "fulfilled") continue;
-    for (const c of result.value) {
-      let name = c.name;
-      let suffix = 2;
-      while (seen.has(name.toLowerCase())) name = `${c.name} ${suffix++}`;
-      seen.add(name.toLowerCase());
-      pool.push({ ...c, name });
+    const settled = await Promise.allSettled(jobs);
+    input.clock?.lap("refine+expand");
+    const pool: Candidate[] = [];
+    const seen = new Set<string>();
+    for (const result of settled) {
+      if (result.status !== "fulfilled") continue;
+      for (const c of result.value) {
+        let name = c.name;
+        let suffix = 2;
+        while (seen.has(name.toLowerCase())) name = `${c.name} ${suffix++}`;
+        seen.add(name.toLowerCase());
+        pool.push({ ...c, name });
+      }
     }
-  }
-  if (pool.length === 0) {
-    const firstError = settled.find(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-    if (firstError) throw firstError.reason;
-    throw new Error("The studio returned no usable marks.");
-  }
+    if (pool.length === 0) {
+      const firstError = settled.find(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+      if (firstError) throw firstError.reason;
+      throw new Error("The studio returned no usable marks.");
+    }
 
-  // 3. Creative-director critique: score, cull, rank. If the critique call
-  // fails we degrade gracefully — return the pool uncritiqued rather than
-  // losing the user's paid generation.
-  let verdicts: Verdict[] = [];
-  try {
-    const critiquePrompt = [
-      ...commonContext(input),
-      ``,
-      `CANDIDATES (${pool.length}):`,
-      ...pool.flatMap((c, i) => [
+    // 3. Creative-director critique: score, cull, rank. If the critique call
+    // fails we degrade gracefully — return the pool uncritiqued rather than
+    // losing the user's paid generation.
+    let verdicts: Verdict[] = [];
+    try {
+      const critiquePrompt = [
+        ...commonContext(input),
         ``,
-        `#${i + 1} "${c.name}" (${c.mark_type}${c.refines ? `; develops client-approved concept "${c.refines}"` : "; new exploration"}) — ${c.idea}`,
-        `Art direction: ${c.art}`,
-      ]),
-      ``,
-      `Score and rank every candidate as a JSON array.`,
-    ].join("\n");
-    verdicts = extractVerdicts(await call(CRITIC_SYSTEM, critiquePrompt, 3000));
-  } catch {
-    verdicts = [];
+        `CANDIDATES (${pool.length}):`,
+        ...pool.flatMap((c, i) => [
+          ``,
+          `#${i + 1} "${c.name}" (${c.mark_type}${c.refines ? `; develops client-approved concept "${c.refines}"` : "; new exploration"}) — ${c.idea}`,
+          `Art direction: ${c.art}`,
+        ]),
+        ``,
+        `Score and rank every candidate as a JSON array.`,
+      ].join("\n");
+      verdicts = extractVerdicts(await call(CRITIC_SYSTEM, critiquePrompt, 3000));
+    } catch {
+      verdicts = [];
+    }
+    input.clock?.lap("critique");
+
+    return { liked_ids: likedIds, pool, verdicts };
+  };
+
+  // A cached plan means an earlier attempt designed these marks and then ran
+  // out of time rendering them. The thinking is already paid for, so resume
+  // from it — this is what makes "trying again resumes from there" true.
+  let plan = input.plan?.pool?.length ? input.plan : null;
+  if (plan) {
+    input.clock?.lap("resumed from cached plan");
+  } else {
+    plan = await design();
+    // Hand it back for caching before the timeout-prone part starts.
+    await input.onPlan?.(plan);
   }
+  const { pool, verdicts } = plan;
 
   const verdictFor = new Map(verdicts.map((v) => [v.name.toLowerCase(), v]));
   const ranked = [...pool].sort((a, b) => {
@@ -399,10 +440,12 @@ export async function generateLogoFinalists(
     return vb - va;
   });
 
-  input.clock?.lap("critique");
-
   // Render the survivors in parallel at high quality. One failed render drops
   // that mark rather than losing the whole (paid) board.
+  //
+  // A resumed run starts the clock fresh with the design work already cached,
+  // so it reaches this guard with the whole budget intact — which is the point
+  // of caching the plan.
   input.clock?.guard("render the finished marks", 150_000);
   const rendered = await Promise.allSettled(
     ranked.slice(0, FINAL_COUNT).map(async (c, i) => {
