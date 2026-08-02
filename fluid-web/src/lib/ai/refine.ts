@@ -1,14 +1,19 @@
 // Phase 2 · Convergence — high-fidelity finalists from the liked sketches.
 //
-// Three-stage studio process:
-//   1. REFINE: each liked croquis is developed into a finished vector mark —
+// Two-stage studio process:
+//   1. REFINE: every liked croquis is developed into finished vector marks —
 //      same underlying geometry, now with proper construction, optical
-//      correction, and the brand's palette.
-//   2. EXPAND: new concepts extending the user's demonstrated taste (the liked
-//      sketches' territories + formal attributes) top the pool up PAST 9 —
-//      we deliberately overproduce so the critique has something to cull.
-//   3. CRITIQUE: a creative-director pass scores every candidate against the
-//      studio rubric, kills the weak, and returns the best 9 with verdicts.
+//      correction, and the brand's palette. A concept drawn more than once
+//      comes back as different resolutions of that idea, never a new one.
+//   2. CRITIQUE: a creative-director pass scores each mark against the studio
+//      rubric and ranks them, attaching the verdict shown on every card.
+//
+// There used to be an EXPAND stage between them, inventing marks alongside the
+// client's picks so the critique could cull down to nine. It was the wrong
+// trade twice over: someone who liked one concept got eight marks they never
+// chose, and the invention was most of the work that pushed this route past
+// its deadline. Refinement now only resolves what was actually picked, so
+// nothing is culled and nothing is invented.
 //
 // Generation is chunked into parallel calls of ≤4 marks each to keep individual
 // responses fast and reliable.
@@ -19,6 +24,7 @@ import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import type { LogoSketch } from "./sketches";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
+import { refinedMarkCount } from "../logo-board";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -62,10 +68,20 @@ export type RefinableSketch = LogoSketch & {
  * paying for the same thinking twice.
  */
 export interface FinalistPlan {
+  v: number; // composition version — see PLAN_VERSION
   liked_ids: string[]; // the picks this plan was designed from
   pool: Candidate[];
   verdicts: Verdict[];
 }
+
+/**
+ * Bumped whenever what belongs in a plan changes.
+ *
+ * v1 plans were a pool of 11 that was mostly marks the client never picked, so
+ * resuming one would render the very thing this stage stopped producing. A
+ * plan from an older version is discarded and redesigned rather than reused.
+ */
+export const PLAN_VERSION = 2;
 
 export interface RefineBrief {
   brandId: string;
@@ -86,9 +102,22 @@ export interface RefineBrief {
 }
 
 const MODEL = "claude-opus-4-8";
-const FINAL_COUNT = 9;
-const POOL_TARGET = 11; // overproduce so the critique can cull
 const CHUNK = 4; // marks per generation call
+
+/**
+ * Spread the finished marks across the liked concepts.
+ *
+ * Every pick gets developed at least once — a mark the client chose is never
+ * dropped to hit the target — so liking more than REFINED_MARK_COUNT concepts
+ * widens the set rather than culling it. Remainders go to the earliest picks.
+ */
+export function planVariants(likedCount: number): number[] {
+  if (likedCount <= 0) return [];
+  const total = refinedMarkCount(likedCount);
+  const base = Math.floor(total / likedCount);
+  const extra = total % likedCount;
+  return Array.from({ length: likedCount }, (_, i) => base + (i < extra ? 1 : 0));
+}
 
 const DESIGNER_SYSTEM = `You are a senior identity designer at Fluid, a brand
 studio operating at the level of Pentagram or Wolff Olins. You are in the
@@ -161,23 +190,21 @@ function tasteProfile(liked: RefinableSketch[]): string[] {
 }
 
 // The style worlds the client actually picked from, in the order they appear.
-function likedStyles(liked: RefinableSketch[]): string[] {
-  const seen: string[] = [];
-  for (const s of liked) {
-    const name = (s.style_name ?? "").trim();
-    if (name && !seen.includes(name)) seen.push(name);
-  }
-  return seen;
+/** A liked sketch and how many finished resolutions of it to draw. */
+interface VariantJob {
+  sketch: RefinableSketch;
+  count: number;
 }
 
-function buildRefinePrompt(input: RefineBrief, chunk: RefinableSketch[]): string {
+function buildRefinePrompt(input: RefineBrief, chunk: VariantJob[]): string {
+  const total = chunk.reduce((n, j) => n + j.count, 0);
   const lines = [
     ...commonContext(input),
     ...tasteProfile(input.liked),
     ``,
-    `YOUR TASK: develop each of the following ${chunk.length} approved sketches`,
-    `into a finished mark. Stay faithful to each sketch's core geometry and`,
-    `idea — this is a refinement, not a re-invention. Apply proper`,
+    `YOUR TASK: develop the approved sketches below into ${total} finished`,
+    `mark${total === 1 ? "" : "s"}. Stay faithful to each sketch's core geometry`,
+    `and idea — this is a refinement, not a re-invention. Apply proper`,
     `construction, optical correction, and the brand colors.`,
     ``,
     // A concept was chosen from a board where every sketch sat in one named
@@ -188,52 +215,39 @@ function buildRefinePrompt(input: RefineBrief, chunk: RefinableSketch[]): string
     `brutalist mark becomes a better brutalist mark, blunt and heavy, not a`,
     `smoothed one. "Finished" means resolved, not polite.`,
     ``,
-    ...chunk.flatMap((s) => [
-      `CONCEPT "${s.name}" (${[
-        s.style_name ? `style world: ${s.style_name}` : "",
-        s.mark_type,
-        `territory: ${s.territory_name}`,
+    // The client asked for their concept, so every mark here develops one. When
+    // a concept is drawn more than once the copies must differ in resolution —
+    // otherwise the extra slots come back as the same mark and the choice at
+    // the end is not a choice.
+    `Where a concept is to be drawn more than once, each version must be a`,
+    `genuinely different RESOLUTION of that same idea — vary the construction,`,
+    `weight, proportion, counter-shapes or how the elements are joined. Never a`,
+    `new idea, never a recolour of the same drawing. Someone comparing them`,
+    `should see one concept resolved several convincing ways.`,
+    ``,
+    ...chunk.flatMap((j) => [
+      `CONCEPT "${j.sketch.name}" (${[
+        j.sketch.style_name ? `style world: ${j.sketch.style_name}` : "",
+        j.sketch.mark_type,
+        `territory: ${j.sketch.territory_name}`,
       ]
         .filter(Boolean)
-        .join("; ")}) — ${s.idea}`,
-      `Its art direction: ${s.art}`,
+        .join("; ")}) — ${j.sketch.idea}`,
+      `Its art direction: ${j.sketch.art}`,
+      `Draw ${j.count} version${j.count === 1 ? "" : "s"} of this concept.`,
       ``,
     ]),
-    `Produce ${chunk.length} marks in the required format, with REFINES set to`,
-    `the exact sketch name each one develops.`,
+    `Produce ${total} marks in the required format, with REFINES set to the`,
+    `exact sketch name each one develops. Give each version its own NAME.`,
   ];
-  return lines.join("\n");
-}
-
-function buildExpandPrompt(input: RefineBrief, count: number): string {
-  const styles = likedStyles(input.liked);
-  const lines = [
-    ...commonContext(input),
-    ...tasteProfile(input.liked),
-    ``,
-    `YOUR TASK: design ${count} NEW finished marks that EXTEND the client's`,
-    `demonstrated taste — same territories and formal qualities, genuinely new`,
-    `ideas (not variations of the approved sketches). Set REFINES: NEW.`,
-  ];
-  // New marks belong in the worlds the client chose from, not in a fourth one
-  // they never saw. Without this the expansion drifts toward a house style and
-  // the finished set reads as less varied than the board it came from.
-  if (styles.length) {
-    lines.push(
-      ``,
-      `Every new mark must sit in one of the style worlds the client chose`,
-      `from: ${styles.join(", ")}. Spread them across those worlds rather than`,
-      `settling into whichever is easiest to draw.`,
-    );
-  }
-  lines.push(``, `Produce ${count} marks in the required format.`);
   return lines.join("\n");
 }
 
 const CRITIC_SYSTEM = `You are the creative director of Fluid, a brand studio
 operating at the level of Pentagram or Wolff Olins. Your designers have
-produced candidate marks; your job is the cull. Judge each candidate honestly
-and rank them.
+resolved the client's chosen concepts several ways. Every one of these marks
+is going to the client, so your job is not the cull — it is to rank them
+honestly and say what you see. Judge each candidate on its own merits.
 
 ${CRITIQUE_RUBRIC}
 
@@ -305,9 +319,32 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
   return out;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+/**
+ * Split the work so no single call has to produce more than `size` marks.
+ *
+ * Groups are measured in marks, not concepts: one concept asked for four ways
+ * is a full call on its own, and a concept needing more than `size` versions is
+ * split across calls rather than overloading one response.
+ */
+function chunkJobs(jobs: VariantJob[], size: number): VariantJob[][] {
+  const out: VariantJob[][] = [];
+  let group: VariantJob[] = [];
+  let used = 0;
+  for (const job of jobs) {
+    let left = job.count;
+    while (left > 0) {
+      if (used === size) {
+        out.push(group);
+        group = [];
+        used = 0;
+      }
+      const take = Math.min(left, size - used);
+      group.push({ sketch: job.sketch, count: take });
+      used += take;
+      left -= take;
+    }
+  }
+  if (group.length) out.push(group);
   return out;
 }
 
@@ -341,39 +378,39 @@ export async function generateLogoFinalists(
   // Stages 1–3: think up the marks and rank them. Everything here is text, and
   // together it was overrunning the budget before rendering could start.
   const design = async (): Promise<FinalistPlan> => {
-    // 1+2. Refine all liked sketches + expand the pool past 9, all in parallel,
-    // chunked so no single call produces more than CHUNK marks.
-    const expandCount = Math.max(0, POOL_TARGET - input.liked.length);
-    const jobs: Promise<Candidate[]>[] = [
-      ...chunk(input.liked, CHUNK).map(async (group) => {
-        const text = await call(
-          DESIGNER_SYSTEM,
-          buildRefinePrompt(input, group),
-          12000,
+    // 1. Develop the liked concepts, and nothing else. Every finished mark
+    // resolves a concept the client actually chose — the studio no longer
+    // invents marks alongside them, which is what the client was asking for
+    // and what made this stage slow enough to miss the deadline.
+    const variants = planVariants(input.liked.length);
+    const work: VariantJob[] = input.liked.map((sketch, i) => ({
+      sketch,
+      count: variants[i],
+    }));
+    const jobs = chunkJobs(work, CHUNK).map(async (group) => {
+      const text = await call(
+        DESIGNER_SYSTEM,
+        buildRefinePrompt(input, group),
+        12000,
+      );
+      const cands = extractCandidates(text, defaultTerritory);
+      // Carry territory/type metadata over from the source sketch when traceable.
+      return cands.map((c) => {
+        const src = group.find(
+          (j) => j.sketch.name.toLowerCase() === (c.refines ?? "").toLowerCase(),
         );
-        const cands = extractCandidates(text, defaultTerritory);
-        // Carry territory/type metadata over from the source sketch when traceable.
-        return cands.map((c) => {
-          const src = group.find(
-            (s) => s.name.toLowerCase() === (c.refines ?? "").toLowerCase(),
-          );
-          return src
-            ? { ...c, territory: src.territory, mark_type: c.mark_type || src.mark_type }
-            : c;
-        });
-      }),
-      ...chunk(Array.from({ length: expandCount }), CHUNK).map(async (group) => {
-        const text = await call(
-          DESIGNER_SYSTEM,
-          buildExpandPrompt(input, group.length),
-          12000,
-        );
-        return extractCandidates(text, defaultTerritory);
-      }),
-    ];
+        return src
+          ? {
+              ...c,
+              territory: src.sketch.territory,
+              mark_type: c.mark_type || src.sketch.mark_type,
+            }
+          : c;
+      });
+    });
 
     const settled = await Promise.allSettled(jobs);
-    input.clock?.lap("refine+expand");
+    input.clock?.lap("refine");
     const pool: Candidate[] = [];
     const seen = new Set<string>();
     for (const result of settled) {
@@ -394,9 +431,11 @@ export async function generateLogoFinalists(
       throw new Error("The studio returned no usable marks.");
     }
 
-    // 3. Creative-director critique: score, cull, rank. If the critique call
-    // fails we degrade gracefully — return the pool uncritiqued rather than
-    // losing the user's paid generation.
+    // 2. Creative-director critique: score and rank. Nothing is culled any
+    // more — every mark develops a concept the client chose, so throwing one
+    // away would be discarding their pick. What this pass is for now is the
+    // ordering and the verdict note on each card. If it fails we degrade
+    // gracefully and return the marks unranked rather than losing them.
     let verdicts: Verdict[] = [];
     try {
       const critiquePrompt = [
@@ -417,7 +456,7 @@ export async function generateLogoFinalists(
     }
     input.clock?.lap("critique");
 
-    return { liked_ids: likedIds, pool, verdicts };
+    return { v: PLAN_VERSION, liked_ids: likedIds, pool, verdicts };
   };
 
   // A cached plan means an earlier attempt designed these marks and then ran
@@ -440,6 +479,10 @@ export async function generateLogoFinalists(
     return vb - va;
   });
 
+  // Sized from the picks, not from a fixed 9: slicing to a constant would drop
+  // a concept the client chose whenever they liked more than the target.
+  const targetCount = refinedMarkCount(input.liked.length);
+
   // Render the survivors in parallel at high quality. One failed render drops
   // that mark rather than losing the whole (paid) board.
   //
@@ -448,7 +491,7 @@ export async function generateLogoFinalists(
   // of caching the plan.
   input.clock?.guard("render the finished marks", 150_000);
   const rendered = await Promise.allSettled(
-    ranked.slice(0, FINAL_COUNT).map(async (c, i) => {
+    ranked.slice(0, targetCount).map(async (c, i) => {
       const id = `fin_${Date.now().toString(36)}_${i + 1}`;
       const img = await renderLogoImage({
         brandId: input.brandId,

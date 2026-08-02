@@ -9,7 +9,7 @@
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
-import { BOARD_SIZE, MAX_REFERENCE_LIKES, summariseBoardPlan } from "@/lib/logo-board";
+import { BOARD_SIZE, MAX_REFERENCE_LIKES, refinedMarkCount, summariseBoardPlan } from "@/lib/logo-board";
 import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
@@ -2392,6 +2392,9 @@ const DirA_LogoRefine = () => {
   };
 
   const done = finalists.length > 0;
+  // Quoted from the same helper the studio plans with, so the screen can't
+  // promise a number the refinement won't return.
+  const markCount = refinedMarkCount(liked.length);
   const dockCopy = done
     ? (chosen ? `${chosen} is your mark. Assemble the kit when you're ready.` : 'Pick the mark you want and the studio will trace it into vectors.')
     : (liked.length
@@ -2408,8 +2411,8 @@ const DirA_LogoRefine = () => {
       step={6}
       title={done ? 'Choose the mark.' : 'Refine what you liked.'}
       subtitle={done
-        ? 'Nine finished marks, developed from your picks and ranked by the studio’s critique.'
-        : 'The studio develops your picks into finished marks, draws more in the same direction, then critiques the pool down to nine.'}
+        ? 'Finished marks, developed from your picks and ranked by the studio’s critique.'
+        : `The studio resolves what you liked into ${markCount} finished mark${markCount === 1 ? '' : 's'} — different constructions of your idea, not new ones.`}
       dockCopy={dockCopy}
       nextLabel="Assemble Brand Kit"
       onBack={() => navigate('logo-sketches')}
@@ -2474,9 +2477,9 @@ const DirA_LogoRefine = () => {
               padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
               boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',lineHeight:1.5,
             }}>
-              These {liked.length === 1 ? 'is the concept' : `are the ${liked.length} concepts`} the studio will
-              develop. It also draws new marks in the same direction so the critique has more than your picks to
-              choose between — which is why nine come back, not {liked.length}.
+              {liked.length === 1
+                ? `This is the concept the studio will develop. It comes back as ${markCount} finished marks — the same idea resolved ${markCount} ways, varying construction, weight and proportion. Nothing new is invented alongside it.`
+                : `These are the ${liked.length} concepts the studio will develop, coming back as ${markCount} finished marks between them. Every one resolves a concept you picked — nothing new is invented alongside them.`}
             </div>
             <div className="home-grid-3" style={{display:'grid',gap:12}}>
               {liked.map((s) => (
@@ -2492,7 +2495,7 @@ const DirA_LogoRefine = () => {
               <AFinalistCard key={f.id} f={f} sel={chosen === f.name}
                 busy={vectorizing === f.id} onClick={() => choose(f)} />
             ))}
-            {loading && !done && Array.from({ length: BOARD_SIZE }).map((_, i) => (
+            {loading && !done && Array.from({ length: markCount }).map((_, i) => (
               <div key={`pending-${i}`} style={{
                 background:'var(--bg-elev)',borderRadius:16,minHeight:210,
                 boxShadow:'inset 0 0 0 1px var(--line)',
@@ -4388,7 +4391,7 @@ const DirA_Step4_Logo = () => {
   const SUBTITLES = {
     brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
     sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
-    final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
+    final: 'Finished marks, developed from your picks and ranked by the studio’s critique.',
   };
 
   return (
