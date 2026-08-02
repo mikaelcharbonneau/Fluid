@@ -768,11 +768,13 @@ const AStepProgress = ({ step }) => {
 };
 
 // Wizard layout wrapper
-const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, nextLabel, backLabel, isThinking }) => {
+const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, onBack, nextLabel, backLabel, dockCopy, nextDisabled, isThinking }) => {
   const { navigate } = useRouter();
-  // Back steps to the previous wizard step (available from step 2 on).
-  const canBack = step > 1;
-  const goBack = () => navigate('step' + (step - 1));
+  // Back steps to the previous wizard step (available from step 2 on), unless
+  // the step runs sub-steps of its own — step 4 walks back through those first
+  // and only leaves the step once it reaches the beginning of them.
+  const canBack = step > 1 || !!onBack;
+  const goBack = onBack || (() => navigate('step' + (step - 1)));
   return (
   <AShell breadcrumb={['Brands', 'New brand']}>
     <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
@@ -818,7 +820,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
         {/* Back button first (leftmost), then the Fluid logo, then the status
             text — the logo sits immediately to the left of the text. */}
         {canBack ? (
-          <button onClick={goBack} style={{
+          <button onClick={goBack} data-selfnav style={{
             padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
             fontSize:12,fontWeight:600, border:0, cursor:'pointer', flex:'0 0 auto'
           }}>
@@ -835,13 +837,21 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
             <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
               Fluid AI is drafting options... <Thinking/>
             </span>
-          ) : "Fill in card details to refine the strategy."}
+          ) : (dockCopy || "Fill in card details to refine the strategy.")}
         </div>
-        <button onClick={onNext} style={{
-          padding:'8px 14px',borderRadius:8,background:'#fff',color:'#000',
-          fontSize:12,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
-          border:0, cursor:'pointer'
-        }}>
+        <button
+          onClick={onNext}
+          disabled={nextDisabled}
+          aria-disabled={nextDisabled}
+          data-selfnav
+          style={{
+            padding:'8px 14px',borderRadius:8,
+            background: nextDisabled ? 'rgba(255,255,255,.14)' : '#fff',
+            color: nextDisabled ? 'rgba(255,255,255,.48)' : '#000',
+            fontSize:12,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
+            border:0, cursor: nextDisabled ? 'not-allowed' : 'pointer',
+          }}
+        >
           {nextLabel || 'Continue'} <ArrowRight size={12}/>
         </button>
       </div>
@@ -850,40 +860,6 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
   );
 };
 
-// Summary side panel used in steps 2, 3, 4
-const AContextPanel = ({ brief, styleName, brandName }) => (
-  <div style={{
-    background: 'var(--bg-elev)', borderRadius: 16, padding: 18,
-    boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-    display: 'flex', flexDirection: 'column', gap: 14,
-    height: 'max-content'
-  }}>
-    <div className="eyebrow" style={{fontSize: 10, color: 'var(--fg-3)'}}>Brand Context</div>
-    
-    {brief && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>01 Brief</div>
-        <div style={{fontSize:12.5, color:'var(--fg-2)', lineHeight:1.4}}>{brief}</div>
-      </div>
-    )}
-
-    {styleName && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>02 Style</div>
-        <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
-          <Chip tone="live">{styleName}</Chip>
-        </div>
-      </div>
-    )}
-
-    {brandName && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>03 Name</div>
-        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'var(--fg-1)'}}>{brandName}</div>
-      </div>
-    )}
-  </div>
-);
 
 // =====================================================================
 // A2 · Step 1 · Brief Input Screen
@@ -955,7 +931,12 @@ const ACompetitorChip = ({ name, domain, onRemove }) => (
 
 const DirA_Step1_Brief = () => {
   const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
   const brief = (draft && draft.brief) || '';
+  // The description is the one thing every later step reads. Audience and
+  // competitors are marked optional on the cards and are genuinely optional
+  // here too — gating on them would contradict the label.
+  const briefReady = brief.trim().length > 0;
   const audience = (draft && draft.audience) || '';
   // Competitors are stored as a comma-separated string; edit them as chips.
   const competitors = ((draft && draft.competitors) || '')
@@ -1004,7 +985,11 @@ const DirA_Step1_Brief = () => {
     status="Draft"
     progress="Step 1 of 5"
     nextLabel="Continue to Style"
-    onNext={() => {}}
+    dockCopy={briefReady
+      ? 'Ready. The style step builds on this description.'
+      : 'Describe the brand in a sentence or two to continue.'}
+    nextDisabled={!briefReady}
+    onNext={() => { if (briefReady) navigate('step2'); }}
     isThinking={false}
   >
     <div style={{display:'flex', flexDirection:'column', gap:14}}>
@@ -1129,6 +1114,126 @@ const DirA_Step1_Brief = () => {
 // the header used to hard-code "of 5".
 const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Refine', 'Export'];
 
+// The logo studio runs in two places: on its own, as a seven-step flow with its
+// own chrome, and inside step 4 of the brand wizard, where the same screens are
+// sub-steps of a bigger job. Rather than keep two implementations in step,
+// every screen renders through LogoStepShell and navigates through
+// useLogoFlowNav — and this context is what tells them which world they are in.
+//
+// Null means standalone. Embedded supplies the phase machinery instead.
+const LogoFlowContext = React.createContext(null);
+
+// The route each studio screen owns, in order. The embedded flow drops 'Brief':
+// the wizard already asked for the name, the description, the audience and the
+// competitors, and asking again is how a long form starts feeling like a form.
+const LOGO_ROUTES = [
+  'logo-brief', 'logo-direction', 'logo-type',
+  'logo-references', 'logo-sketches', 'logo-refine', 'logo-export',
+];
+const EMBEDDED_LOGO_ROUTES = LOGO_ROUTES.filter((r) => r !== 'logo-brief');
+
+/**
+ * Move between studio screens without caring which flow is running.
+ *
+ * Standalone screens change route; embedded ones change phase. Passing a route
+ * name the embedded flow doesn't have — 'logo-brief', or the wizard steps
+ * either side of it — falls through to real navigation, which is what makes
+ * "back" from the first sub-step land on step 3.
+ */
+const useLogoFlowNav = () => {
+  const { navigate } = useRouter();
+  const embed = React.useContext(LogoFlowContext);
+  return React.useCallback((target) => {
+    if (embed && EMBEDDED_LOGO_ROUTES.includes(target)) embed.setPhase(target);
+    else navigate(target);
+  }, [embed, navigate]);
+};
+
+/**
+ * The chrome around one studio screen.
+ *
+ * Standalone, it is the full-page logo wizard. Embedded, the page already
+ * belongs to the brand wizard — so this renders the heading and the sub-step
+ * rail inline, and hands its dock (label, copy, disabled, handlers) up to the
+ * parent, which owns the only dock on screen. Two docks would be two answers to
+ * the same question.
+ */
+const LogoStepShell = ({
+  children, step, title, subtitle, dockCopy,
+  nextLabel, onNext, onBack, nextDisabled,
+}) => {
+  const embed = React.useContext(LogoFlowContext);
+
+  // Embedded, the parent owns the page header and the dock, so it needs what
+  // this screen would have put in them. An effect rather than a render-time
+  // call: setting parent state while the child renders is the classic warning.
+  React.useEffect(() => {
+    if (!embed) return;
+    embed.setChrome({ title, subtitle, dockCopy, nextLabel, onNext, onBack, nextDisabled });
+  }, [embed, title, subtitle, dockCopy, nextLabel, onNext, onBack, nextDisabled]);
+
+  if (!embed) {
+    return (
+      <ALogoWizardLayout
+        step={step} title={title} subtitle={subtitle} dockCopy={dockCopy}
+        nextLabel={nextLabel} onNext={onNext} onBack={onBack} nextDisabled={nextDisabled}
+      >
+        {children}
+      </ALogoWizardLayout>
+    );
+  }
+
+  // No heading here: the wizard header above is already showing this screen's
+  // title, and repeating it would read as two different questions.
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <ALogoSubProgress activeStep={step} onPick={embed.goToStep} furthest={embed.furthest} />
+      {children}
+    </div>
+  );
+};
+
+// The sub-step rail shown inside wizard step 4. Steps already visited are
+// clickable so a client can go back and change a choice without walking the
+// whole flow forward again.
+const ALogoSubProgress = ({ activeStep, onPick, furthest = 1 }) => {
+  const labels = LOGO_STEPS.slice(1); // 'Brief' belongs to the standalone flow
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}
+      aria-label="Logo progress">
+      {labels.map((label, i) => {
+        const n = i + 2; // sub-step 1 is LOGO_STEPS[1]
+        const active = n === activeStep;
+        const done = n < activeStep;
+        const reachable = n <= furthest;
+        return (
+          <React.Fragment key={label}>
+            {i > 0 && <div style={{width:12,height:1.5,background:'var(--line)'}}/>}
+            <button
+              type="button"
+              onClick={reachable && !active ? () => onPick(n) : undefined}
+              aria-current={active ? 'step' : undefined}
+              disabled={!reachable || active}
+              style={{
+                display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',
+                borderRadius:99,border:0,fontFamily:'inherit',
+                background: active ? '#0E0F12' : (done ? 'var(--bg-sunken)' : 'transparent'),
+                boxShadow: active || done ? 'none' : 'inset 0 0 0 1px var(--line)',
+                color: active ? '#fff' : (reachable ? 'var(--fg-2)' : 'var(--fg-4)'),
+                fontSize:11.5,fontWeight: active ? 700 : 600,
+                cursor: reachable && !active ? 'pointer' : 'default',
+              }}
+            >
+              <span style={{fontFamily:'var(--font-mono)',fontSize:9.5,opacity:.75}}>{n - 1}</span>
+              {label}
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 const ALogoProgress = ({ activeStep = 1 }) => {
   const steps = LOGO_STEPS;
   return (
@@ -1190,7 +1295,7 @@ const ALogoWizardLayout = ({
         overflow:'hidden',zIndex:10,
       }}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'var(--fl-accent)'}}/>
-        {onBack && <button type="button" onClick={onBack} style={{
+        {onBack && <button type="button" onClick={onBack} data-selfnav style={{
           padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
           fontSize:12,fontWeight:600,border:0,cursor:'pointer',flex:'0 0 auto',
         }}>Back</button>}
@@ -1206,6 +1311,7 @@ const ALogoWizardLayout = ({
           onClick={onNext}
           disabled={nextDisabled}
           aria-disabled={nextDisabled}
+          data-selfnav
           style={{
             padding:'8px 14px',borderRadius:8,
             background:nextDisabled ? 'rgba(255,255,255,.14)' : '#fff',
@@ -1600,7 +1706,7 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
 // fictional identity board with concise guidance for the direction.
 const DirA_LogoDirection = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const direction = data.logo_direction || {};
   const selectedStyles = direction.mode === 'manual'
@@ -1630,7 +1736,7 @@ const DirA_LogoDirection = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={2}
       title="Pick a visual style."
       subtitle="Choose the visual world for the first round of logo concepts."
@@ -1712,7 +1818,7 @@ const DirA_LogoDirection = () => {
           })}
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -1720,7 +1826,7 @@ const DirA_LogoDirection = () => {
 // the later concepts step; this choice controls the structural logo direction.
 const DirA_LogoType = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const aiChoosesType = data.logo_type_mode === 'ai';
   const selectedTypes = Array.isArray(data.logo_types)
@@ -1748,7 +1854,7 @@ const DirA_LogoType = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={3}
       title="Choose a logo type."
       subtitle="Pick up to three structures for the first round of concepts to explore."
@@ -1776,7 +1882,7 @@ const DirA_LogoType = () => {
           })}
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -1934,7 +2040,7 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
 // the brief, style, type, and the references liked here.
 const DirA_LogoReferences = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
   const aiChoosesType = data.logo_type_mode === 'ai';
@@ -2026,7 +2132,7 @@ const DirA_LogoReferences = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={4}
       title="Browse logo references."
       subtitle="Like the existing logos that feel closest to the direction you want. Each one you like gets its own concept."
@@ -2085,7 +2191,7 @@ const DirA_LogoReferences = () => {
           </div>
         )}
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -2095,7 +2201,7 @@ const DirA_LogoReferences = () => {
 // something lands.
 const DirA_LogoSketches = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const brandId = draft && draft.id;
   const hasBrief = !!String((draft && draft.brief) || '').trim();
@@ -2194,7 +2300,7 @@ const DirA_LogoSketches = () => {
   const busyLabel = stage === 'research' ? 'Studying the category…' : 'Sketching nine concepts…';
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={5}
       title="Explore concepts."
       subtitle="Nine rough sketches at a time. Like the ones worth developing."
@@ -2334,7 +2440,7 @@ const DirA_LogoSketches = () => {
           </div>
         )}
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -2423,7 +2529,7 @@ const AVersionPalette = ({ index, colors, onChange, disabled }) => {
 // runs until the brief is complete and the client asks for it.
 const DirA_LogoRefine = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const brandId = draft && draft.id;
 
@@ -2565,7 +2671,7 @@ const DirA_LogoRefine = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={6}
       title={done ? 'Choose the mark.' : 'Brief the refinement.'}
       subtitle={done
@@ -2763,7 +2869,7 @@ const DirA_LogoRefine = () => {
           </div>
         )}
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -2776,7 +2882,7 @@ const DirA_LogoRefine = () => {
 // client who knows they need a PDF can have one whatever they ticked above.
 const DirA_LogoExport = () => {
   const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
 
   const svg = pickLogoSvg(draft || {});
@@ -2923,7 +3029,7 @@ const DirA_LogoExport = () => {
   });
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={7}
       title="Export the mark."
       subtitle="Say what it's for and the right files are picked for you. Change anything you like."
@@ -3050,7 +3156,7 @@ const DirA_LogoExport = () => {
           </div>
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
@@ -4052,6 +4158,15 @@ const ATypographySection = () => {
 
 const DirA_Step2_Style = () => {
   const { step2, setStep2 } = useStep2();
+  const { draft } = useBrandDraft();
+  const { navigate } = useRouter();
+  // A style is the gate. Palette and typography can be delegated to the studio
+  // and often are, so requiring them would block the path this screen invites.
+  //
+  // It lives on the brand's own `style_id` column, not in the step2 blob —
+  // both the direction cards and "Fluid decides" write there, and delegating
+  // stores the AI_CHOICE sentinel, which counts as decided.
+  const styleReady = !!(draft && draft.style_id);
 
   // Load all preview fonts once when the step opens.
   React.useEffect(() => {
@@ -4070,7 +4185,11 @@ const DirA_Step2_Style = () => {
     status="Draft"
     progress="Step 2 of 5"
     nextLabel="Continue to Name"
-    onNext={() => {}}
+    dockCopy={styleReady
+      ? 'Style set. Naming comes next.'
+      : 'Pick a visual direction — or let the studio choose one — to continue.'}
+    nextDisabled={!styleReady}
+    onNext={() => { if (styleReady) navigate('step3'); }}
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -4178,6 +4297,7 @@ const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
 const DirA_Step3_Name = () => {
   const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
   // `name` should still show that name selected here rather than looking as
   // though nothing was ever picked.
@@ -4251,7 +4371,11 @@ const DirA_Step3_Name = () => {
     status="Draft"
     progress="Step 3 of 5"
     nextLabel="Continue to Logo"
-    onNext={() => {}}
+    dockCopy={chosen
+      ? `“${chosen}” it is. The logo studio opens next.`
+      : 'Choose a name — the mark is drawn around it.'}
+    nextDisabled={!chosen}
+    onNext={() => { if (chosen) navigate('step4'); }}
     isThinking={loading}
   >
     {/* Top toolbar — own name, liked names, regenerate */}
@@ -4467,128 +4591,7 @@ const AFinalistCard = ({ f, sel, busy, onClick }) => (
   </div>
 );
 
-// Right-rail panel showing what the studio found in the category. Research is
-// part of the deliverable — the client should see the evidence behind the work,
-// including which clichés the marks are deliberately avoiding.
-const AResearchPanel = ({ research }) => {
-  const [open, setOpen] = React.useState(false);
-  if (!research) return null;
-  const rec = [
-    research.recommended_direction && ['Direction', research.recommended_direction],
-    research.recommended_palette && ['Palette', research.recommended_palette],
-    research.recommended_typography && ['Typography', research.recommended_typography],
-  ].filter(Boolean);
-  return (
-    <div style={{
-      background:'var(--bg-elev)', borderRadius:16, padding:16,
-      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:12,
-    }}>
-      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>
-        Category research{research.category ? ' · ' + research.category : ''}
-      </div>
-      {research.landscape && (
-        <div style={{fontSize:12, color:'var(--fg-2)', lineHeight:1.5}}>{research.landscape}</div>
-      )}
 
-      {/* The studio's calls on whatever the client delegated in Step 2. */}
-      {rec.length > 0 && (
-        <div style={{display:'flex', flexDirection:'column', gap:8, padding:'10px 12px', borderRadius:10, background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.30)'}}>
-          <div style={{fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'#8A5A12'}}>Fluid decided</div>
-          {rec.map(([label, r]) => (
-            <div key={label}>
-              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{label}: {r.value}</div>
-              {r.rationale && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{r.rationale}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(research.conventions || []).length > 0 && (
-        <div>
-          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Category conventions</div>
-          <div style={{display:'flex', flexDirection:'column', gap:4}}>
-            {research.conventions.slice(0, open ? 99 : 3).map((c, i) => (
-              <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>
-                <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.pattern}</span>
-                {c.note ? ` — ${c.note}` : ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {open && (
-        <>
-          {(research.trends || []).length > 0 && (
-            <div>
-              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Current design trends</div>
-              {research.trends.map((w, i) => (
-                <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>· {w}</div>
-              ))}
-            </div>
-          )}
-          {(research.competitors || []).length > 0 && (
-            <div>
-              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Competitor identities</div>
-              {research.competitors.map((c) => (
-                <div key={c.name} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45, marginBottom:3}}>
-                  <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.name}</span> — {c.identity}
-                </div>
-              ))}
-            </div>
-          )}
-          {(research.sources || []).length > 0 && (
-            <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.5, wordBreak:'break-all'}}>
-              {research.sources.length} source{research.sources.length === 1 ? '' : 's'} consulted
-            </div>
-          )}
-        </>
-      )}
-
-      <button onClick={() => setOpen((v) => !v)} style={{
-        alignSelf:'flex-start', padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
-        background:'transparent', color:'var(--fg-2)', fontSize:11.5, fontWeight:600,
-        boxShadow:'inset 0 0 0 1px var(--line)',
-      }}>{open ? 'Show less' : 'Full findings'}</button>
-    </div>
-  );
-};
-
-// Right-rail panel showing the creative platform the board was designed
-// from — the strategy is part of the deliverable, not hidden plumbing.
-const APlatformPanel = ({ platform }) => {
-  if (!platform) return null;
-  return (
-    <div style={{
-      background:'var(--bg-elev)', borderRadius:16, padding:16,
-      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:12,
-    }}>
-      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>Creative platform</div>
-      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, lineHeight:1.35, letterSpacing:'-0.015em', color:'#000'}}>
-        “{platform.brand_idea}”
-      </div>
-      {(platform.personality || []).length > 0 && (
-        <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
-          {platform.personality.map((p) => (
-            <span key={p} style={{fontSize:10.5, fontWeight:600, color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'3px 9px', borderRadius:99}}>{p}</span>
-          ))}
-        </div>
-      )}
-      {(platform.territories || []).length > 0 && (
-        <div style={{display:'flex', flexDirection:'column', gap:8}}>
-          {platform.territories.map((t) => (
-            <div key={t.key}>
-              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{t.name}</div>
-              <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4}}>{t.description}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ── Step 4 brief · preview illustrations ─────────────────────────────
 // Small hand-authored SVGs showing what each choice produces. These are
@@ -4790,379 +4793,114 @@ const AChoiceCard = ({ option, preview, refs, sel, onClick }) => {
   );
 };
 
+// Brand wizard · Step 4 · Logo.
+//
+// The same studio the standalone flow runs, as sub-steps of one wizard step.
+// Not a reimplementation: these are the very screens from that flow, rendered
+// through LogoStepShell with LogoFlowContext supplied, so a fix to the board or
+// the refinement brief lands in both places at once.
+//
+// The studio's own brief screen is skipped. The wizard already asked for the
+// name, the description, the audience and the competitors, and the one thing it
+// genuinely still needs to ask — which style world the MARK lives in, a
+// different question from the brand's visual style — is the first sub-step.
+const EMBEDDED_LOGO_SCREENS = {
+  'logo-direction': DirA_LogoDirection,
+  'logo-type': DirA_LogoType,
+  'logo-references': DirA_LogoReferences,
+  'logo-sketches': DirA_LogoSketches,
+  'logo-refine': DirA_LogoRefine,
+  'logo-export': DirA_LogoExport,
+};
+
+// Where to drop someone back into the studio, read off what the brand already
+// has. Resuming at the start when nine concepts are already drawn would look
+// like the work had been lost.
+function resumeLogoPhase(data) {
+  const d = data || {};
+  if ((d.logo_finalists || []).length) return 'logo-export';
+  if ((d.logo_board || []).length) return 'logo-sketches';
+  if ((d.logo_types || []).length || d.logo_type_mode) return 'logo-references';
+  if (d.logo_direction) return 'logo-type';
+  return 'logo-direction';
+}
+
 const DirA_Step4_Logo = () => {
-  const { draft, setField } = useBrandDraft();
-  const brandId = draft && draft.id;
+  const { draft } = useBrandDraft();
+  const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
-  const brief = String((draft && draft.brief) || '').trim();
-  const hasBrief = !!brief;
-  const name = (draft && (draft.name_choice || draft.name)) || '';
-  const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
-  const chosen = (draft && draft.logo_choice) || null;
 
-  const savedConfig = data.logo_config || {};
-  const [platform, setPlatform] = React.useState(data.creative_platform || null);
-  const [research, setResearch] = React.useState(data.research || null);
-  const [sketches, setSketches] = React.useState(data.logo_sketches || []);
-  const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
-  const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
-  // The Step 4 brief — the studio doesn't draw a line until the client has
-  // specified what kind of mark they're commissioning.
-  const [markType, setMarkType] = React.useState(savedConfig.mark_type || null);
-  const [designStyle, setDesignStyle] = React.useState(savedConfig.design_style || 'studio');
-  const [instructions, setInstructions] = React.useState(savedConfig.instructions || '');
-  const [phase, setPhase] = React.useState(
-    (data.logo_finalists || []).length ? 'final'
-      : (data.logo_sketches || []).length ? 'sketch'
-      : 'brief',
+  const [phase, setPhase] = React.useState(() => resumeLogoPhase(data));
+  const index = Math.max(0, EMBEDDED_LOGO_ROUTES.indexOf(phase));
+  const stepNo = index + 2; // sub-step 1 is LOGO_STEPS[1], 'Style'
+  const [furthest, setFurthest] = React.useState(stepNo);
+
+  // The active screen hands its header and dock up here. Handlers live in a ref
+  // and only the text lives in state: a screen re-renders with fresh inline
+  // callbacks constantly, and storing those in state would set state on every
+  // render of the child, which is a render loop with extra steps.
+  const handlers = React.useRef({});
+  const [chrome, setChrome] = React.useState({});
+  const publishChrome = React.useCallback((next) => {
+    handlers.current = next;
+    setChrome((prev) => (
+      prev.title === next.title
+      && prev.subtitle === next.subtitle
+      && prev.dockCopy === next.dockCopy
+      && prev.nextLabel === next.nextLabel
+      && prev.nextDisabled === next.nextDisabled
+        ? prev
+        : {
+            title: next.title,
+            subtitle: next.subtitle,
+            dockCopy: next.dockCopy,
+            nextLabel: next.nextLabel,
+            nextDisabled: next.nextDisabled,
+          }
+    ));
+  }, []);
+
+  const goPhase = React.useCallback((next) => {
+    setPhase(next);
+    const n = EMBEDDED_LOGO_ROUTES.indexOf(next) + 2;
+    setFurthest((f) => Math.max(f, n));
+  }, []);
+
+  const goToStep = React.useCallback((n) => {
+    goPhase(EMBEDDED_LOGO_ROUTES[n - 2]);
+  }, [goPhase]);
+
+  const flow = React.useMemo(
+    () => ({ setPhase: goPhase, setChrome: publishChrome, goToStep, furthest }),
+    [goPhase, publishChrome, goToStep, furthest],
   );
-  const [loadingSketches, setLoadingSketches] = React.useState(false);
-  const [loadingRefine, setLoadingRefine] = React.useState(false);
-  const [stage, setStage] = React.useState('');
-  const [error, setError] = React.useState('');
 
-  const loading = loadingSketches || loadingRefine;
+  const Screen = EMBEDDED_LOGO_SCREENS[phase] || DirA_LogoDirection;
 
-  // Phase 1 — draw one more concept sketch. Likes so far bias the new concept;
-  // `fresh` starts a new board (used when the brief just changed) instead of
-  // adding this concept to the existing one. The server returns the full
-  // board either way, so the client just displays whatever comes back.
-  const generateSketches = React.useCallback(async (likedIds, { fresh = false } = {}) => {
-    if (!brandId || !markType) return;
-    setLoadingSketches(true); setError('');
-    setPhase('sketch');
-
-    // Research and the platform run as their own request. Doing them inline
-    // with the design and render passes exceeded the server's time limit and
-    // the whole board was lost. Both are cached, so this returns immediately
-    // on a regeneration.
-    setStage('research');
-    const pre = await apiResearchCategory(brandId);
-    if (pre.error) {
-      // Not fatal: the studio can still design without category grounding.
-      // Say so rather than failing silently on a degraded result.
-      console.warn('Research unavailable:', pre.error);
-    } else {
-      if (pre.research) setResearch(pre.research);
-      if (pre.platform) setPlatform(pre.platform);
-    }
-
-    setStage('sketch');
-    const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
-      mark_type: markType, design_style: designStyle, instructions,
-    }, fresh);
-    if (res.error) {
-      setError(res.error);
-      if (!sketches.length) setPhase('brief');
-    } else {
-      setPlatform(res.platform);
-      if (res.research) setResearch(res.research);
-      setSketches(res.sketches);
-      setLikes(fresh ? [] : (likedIds || []));
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        ...(res.research ? { research: res.research } : {}),
-        creative_platform: res.platform,
-        logo_config: { mark_type: markType, design_style: designStyle, instructions },
-        logo_sketches: res.sketches,
-        logo_sketch_likes: fresh ? [] : (likedIds || []),
-      });
-    }
-    setStage('');
-    setLoadingSketches(false);
-  }, [brandId, draft, setField, markType, designStyle, instructions, sketches.length]);
-
-  // Phase 2 — refine the liked directions into 9 critiqued finalists.
-  const refine = React.useCallback(async () => {
-    if (!brandId || likes.length === 0) return;
-    setLoadingRefine(true); setError('');
-    const res = await apiRefineLogoSketches(brandId, likes);
-    if (res.error) {
-      setError(res.error);
-    } else {
-      setFinalists(res.finalists);
-      setPhase('final');
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        logo_finalists: res.finalists,
-        logo_sketch_likes: likes,
-        logos: res.finalists.map((f) => ({ name: f.name, descriptor: f.idea, svg: f.svg })),
-      });
-    }
-    setLoadingRefine(false);
-  }, [brandId, likes, draft, setField]);
-
-  // Choosing a mark is also the trigger to produce the real vector file.
-  // Cached server-side, so re-picking the same mark costs nothing.
-  const [vectorizing, setVectorizing] = React.useState('');
-  const chooseFinalist = async (f) => {
-    setField('logo_choice', f.name);
-    if (f.svg || vectorizing) return;
-    setVectorizing(f.id); setError('');
-    const res = await apiVectorizeLogo(brandId, f.id);
-    if (res.error) {
-      setError(res.error);
-    } else {
-      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
-      setFinalists(next);
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        logo_finalists: next,
-        logos: next.map((x) => ({ name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url })),
-      });
-    }
-    setVectorizing('');
-  };
-
-  const toggleLike = (id) => {
-    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
-    setLikes(next);
-    setField('data', { ...((draft && draft.data) || {}), logo_sketch_likes: next });
-  };
-
-  // No auto-generation: the studio waits for the client's brief. Nothing is
-  // drawn (and no tokens spent) until a mark type is chosen.
-
-  const toolBtn = {
-    padding:'8px 12px', borderRadius:10, fontSize:12, fontWeight:600, border:0,
-    display:'inline-flex', alignItems:'center', gap:6,
-  };
-
-  const TITLES = {
-    brief: 'Brief the studio.',
-    sketch: 'Pick the directions you like.',
-    final: 'Choose the mark.',
-  };
-  const SUBTITLES = {
-    brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
-    sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
-    final: 'Finished marks, developed from your picks and ranked by the studio’s critique.',
-  };
+  // Back out of the first sub-step lands on step 3, not on the studio's own
+  // brief screen — which this flow skipped, and which would strand the client
+  // in the standalone flow if they reached it.
+  const onBack = index === 0
+    ? () => navigate('step3')
+    : () => handlers.current.onBack && handlers.current.onBack();
 
   return (
-  <AWizardLayout
-    step={4}
-    title={TITLES[phase]}
-    subtitle={SUBTITLES[phase]}
-    status="Draft"
-    progress="Step 4 of 5"
-    nextLabel="Assemble Brand Kit"
-    onNext={() => {}}
-    isThinking={loading}
-  >
-    <div style={{display:'grid', gridTemplateColumns:'2.6fr 1fr', gap:18, alignItems:'start'}}>
-      <div>
-        {/* ── Toolbar ─────────────────────────────────────────────── */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:14, flexWrap:'wrap'}}>
-          {phase === 'brief' ? (
-            <>
-              <div className="eyebrow" style={{color:'var(--fg-3)'}}>The brief</div>
-              {sketches.length > 0 && (
-                <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
-                  Back to sketches
-                </button>
-              )}
-            </>
-          ) : phase === 'sketch' ? (
-            <>
-              <div className="eyebrow" style={{color:'var(--fg-3)'}}>
-                Concept sketches{likes.length ? ' · ' + likes.length + ' liked' : ''}
-              </div>
-              <div style={{display:'flex', gap:8}}>
-                <button onClick={() => !loading && setPhase('brief')} disabled={loading} style={{
-                  ...toolBtn, background:'transparent', color:'var(--fg-2)',
-                  boxShadow:'inset 0 0 0 1px var(--line)',
-                  cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1,
-                }}>
-                  Edit brief
-                </button>
-                <button onClick={() => !loading && hasBrief && generateSketches(likes)} disabled={loading || !hasBrief} style={{
-                  ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
-                  boxShadow:'inset 0 0 0 1px var(--line)',
-                  cursor: loading || !hasBrief ? 'default' : 'pointer', opacity: loading || !hasBrief ? 0.6 : 1,
-                }}>
-                  <Sparkle size={11}/> {sketches.length ? 'Draw another concept' : 'Sketch a concept'}
-                </button>
-                <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
-                  ...toolBtn, background:'#000', color:'#fff',
-                  cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.5 : 1,
-                }}>
-                  Create high-fidelity logos {likes.length ? '(' + likes.length + ')' : ''} <ArrowRight size={11}/>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
-                ← Concept sketches
-              </button>
-              <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
-                ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)', boxShadow:'inset 0 0 0 1px var(--line)',
-                cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.6 : 1,
-              }}>
-                <Sparkle size={11}/> Re-run the studio
-              </button>
-            </>
-          )}
-        </div>
-
-        {error && (
-          <div style={{marginBottom:14, padding:'12px 14px', borderRadius:12, background:'rgba(253,121,71,.10)', boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)', fontSize:12.5, color:'#A8421F', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
-            <span>{error}</span>
-            <button onClick={() => phase === 'final' || finalists.length ? refine() : generateSketches(likes)} style={{padding:'5px 10px', borderRadius:8, background:'#000', color:'#fff', fontSize:11.5, fontWeight:600, border:0, cursor:'pointer'}}>Try again</button>
-          </div>
-        )}
-
-        {!hasBrief && !sketches.length && (
-          <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5, background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)'}}>
-            Add a brief in Step 1 and the studio will sketch logo concepts here.
-          </div>
-        )}
-
-        {/* ── Phase 0 · the brief ─────────────────────────────────── */}
-        {phase === 'brief' && hasBrief && (
-          <div style={{display:'flex', flexDirection:'column', gap:22}}>
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>What kind of mark?</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Required</span>
-              </div>
-              <div className="home-grid-3" style={{display:'grid', gap:10}}>
-                {MARK_TYPE_OPTIONS.map((o) => (
-                  <AChoiceCard key={o.id} option={o} preview={MARK_TYPE_PREVIEW[o.id]}
-                    refs={logoReferencesFor(o.id)}
-                    sel={markType === o.id} onClick={() => setMarkType(o.id)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Visual language</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Current logo-design trends</span>
-              </div>
-              <div className="home-grid-3" style={{display:'grid', gap:10}}>
-                {DESIGN_STYLE_OPTIONS.map((o) => (
-                  <AChoiceCard key={o.id} option={o} preview={DESIGN_STYLE_PREVIEW[o.id]}
-                    sel={designStyle === o.id} onClick={() => setDesignStyle(o.id)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Anything else?</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Optional</span>
-              </div>
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value.slice(0, 1000))}
-                placeholder="e.g. avoid anything circular · reference our origami packaging · must work embroidered on a cap"
-                rows={3}
-                style={{
-                  width:'100%', resize:'vertical', padding:'12px 14px', borderRadius:12,
-                  background:'var(--bg-elev)', border:0, outline:'none',
-                  boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-                  fontSize:13, lineHeight:1.5, color:'var(--fg-1)', fontFamily:'inherit',
-                }}
-              />
-              <div style={{fontSize:11, color:'var(--fg-4)', marginTop:5, textAlign:'right'}}>{instructions.length}/1000</div>
-            </div>
-
-            <div style={{display:'flex', alignItems:'center', gap:12, flexWrap:'wrap'}}>
-              <button onClick={() => !loading && markType && generateSketches([], { fresh: true })} disabled={loading || !markType} style={{
-                ...toolBtn, padding:'11px 18px', fontSize:13.5, background:'#000', color:'#fff',
-                cursor: loading || !markType ? 'default' : 'pointer', opacity: loading || !markType ? 0.5 : 1,
-              }}>
-                <Sparkle size={12} color="#fff"/> Sketch a concept <ArrowRight size={12}/>
-              </button>
-              {!markType && <span style={{fontSize:12, color:'var(--fg-4)'}}>Choose a mark type to continue.</span>}
-              {sketches.length > 0 && markType && (
-                <span style={{fontSize:12, color:'var(--fg-4)'}}>This replaces your current board.</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Phase 1 · the sketch board ──────────────────────────── */}
-        {/* One concept renders at a time; the board grows as the client asks
-            for more, rather than arriving all at once as a 9-up. */}
-        {phase === 'sketch' && hasBrief && sketches.length === 0 && (
-          <div className="home-grid-3" style={{display:'grid', gap:12}}>
-            <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-              {loadingSketches ? (
-                <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
-                  <Thinking/>
-                  <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
-                    {stage === 'research'
-                      ? 'Studying the category…'
-                      : 'Drawing a concept…'}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
-        {phase === 'sketch' && sketches.length > 0 && (
-          <>
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loadingRefine ? 0.45 : 1}}>
-              {sketches.map((s) => (
-                <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
-              ))}
-              {loadingSketches && (
-                <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
-                    <Thinking/>
-                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
-                      {stage === 'research' ? 'Studying the category…' : 'Drawing a concept…'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            {loadingRefine && (
-              <div style={{marginTop:14, padding:'12px 16px', borderRadius:12, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', fontSize:12.5, color:'var(--fg-2)', display:'flex', alignItems:'center', gap:10}}>
-                <Thinking/> The studio is refining your directions into finished marks — this takes a minute…
-              </div>
-            )}
-            {!loadingRefine && likes.length === 0 && (
-              <div style={{marginTop:14, fontSize:12, color:'var(--fg-4)', textAlign:'center'}}>
-                Like at least one sketch to unlock high-fidelity design.
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── Phase 2 · the finalists ─────────────────────────────── */}
-        {phase === 'final' && (
-          finalists.length > 0 ? (
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
-              {finalists.map((f) => (
-                <AFinalistCard key={f.id || f.name} f={f} sel={chosen === f.name}
-                  busy={vectorizing === f.id}
-                  onClick={() => chooseFinalist(f)} />
-              ))}
-            </div>
-          ) : (
-            <div className="home-grid-3" style={{display:'grid', gap:12}}>
-              {Array.from({length:9}).map((_, i) => (
-                <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:220, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                  {loadingRefine && i === 4 ? <Thinking/> : null}
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
-
-      {/* ── Right rail: strategy + context ───────────────────────── */}
-      <div style={{display:'flex', flexDirection:'column', gap:14}}>
-        <AResearchPanel research={research} />
-        <APlatformPanel platform={platform} />
-        <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
-      </div>
-    </div>
-  </AWizardLayout>
+    <AWizardLayout
+      step={4}
+      title={chrome.title || 'Design the logo.'}
+      subtitle={chrome.subtitle}
+      status="Draft"
+      progress="Step 4 of 5"
+      dockCopy={chrome.dockCopy}
+      nextLabel={chrome.nextLabel || 'Continue'}
+      nextDisabled={!!chrome.nextDisabled}
+      onBack={onBack}
+      onNext={() => handlers.current.onNext && handlers.current.onNext()}
+    >
+      <LogoFlowContext.Provider value={flow}>
+        <Screen />
+      </LogoFlowContext.Provider>
+    </AWizardLayout>
   );
 };
 
@@ -7227,15 +6965,6 @@ const SecFluid = () => (
   </div>
 );
 
-const SecIntegrations = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <SectionHead eyebrow="Settings · Integrations" title="Integrations." desc="Connect Fluid to the tools where your brand work actually lives." />
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-      {INTEGRATIONS.map((it) => <IntegrationCard key={it.name} it={it} />)}
-    </div>
-  </div>
-);
-
 // ---------------------------------------------------------------------
 // Section: Notifications
 // ---------------------------------------------------------------------
@@ -7396,8 +7125,9 @@ const SETTINGS_NAV = [
   { id: 'billing',      label: 'Billing',         d: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></> },
   { id: 'workspace',    label: 'Workspace',       d: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></> },
   { id: 'fluid',        label: 'Fluid AI',        d: <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></> },
-  // Members and Plan/Billing hidden until those features exist.
-  { id: 'integrations', label: 'Integrations',    d: <><path d="M6 3v12M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" /></> },
+  // Members, Plan/Billing and Integrations are hidden until those features
+  // exist. The Integrations tab mapped an INTEGRATIONS list through an
+  // IntegrationCard, neither of which was ever written — opening it threw.
   { id: 'notifications',label: 'Notifications',   d: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></> },
 ];
 
@@ -7406,7 +7136,6 @@ const SECTIONS = {
   billing: SecBilling,
   workspace: SecWorkspace,
   fluid: SecFluid,
-  integrations: SecIntegrations,
   notifications: SecNotifications,
 };
 
@@ -7549,6 +7278,14 @@ const CRUMB_TO_ROUTE = {
 // non-routing CTAs like "Export kit".
 // ---------------------------------------------------------------------
 function resolveClick(target, currentRoute, out) {
+  // 0) Controls that navigate themselves. This delegate matches on button TEXT,
+  //    which is fine for a prototype's one-way CTAs but wrong for a control
+  //    whose destination depends on state the DOM cannot see — the wizard dock,
+  //    where "Continue" means the next sub-step of step 4, not step 5. Because
+  //    the delegate calls stopPropagation when it matches, a hijacked button
+  //    never reaches its own onClick at all. Opting out leaves the event alone.
+  if (target.closest && target.closest('[data-selfnav]')) return null;
+
   // 1) Fluid wordmark in the top dock — always goes Home.
   if (target.closest && target.closest('.fl-wordmark')) return 'home';
 
@@ -8549,21 +8286,6 @@ async function apiResearchCategory(brandId) {
   } catch { return { error: 'Network error.' }; }
 }
 
-// Logo studio · Phase 1 — one low-fi concept sketch at a time, rendered as an
-// image. likedIds bias the concept toward the client's demonstrated taste;
-// reset starts a fresh board instead of adding to the existing one.
-async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
-  try {
-    const r = await fetch('/api/generate/logo/sketches', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok) return { error: describeFailure(r, j, 'Sketch generation failed.'), code: j.code };
-    return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
-  } catch { return { error: 'Network error.' }; }
-}
 // Standalone logo flow · divergence — nine pencil croquis in one press,
 // distributed across the style × type pairings the client chose. Presses
 // append, so a board grows; `fresh` starts a new one.
