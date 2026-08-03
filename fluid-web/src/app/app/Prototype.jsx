@@ -8763,7 +8763,18 @@ function BrandDraftProvider({ children }) {
       const toSave = pendingPatch.current;
       pendingPatch.current = {};
       const updated = await apiUpdateBrand(d.id, toSave);
-      if (updated) refresh();
+      if (updated) {
+        refresh();
+        return;
+      }
+      // A failed save used to be dropped here without a word: the patch had
+      // already been cleared from the queue, so the edit was gone for good
+      // while the screen still showed it — until something re-read the draft
+      // and it reverted. Put the keys back so the next save carries them, and
+      // say that it happened.
+      pendingPatch.current = { ...toSave, ...pendingPatch.current };
+      console.warn('Failed to save:', Object.keys(toSave).join(', '));
+      makeToast('Could not save that change — it will retry with your next edit.');
     }, 500);
   }, [refresh]);
 
