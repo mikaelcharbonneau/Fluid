@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { styleContext } from "@/lib/ai/step2";
 import { getPlatform } from "@/lib/ai/platform";
-import type { LogoSketch } from "@/lib/ai/sketches";
 import type { BoardSketch } from "@/lib/ai/sketch-board";
 import {
   generateLogoFinalists,
@@ -76,12 +75,10 @@ export async function POST(request: Request) {
   const data = (brand.data as Record<string, unknown>) ?? {};
   const platform = getPlatform(data);
 
-  // Concepts come from the board. `logo_sketches` is the older Phase-1 store,
-  // kept as a fallback so a brand part-way through that flow still refines —
-  // reading only it is what made this step unreachable for every board brand.
-  const board = (data.logo_board as BoardSketch[] | undefined) ?? [];
-  const legacy = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
-  const sketches: RefinableSketch[] = board.length ? board : legacy;
+  // Concepts come from the board — the only place they have ever come from
+  // since the wizard's own logo step became this same studio. The older
+  // `logo_sketches` store went with it; no brand ever held one.
+  const sketches: RefinableSketch[] = (data.logo_board as BoardSketch[] | undefined) ?? [];
 
   // Refinement develops exactly one concept. The request names it; a brand
   // whose brief was saved earlier falls back to that, and a single liked

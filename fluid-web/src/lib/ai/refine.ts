@@ -23,7 +23,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
 import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
-import type { LogoSketch } from "./sketches";
+import type { BoardSketch } from "./sketch-board";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
 import type { RefineVersion } from "../logo-refine";
 import {
@@ -53,14 +53,12 @@ export interface LogoFinalist {
 /**
  * A sketch that can be developed into a finalist.
  *
- * Board concepts carry the style world they were drawn in; the older Phase-1
- * sketches do not. Optional rather than required so both flows fit, and so a
- * brand part-way through the old flow still refines.
+ * Concepts only ever come off the board now — the wizard's own logo step became
+ * this same studio, and the older Phase-1 sketch shape went with it. The alias
+ * stays because "what refinement can develop" is a different idea from "what
+ * the board draws", even while they are the same shape.
  */
-export type RefinableSketch = LogoSketch & {
-  style_id?: string | null;
-  style_name?: string | null;
-};
+export type RefinableSketch = BoardSketch;
 
 /**
  * Everything the design stages produce, before a single pixel is rendered.
