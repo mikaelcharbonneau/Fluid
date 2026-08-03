@@ -5,6 +5,8 @@ import { researchCategory, getResearch } from "@/lib/ai/research";
 import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
+import { streamActivity } from "@/lib/sse";
+import type { Activity } from "@/lib/ai/activity";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -75,12 +77,15 @@ export async function POST(request: Request) {
   const clock = startClock("logo/research", 240_000);
   const RESEARCH_BUDGET_MS = 120_000;
 
-  try {
+  return streamActivity(async (activity: Activity) => {
     // Research degrades gracefully: if search is unavailable or the model
     // returns unusable JSON, the studio still designs — just without category
     // grounding. Losing the run over a failed search is the worse outcome.
     let research = cachedResearch;
-    if (!research) {
+    if (research) {
+      activity.emit("note", "Category research already cached — reusing it");
+    } else {
+      const done = activity.phase("Researching the category on the web");
       try {
         research = await researchCategory(
           {
@@ -91,11 +96,18 @@ export async function POST(request: Request) {
             delegated: delegatedChoices(brand),
           },
           RESEARCH_BUDGET_MS,
+          activity,
         );
       } catch (err) {
         console.error("Category research failed; continuing without it:", err);
+        activity.emit(
+          "warn",
+          "Research failed — designing without category grounding",
+          err instanceof Error ? err.message : String(err),
+        );
         research = null;
       }
+      done();
       clock.lap("research");
 
       // Save research the moment it exists, BEFORE the platform pass. Research
@@ -121,8 +133,11 @@ export async function POST(request: Request) {
     );
 
     let platform = cachedPlatform;
-    if (!platform) {
+    if (platform) {
+      activity.emit("note", "Creative platform already cached — reusing it");
+    } else {
       clock.guard("write the creative platform", 60_000);
+      const done = activity.phase("Writing the creative platform");
       platform = await generateCreativePlatform({
         brief: String(brand.brief),
         name: brandName,
@@ -130,6 +145,19 @@ export async function POST(request: Request) {
         competitors: brand.competitors as string | null,
         styleContext: ctx,
       });
+      done();
+      activity.emit(
+        "thinking",
+        `Brand idea — ${platform.brand_idea}`,
+        [
+          `Brand idea: ${platform.brand_idea}`,
+          platform.personality.length ? `Personality: ${platform.personality.join(", ")}` : "",
+          platform.design_notes ? `Design notes: ${platform.design_notes}` : "",
+          platform.territories?.length
+            ? `Territories: ${platform.territories.map((t) => t.name).join(", ")}`
+            : "",
+        ].filter(Boolean).join("\n"),
+      );
       clock.lap("platform");
     }
 
@@ -144,10 +172,10 @@ export async function POST(request: Request) {
       console.error("Failed to cache research/platform:", saveError.message);
     }
 
-    return NextResponse.json({ research, platform });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Category research failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+    return { research, platform };
+  }, {
+    onError: (err) => ({
+      message: err instanceof Error ? err.message : "Category research failed.",
+    }),
+  });
 }

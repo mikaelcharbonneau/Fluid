@@ -768,8 +768,171 @@ const AStepProgress = ({ step }) => {
 };
 
 // Wizard layout wrapper
+/**
+ * The run log the dock renders.
+ *
+ * Events arrive on a window event rather than through context because the API
+ * helpers are plain functions called from deep inside screens — threading a
+ * setter down to every call site would mean touching every screen to show a
+ * log none of them own.
+ *
+ * The log is kept after a run ends. "What did it just do?" is asked most often
+ * once something looks wrong, which is always after the run finished.
+ */
+const useActivityLog = () => {
+  const [events, setEvents] = React.useState([]);
+  const [running, setRunning] = React.useState(false);
+  const [runName, setRunName] = React.useState('');
+  const [failure, setFailure] = React.useState('');
+
+  React.useEffect(() => {
+    const onActivity = (e) => {
+      const d = e.detail || {};
+      if (d.kind === 'start') {
+        setRunning(true);
+        setRunName(d.name || '');
+        setFailure('');
+        // Each run starts a fresh log: two runs' events interleaved read as
+        // one confusing run.
+        setEvents([{ seq: 0, at: 0, kind: 'phase', label: d.name || 'Working…' }]);
+      } else if (d.kind === 'event' && d.event) {
+        setEvents((prev) => [...prev, d.event]);
+      } else if (d.kind === 'end') {
+        setRunning(false);
+        if (d.error) setFailure(d.error);
+      }
+    };
+    window.addEventListener(ACTIVITY_EVENT, onActivity);
+    return () => window.removeEventListener(ACTIVITY_EVENT, onActivity);
+  }, []);
+
+  return { events, running, runName, failure };
+};
+
+const ACTIVITY_TONE = {
+  phase: '#FDBA50',
+  tool: '#7DD3FC',
+  prompt: '#C4B5FD',
+  thinking: '#A7F3D0',
+  note: 'rgba(255,255,255,.45)',
+  warn: '#FD7947',
+};
+
+const fmtAt = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
+
+// One line of the log. Events carrying a detail — an image prompt, the model's
+// reasoning — expand in place rather than opening anything.
+const AActivityRow = ({ event }) => {
+  const [open, setOpen] = React.useState(false);
+  const hasDetail = !!event.detail;
+  return (
+    <div style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+      <div
+        onClick={hasDetail ? () => setOpen((o) => !o) : undefined}
+        style={{
+          display: 'flex', alignItems: 'baseline', gap: 10,
+          cursor: hasDetail ? 'pointer' : 'default',
+        }}
+      >
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'rgba(255,255,255,.35)',
+          flex: '0 0 46px', textAlign: 'right',
+        }}>{fmtAt(event.at)}</span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+          color: ACTIVITY_TONE[event.kind] || 'rgba(255,255,255,.5)',
+          flex: '0 0 58px',
+        }}>{event.kind}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,.85)', lineHeight: 1.45 }}>
+          {event.label}
+          {hasDetail && (
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
+              {open ? '▾ hide' : '▸ show'}
+            </span>
+          )}
+        </span>
+      </div>
+      {open && (
+        <pre style={{
+          margin: '8px 0 4px 114px', padding: '10px 12px', borderRadius: 8,
+          background: 'rgba(0,0,0,.35)', color: 'rgba(255,255,255,.78)',
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, lineHeight: 1.5,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 260, overflowY: 'auto',
+        }}>{event.detail}</pre>
+      )}
+    </div>
+  );
+};
+
+/**
+ * The dock's activity panel.
+ *
+ * Collapsed it is one line — the newest, because during a run the newest line
+ * is the answer to "what is it doing". Expanded it is the whole run.
+ */
+const ADockActivity = ({ events, running, failure, open, onToggle }) => {
+  const bodyRef = React.useRef(null);
+  const latest = events.length ? events[events.length - 1] : null;
+
+  // Follow the tail while it runs, but not once the client has expanded the log
+  // to read something — yanking the scroll away mid-read is worse than stale.
+  const [pinned, setPinned] = React.useState(true);
+  React.useEffect(() => {
+    if (!open || !pinned || !bodyRef.current) return;
+    bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [events, open, pinned]);
+
+  if (!latest && !running) return null;
+
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={onToggle}
+        style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', minWidth: 0 }}
+      >
+        {running
+          ? <Thinking/>
+          : <span style={{
+              width: 6, height: 6, borderRadius: 99, flex: '0 0 6px',
+              background: failure ? '#FD7947' : 'rgba(255,255,255,.35)',
+            }}/>}
+        <span style={{
+          flex: 1, minWidth: 0, fontSize: 12.5, color: 'rgba(255,255,255,.85)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {failure || (latest ? latest.label : 'Working…')}
+        </span>
+        <span style={{
+          fontSize: 10.5, color: 'rgba(255,255,255,.45)', flex: '0 0 auto',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {events.length} {open ? '▾' : '▸'}
+        </span>
+      </div>
+
+      {open && (
+        <div
+          ref={bodyRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+          }}
+          style={{
+            marginTop: 10, maxHeight: 300, overflowY: 'auto',
+            borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 6,
+          }}
+        >
+          {events.map((ev, i) => <AActivityRow key={`${ev.seq}-${i}`} event={ev} />)}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, onBack, nextLabel, backLabel, dockCopy, nextDisabled, isThinking }) => {
   const { navigate } = useRouter();
+  const activity = useActivityLog();
+  const [logOpen, setLogOpen] = React.useState(false);
   // Back steps to the previous wizard step (available from step 2 on), unless
   // the step runs sub-steps of its own — step 4 walks back through those first
   // and only leaves the step once it reaches the beginning of them.
@@ -808,7 +971,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
         position:'absolute', bottom: 20, left: 24, right: 24,
         background: '#0E0F12', color: '#fff', borderRadius: 16,
         padding: '14px 18px',
-        display:'flex',alignItems:'center',gap:14,
+        display:'flex',alignItems: logOpen ? 'flex-start' : 'center',gap:14,
         boxShadow:'0 18px 50px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06)',
         overflow:'hidden',
         zIndex: 10
@@ -832,13 +995,23 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
           background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
-        <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
-          {isThinking ? (
-            <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
-              Fluid AI is drafting options... <Thinking/>
-            </span>
-          ) : (dockCopy || "Fill in card details to refine the strategy.")}
-        </div>
+        {activity.events.length || activity.running ? (
+          <ADockActivity
+            events={activity.events}
+            running={activity.running}
+            failure={activity.failure}
+            open={logOpen}
+            onToggle={() => setLogOpen((o) => !o)}
+          />
+        ) : (
+          <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
+            {isThinking ? (
+              <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
+                Fluid AI is drafting options... <Thinking/>
+              </span>
+            ) : (dockCopy || "Fill in card details to refine the strategy.")}
+          </div>
+        )}
         <button
           onClick={onNext}
           disabled={nextDisabled}
@@ -1263,7 +1436,10 @@ const ALogoWizardLayout = ({
   subtitle = 'Start with the name and the idea. Visual direction comes next.',
   dockCopy = 'Add a name and brief to shape the first directions.',
   nextLabel = 'Continue to direction', onNext, nextDisabled, onBack,
-}) => (
+}) => {
+  const activity = useActivityLog();
+  const [logOpen, setLogOpen] = React.useState(false);
+  return (
   <AShell breadcrumb={['Brands', 'Logo studio']}>
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       <div className="logo-wizard-header" style={{
@@ -1290,7 +1466,7 @@ const ALogoWizardLayout = ({
       <div className="logo-wizard-dock" style={{
         position:'absolute',bottom:20,left:24,right:24,
         background:'#0E0F12',color:'#fff',borderRadius:16,padding:'14px 18px',
-        display:'flex',alignItems:'center',gap:14,
+        display:'flex',alignItems: logOpen ? 'flex-start' : 'center',gap:14,
         boxShadow:'0 18px 50px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06)',
         overflow:'hidden',zIndex:10,
       }}>
@@ -1303,9 +1479,19 @@ const ALogoWizardLayout = ({
           width:28,height:28,background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
-        <div className="logo-dock-copy" style={{flex:1,minWidth:0,fontSize:13,color:'rgba(255,255,255,.85)'}}>
-          {dockCopy}
-        </div>
+        {activity.events.length || activity.running ? (
+          <ADockActivity
+            events={activity.events}
+            running={activity.running}
+            failure={activity.failure}
+            open={logOpen}
+            onToggle={() => setLogOpen((o) => !o)}
+          />
+        ) : (
+          <div className="logo-dock-copy" style={{flex:1,minWidth:0,fontSize:13,color:'rgba(255,255,255,.85)'}}>
+            {dockCopy}
+          </div>
+        )}
         <button
           type="button"
           onClick={onNext}
@@ -1325,7 +1511,8 @@ const ALogoWizardLayout = ({
       </div>
     </div>
   </AShell>
-);
+  );
+};
 
 const DirA_LogoBrief = () => {
   const { draft, setField } = useBrandDraft();
@@ -8271,50 +8458,126 @@ function describeFailure(r, j, fallback) {
   return fallback;
 }
 
+// ── The activity stream ────────────────────────────────────────────────
+// The three slow routes answer with server-sent events rather than one JSON
+// blob: a run of several minutes now narrates itself instead of going quiet.
+// Every event is pushed to the log the dock renders; the terminal `result`
+// message is what the caller was waiting for all along.
+//
+// Pre-flight refusals — not signed in, out of tokens, a malformed body — are
+// still ordinary JSON with a real status code, because they are not part of a
+// run and a status code says so better than an event does.
+const ACTIVITY_EVENT = 'fluid:activity';
+
+function pushActivity(kind, payload) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind, ...payload } }));
+}
+
+async function readActivityStream(response, label) {
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/event-stream')) {
+    // A plain JSON refusal. Nothing streamed, so nothing to log.
+    const j = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: describeFailure(response, j, label), code: j.code };
+    return { data: j };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let outcome = null;
+
+  // SSE frames are separated by a blank line; a chunk can split one anywhere,
+  // so the tail stays in the buffer until its terminator arrives.
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const line = frame.split('\n').find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line.slice(5).trim()); } catch { continue; }
+      if (msg.type === 'activity') pushActivity('event', { event: msg.event });
+      else if (msg.type === 'result') outcome = { data: msg.data };
+      else if (msg.type === 'error') outcome = { error: msg.error, code: msg.code };
+    }
+  }
+
+  // The stream ended without saying how it went — a dropped connection, or the
+  // function killed mid-run. Say that rather than resolving with nothing.
+  return outcome ?? {
+    error: 'The connection closed before the run finished. Your progress was saved — try again and it will pick up where it left off.',
+  };
+}
+
+// Wraps one streamed run: opens the log, reports the outcome, closes it.
+async function runStreamed(name, request, fallback) {
+  pushActivity('start', { name });
+  try {
+    const response = await request();
+    const out = await readActivityStream(response, fallback);
+    pushActivity('end', { error: out.error || null });
+    return out;
+  } catch {
+    pushActivity('end', { error: 'Network error.' });
+    return { error: 'Network error.' };
+  }
+}
+
 // Logo studio · Phase -1/0 — category research and the creative platform.
 // Split from the sketch call because all four phases in one request exceeded
 // the serverless time limit. Cached server-side, so this is fast on reruns.
 async function apiResearchCategory(brandId) {
-  try {
-    const r = await fetch('/api/generate/logo/research', {
+  const out = await runStreamed(
+    'Studying the category',
+    () => fetch('/api/generate/logo/research', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brandId }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: describeFailure(r, j, 'Category research failed.'), code: j.code };
-    return { research: j.research || null, platform: j.platform || null };
-  } catch { return { error: 'Network error.' }; }
+    }),
+    'Category research failed.',
+  );
+  if (out.error) return { error: out.error, code: out.code };
+  const j = out.data || {};
+  return { research: j.research || null, platform: j.platform || null };
 }
 
 // Standalone logo flow · divergence — nine pencil croquis in one press,
 // distributed across the style × type pairings the client chose. Presses
 // append, so a board grows; `fresh` starts a new one.
 async function apiGenerateLogoBoard(brandId, config, fresh) {
-  try {
-    const r = await fetch('/api/generate/logo/board', {
+  const out = await runStreamed(
+    'Sketching the board',
+    () => fetch('/api/generate/logo/board', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brandId, config: config || {}, reset: !!fresh }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok) return { error: describeFailure(r, j, 'Sketching the board failed.'), code: j.code };
-    return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0 };
-  } catch { return { error: 'Network error.' }; }
+    }),
+    'Sketching the board failed.',
+  );
+  signalBalanceChanged(out.code);
+  if (out.error) return { error: out.error, code: out.code };
+  const j = out.data || {};
+  return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0 };
 }
 
 // Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,
 // each in the colours the client set for it.
 async function apiRefineLogoSketches(brandId, conceptId, versions) {
-  try {
-    const r = await fetch('/api/generate/logo/refine', {
+  const out = await runStreamed(
+    'Refining the concept',
+    () => fetch('/api/generate/logo/refine', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brandId, conceptId, versions: versions || [] }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok) return { error: describeFailure(r, j, 'Refinement failed.'), code: j.code };
-    return { finalists: j.finalists || [] };
-  } catch { return { error: 'Network error.' }; }
+    }),
+    'Refinement failed.',
+  );
+  signalBalanceChanged(out.code);
+  if (out.error) return { error: out.error, code: out.code };
+  return { finalists: (out.data || {}).finalists || [] };
 }
 // Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
 async function apiVectorizeLogo(brandId, conceptId) {

@@ -23,6 +23,7 @@
 // suitability from stale execution instead of defaulting to differentiation.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { silentActivity, type Activity } from "./activity";
 
 export interface CompetitorNote {
   name: string;
@@ -273,9 +274,36 @@ function looksLikeJson(text: string): boolean {
 // slow call can block for ~30 minutes — far longer than the whole serverless
 // function — and no between-rounds check can interrupt it. That is exactly how
 // this step used to overrun its budget into negative time.
+/**
+ * Report what the model actually searched for.
+ *
+ * The web search runs server-side inside the model's own loop, so the queries
+ * only exist in the response blocks. They are the single most useful thing in
+ * the log when research comes back thin: you can see whether it searched for
+ * the right thing at all.
+ */
+function reportSearches(
+  activity: Activity,
+  response: Anthropic.Message,
+  round: number,
+): void {
+  for (const block of response.content) {
+    if (block.type !== "server_tool_use") continue;
+    const query = (block.input as { query?: unknown } | null)?.query;
+    activity.emit(
+      "tool",
+      typeof query === "string" && query.trim()
+        ? `Searched the web: "${query.trim()}"`
+        : `Searched the web (round ${round})`,
+      typeof query === "string" ? query : undefined,
+    );
+  }
+}
+
 export async function researchCategory(
   input: ResearchBrief,
   budgetMs = 120_000,
+  activity: Activity = silentActivity,
 ): Promise<CategoryResearch> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not configured.");
@@ -314,6 +342,7 @@ export async function researchCategory(
     );
 
   let response = await call(messages);
+  reportSearches(activity, response, 1);
 
   // Server-side tools run their own loop; when it hits the per-request cap the
   // turn pauses and we resume by echoing the assistant turn back.
@@ -324,8 +353,10 @@ export async function researchCategory(
     remainingMs() > MIN_CALL_MS
   ) {
     rounds += 1;
+    activity.emit("note", `Search round ${rounds} of at most ${MAX_SEARCH_ROUNDS}`);
     messages.push({ role: "assistant", content: response.content });
     response = await call(messages);
+    reportSearches(activity, response, rounds);
   }
 
   let text = textOf(response);
@@ -337,6 +368,10 @@ export async function researchCategory(
   if (!looksLikeJson(text)) {
     console.warn(
       `[research] no findings after ${rounds} round(s), ${Date.now() - startedAt}ms — asking for the write-up`,
+    );
+    activity.emit(
+      "warn",
+      `No findings written after ${rounds} search round(s) — asking for the write-up alone`,
     );
     messages.push({ role: "assistant", content: response.content });
     messages.push({
