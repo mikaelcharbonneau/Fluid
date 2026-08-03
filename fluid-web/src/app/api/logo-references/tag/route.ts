@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tagReferenceImage } from "@/lib/ai/tag-reference";
 import { captionReferenceImage } from "@/lib/ai/caption-reference";
-import { referenceImageUrl } from "@/lib/logo-reference-query";
+import { LOGO_REFERENCES_CACHE_TAG, referenceImageUrl } from "@/lib/logo-reference-query";
 import { aspectRatioFrom } from "@/lib/image-size";
 
 export const runtime = "nodejs";
@@ -219,6 +220,13 @@ async function tagNew(
 
   const { data: left } = await admin.rpc("logo_references_untagged_count", { p_prefix: prefix });
 
+  // New rows just landed (or dryRun would have returned already above if
+  // there were none to try): the gallery's cached ranking needs to see them,
+  // not wait out its 60s TTL. `{ expire: 0 }` is the immediate-invalidation
+  // form — appropriate here because this is a Route Handler, not a Server
+  // Action, so `updateTag`'s read-your-own-writes semantics aren't available.
+  if (!dryRun) revalidateTag(LOGO_REFERENCES_CACHE_TAG, { expire: 0 });
+
   return NextResponse.json({
     mode: "new",
     dryRun,
@@ -331,6 +339,12 @@ async function captionExisting(
     .eq("is_active", true);
   if (prefix) remainingQuery = remainingQuery.like("image_path", `${prefix}%`);
   const { count } = await remainingQuery;
+
+  // A missing-image row gets deactivated inline above, which the gallery's
+  // is_active filter cares about — so invalidate here too, even though a
+  // plain caption backfill doesn't otherwise change what the ranked query
+  // returns.
+  if (!dryRun) revalidateTag(LOGO_REFERENCES_CACHE_TAG, { expire: 0 });
 
   return NextResponse.json({
     mode: "caption",

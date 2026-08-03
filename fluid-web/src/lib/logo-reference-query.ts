@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { createPublicClient } from "@/lib/supabase/public";
 import { STANDALONE_STYLE_OPTIONS } from "@/lib/logo-styles";
 
 // The reference library lives in Supabase: rows in public.logo_references,
@@ -53,6 +55,19 @@ function toAspectRatio(raw: number | string | null): number | null {
 export const STYLE_ATTRIBUTES: Record<string, string[]> = Object.fromEntries(
   STANDALONE_STYLE_OPTIONS.map((s) => [s.id, s.attributes]),
 );
+
+// Trim, lowercase, dedupe and sort a filter list (mark types or style ids).
+// Two requests for the same filter that only differ in casing or item order
+// — "Wordmark,Abstract" vs "abstract,wordmark" — are the same request, and
+// should hit the same cache entry rather than missing on each other.
+export function normalizeFilterList(items: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const item of items) {
+    const v = item.trim().toLowerCase();
+    if (v) out.add(v);
+  }
+  return Array.from(out).sort();
+}
 
 // The union of attributes for the directions the client picked. An empty array
 // means "no attribute preference", which callers treat as no filter rather
@@ -203,6 +218,17 @@ export function readAxes(
 // Rows that match nothing are kept as padding but always sort last, so the
 // grid still fills when a narrow selection has few genuine matches — showing
 // nine tiles of the right type beats showing two.
+//
+// This used to be the only ranking path: the route loaded every matching row
+// and scored it here. That's now done in SQL (see
+// supabase/migrations/0014_logo_reference_ranked_rpc.sql and
+// fetchRankedReferences below) so a growing catalogue doesn't have to be
+// pulled into function memory on every request. This function is kept,
+// deliberately, as the route's fallback for when the RPC call fails (e.g. the
+// migration hasn't reached an environment yet) — see the catch block in
+// app/api/logo-references/route.ts. It is still exercised on every request in
+// that path, so it isn't dead code; it's the one piece of this file the SQL
+// version has to keep agreeing with.
 export function rankReferences(
   rows: readonly LogoReferenceRow[],
   wantedAttributes: readonly string[],
@@ -235,4 +261,122 @@ export function rankReferences(
     aspectRatio: toAspectRatio(s.row.aspect_ratio),
     refinement: s.row.refinement ?? null,
   }));
+}
+
+// ── SQL-backed ranking (with bounded caching) ─────────────────────────
+//
+// Tag any cached logo_references read with this so a catalogue mutation
+// (fluid-web/src/app/api/logo-references/tag/route.ts) can invalidate it
+// with revalidateTag rather than waiting out the TTL.
+export const LOGO_REFERENCES_CACHE_TAG = "logo-references";
+
+// How long a warm serverless instance may serve a cached ranking before
+// hitting the database again. Short on purpose: this is a performance
+// backstop against a burst of identical requests hitting the same warm
+// instance, not a source of truth for freshness. Bounded caching, not
+// indefinite caching — the catalogue is expected to change (new marks
+// tagged, re-tagging) and 60s is short enough that nobody reasonably notices
+// a stale gallery, especially since a mutation also actively revalidates the
+// tag (see tag/route.ts).
+const CACHE_REVALIDATE_SECONDS = 60;
+
+interface RankedRow {
+  name: string;
+  mark_type: string;
+  image_path: string;
+  attributes: string[] | null;
+  industry: string | null;
+  sort_order: number;
+  aspect_ratio: number | string | null;
+  refinement: Record<string, unknown> | null;
+  match_count: number;
+  total_count: number | string;
+}
+
+// unstable_cache derives its cache key from the stringified function plus its
+// arguments, so `types`/`attributes` MUST already be normalized (see
+// normalizeFilterList) before they reach here — otherwise "wordmark,abstract"
+// and "abstract,wordmark" would populate two separate cache entries for what
+// is, semantically, the same request.
+//
+// This intentionally does not thread the request's cookie-bound Supabase
+// client through: `unstable_cache` cannot read request-scoped state
+// (cookies/headers), so it uses the cookie-less client from
+// lib/supabase/public.ts instead. That's safe here specifically because
+// logo_references' RLS policy already reads `using (true)` — this function
+// must never be reused for a table whose row visibility depends on who's
+// asking.
+//
+// IMPORTANT CAVEAT (documented per the issue): this is Next's in-memory
+// route cache. In a Vercel serverless/edge deployment there is no single
+// long-lived process — each cold-started instance starts with an empty
+// cache, and a warm instance's cache is invisible to every other instance.
+// This still earns its keep (it collapses repeated requests hitting the same
+// warm instance, e.g. React StrictMode double-invokes, retries, or a burst
+// of traffic during a demo), but it is not a substitute for a shared cache
+// and must not be relied on for cross-instance consistency.
+const queryRankedReferences = unstable_cache(
+  async (
+    typesKey: string,
+    attributesKey: string,
+    limit: number,
+  ): Promise<{ rows: RankedRow[]; total: number }> => {
+    const types = typesKey ? typesKey.split(",") : [];
+    const attributes = attributesKey ? attributesKey.split(",") : [];
+
+    const supabase = createPublicClient();
+    const { data, error } = await supabase.rpc("logo_references_ranked", {
+      p_types: types.length ? types : null,
+      p_attributes: attributes,
+      p_limit: limit,
+    });
+    if (error) throw error;
+
+    const rows = (data ?? []) as RankedRow[];
+    const total = rows.length ? Number(rows[0].total_count) : 0;
+    return { rows, total };
+  },
+  ["logo-references-ranked"],
+  { revalidate: CACHE_REVALIDATE_SECONDS, tags: [LOGO_REFERENCES_CACHE_TAG] },
+);
+
+// The SQL-backed equivalent of rankReferences(): filtering, scoring and
+// limiting all happen in the database (supabase/migrations/0014_...), so this
+// only has to map the already-ranked, already-limited rows onto the response
+// shape and recompute `matched` for display — recomputing that from `wanted`
+// against the (at most `limit`) returned rows is cheap and keeps the "which
+// attributes actually matched" logic in one place rather than duplicating it
+// in SQL.
+//
+// Throws if the RPC call fails (e.g. the 0014 migration hasn't reached this
+// environment yet) — callers should catch and fall back to the full-scan +
+// rankReferences() path. See app/api/logo-references/route.ts.
+export async function fetchRankedReferences(
+  types: readonly string[],
+  wantedAttributes: readonly string[],
+  limit: number,
+): Promise<{ references: RankedReference[]; total: number }> {
+  const wanted = new Set(wantedAttributes);
+  const { rows, total } = await queryRankedReferences(
+    types.join(","),
+    wantedAttributes.join(","),
+    limit,
+  );
+
+  const references = rows.map((row) => {
+    const attributes = Array.isArray(row.attributes) ? row.attributes : [];
+    const matched = wanted.size ? attributes.filter((a) => wanted.has(a)) : [];
+    return {
+      id: row.image_path,
+      name: row.name,
+      markType: row.mark_type,
+      imageUrl: referenceImageUrl(row.image_path),
+      attributes,
+      matched,
+      aspectRatio: toAspectRatio(row.aspect_ratio),
+      refinement: row.refinement ?? null,
+    };
+  });
+
+  return { references, total };
 }
