@@ -1515,7 +1515,7 @@ const ALogoWizardLayout = ({
 };
 
 const DirA_LogoBrief = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setField, setData } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
   const name = (draft && (draft.name_choice || resolveBrandName(draft))) || '';
@@ -1533,8 +1533,8 @@ const DirA_LogoBrief = () => {
     setField('name_choice', value);
     setField('name', value);
   };
-  const setTagline = (value) => setField('data', { ...data, logo_tagline: value });
-  const setNameMeaning = (value) => setField('data', { ...data, logo_name_meaning: value });
+  const setTagline = (value) => setData({ logo_tagline: value });
+  const setNameMeaning = (value) => setData({ logo_name_meaning: value });
   const addCompetitor = (raw) => {
     const value = String(raw || '').trim().replace(/,+$/, '').trim();
     if (!value) return;
@@ -1892,7 +1892,7 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
 // Standalone logo studio · Step 2 · Visual style. Each card pairs a custom
 // fictional identity board with concise guidance for the direction.
 const DirA_LogoDirection = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const direction = data.logo_direction || {};
@@ -1907,14 +1907,12 @@ const DirA_LogoDirection = () => {
       ? selectedStyles.filter((id) => id !== styleId)
       : (selectedStyles.length < MAX_LOGO_STYLES ? [...selectedStyles, styleId] : null);
     if (!next) { makeToast(`Choose up to ${MAX_LOGO_STYLES} styles — they're explored separately, not blended.`); return; }
-    setField('data', {
-      ...data,
+    setData({
       logo_direction: { mode: next.length ? 'manual' : null, style_ids: next, style_id: next[0] || null },
     });
   };
   const chooseFluid = () => {
-    setField('data', {
-      ...data,
+    setData({
       logo_direction: fluidChooses ? { mode: null, style_ids: [], style_id: null } : { mode: 'ai', style_ids: [], style_id: null },
     });
   };
@@ -2012,7 +2010,7 @@ const DirA_LogoDirection = () => {
 // Standalone logo studio · Step 3 · Logo type. Visual treatments remain for
 // the later concepts step; this choice controls the structural logo direction.
 const DirA_LogoType = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const aiChoosesType = data.logo_type_mode === 'ai';
@@ -2022,8 +2020,7 @@ const DirA_LogoType = () => {
 
   const chooseType = (typeId) => {
     if (typeId === 'ai') {
-      setField('data', {
-        ...data,
+      setData({
         logo_type_mode: aiChoosesType ? null : 'ai',
         logo_types: [],
         logo_type: '',
@@ -2034,7 +2031,7 @@ const DirA_LogoType = () => {
       ? selectedTypes.filter((id) => id !== typeId)
       : (selectedTypes.length < 3 ? [...selectedTypes, typeId] : null);
     if (!next) { makeToast('Choose up to three logo types.'); return; }
-    setField('data', { ...data, logo_type_mode: next.length ? 'manual' : null, logo_types: next, logo_type: next[0] || '' });
+    setData({ logo_type_mode: next.length ? 'manual' : null, logo_types: next, logo_type: next[0] || '' });
   };
   const continueToConcepts = () => {
     if (selectedTypes.length || aiChoosesType) navigate('logo-references');
@@ -2226,7 +2223,7 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
 // visual preferences only; the next step will generate original sketches from
 // the brief, style, type, and the references liked here.
 const DirA_LogoReferences = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
@@ -2290,8 +2287,7 @@ const DirA_LogoReferences = () => {
     const nextDislikes = dislikes.filter((item) => item !== id);
     setLikes(next);
     setDislikes(nextDislikes);
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_reference_likes: next,
       logo_reference_dislikes: nextDislikes,
       logo_reference_context: {
@@ -2306,8 +2302,7 @@ const DirA_LogoReferences = () => {
     const nextLikes = likes.filter((item) => item !== id);
     setDislikes(next);
     setLikes(nextLikes);
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_reference_likes: nextLikes,
       logo_reference_dislikes: next,
       logo_reference_context: {
@@ -2387,7 +2382,7 @@ const DirA_LogoReferences = () => {
 // so the client controls how much they pay for and can stop as soon as
 // something lands.
 const DirA_LogoSketches = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const brandId = draft && draft.id;
@@ -2416,8 +2411,7 @@ const DirA_LogoSketches = () => {
   const [notice, setNotice] = React.useState('');
 
   const persist = (nextBoard, nextLikes) => {
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_board: nextBoard,
       logo_board_likes: nextLikes,
     });
@@ -2715,7 +2709,7 @@ const AVersionPalette = ({ index, colors, onChange, disabled }) => {
 // only one concept comes through this door. It is a single charge, so nothing
 // runs until the brief is complete and the client asks for it.
 const DirA_LogoRefine = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setField, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const brandId = draft && draft.id;
@@ -2753,8 +2747,7 @@ const DirA_LogoRefine = () => {
   const chosen = (draft && draft.logo_choice) || null;
 
   const persistBrief = (nextConceptId, nextVersions) => {
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_refine_concept: nextConceptId,
       logo_refine_versions: nextVersions,
     });
@@ -2804,8 +2797,7 @@ const DirA_LogoRefine = () => {
       // The server has already merged these onto the brand. Mirroring them into
       // the local draft keeps the screen correct if the client steps away and
       // comes back before the next refresh lands.
-      setField('data', {
-        ...((draft && draft.data) || {}),
+      setData({
         logo_finalists: res.finalists,
         logo_refine_concept: concept.id,
         logo_refine_versions: clean,
@@ -2829,8 +2821,7 @@ const DirA_LogoRefine = () => {
     } else {
       const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
       setFinalists(next);
-      setField('data', {
-        ...((draft && draft.data) || {}),
+      setData({
         logo_finalists: next,
         logos: next.map((x) => ({
           name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url,
@@ -3068,7 +3059,7 @@ const DirA_LogoRefine = () => {
 // corrected. The uses only pre-tick the formats; every one stays editable, so a
 // client who knows they need a PDF can have one whatever they ticked above.
 const DirA_LogoExport = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
 
@@ -3094,8 +3085,7 @@ const DirA_LogoExport = () => {
   const selected = EXPORT_FORMATS.filter((f) => isOn(f.id)).map((f) => f.id);
 
   const persist = (nextUses, nextOverrides) => {
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_export_uses: nextUses,
       logo_export_formats: nextOverrides,
     });
@@ -4035,10 +4025,10 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
 // Shared read/write for Step 2 picks, namespaced under brand data.step2 so it
 // never collides with the generated data.palette / data.typography, etc.
 const useStep2 = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const step2 = (draft && draft.data && draft.data.step2) || {};
   const setStep2 = (patch) =>
-    setField('data', { ...((draft && draft.data) || {}), step2: { ...step2, ...patch } });
+    setData({ step2: { ...step2, ...patch } });
   return { step2, setStep2 };
 };
 
@@ -4483,7 +4473,7 @@ const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
 const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
 const DirA_Step3_Name = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setField, setData } = useBrandDraft();
   const { navigate } = useRouter();
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
   // `name` should still show that name selected here rather than looking as
@@ -4518,7 +4508,7 @@ const DirA_Step3_Name = () => {
 
   // Persist names + liked together, merging onto whatever else is in data.
   const persist = React.useCallback((nextNames, nextLiked) => {
-    setField('data', { ...((draft && draft.data) || {}), names: nextNames, liked_names: nextLiked });
+    setData({ names: nextNames, liked_names: nextLiked });
   }, [draft, setField]);
 
   const toggleLike = (name) => {
@@ -8758,16 +8748,50 @@ function BrandDraftProvider({ children }) {
       : { [key]: value };
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
     const d = draftRef.current;
-    if (!d || !d.id) return;
+    if (!d || !d.id) {
+      // No draft to write to, so this click changed nothing and never will.
+      // It used to return in silence, which looks exactly like a save: the
+      // card highlights from local state and reverts the moment the screen
+      // re-reads the draft. Say so instead of losing the work quietly.
+      console.warn('Ignored an edit with no draft loaded:', Object.keys(patch).join(', '));
+      makeToast('That change was not saved — reopen the brand and try again.');
+      return;
+    }
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const toSave = pendingPatch.current;
       pendingPatch.current = {};
       const updated = await apiUpdateBrand(d.id, toSave);
-      if (updated) refresh();
+      if (updated) {
+        refresh();
+        return;
+      }
+      // A failed save used to be dropped here without a word: the patch had
+      // already been cleared from the queue, so the edit was gone for good
+      // while the screen still showed it — until something re-read the draft
+      // and it reverted. Put the keys back so the next save carries them, and
+      // say that it happened.
+      pendingPatch.current = { ...toSave, ...pendingPatch.current };
+      console.warn('Failed to save:', Object.keys(toSave).join(', '));
+      makeToast('Could not save that change — it will retry with your next edit.');
     }, 500);
   }, [refresh]);
+
+  /**
+   * Merge keys into the brand's `data` blob.
+   *
+   * Every caller used to spread a copy of `data` captured when its screen last
+   * rendered, spreading it into setField('data', ...). That is only
+   * correct while nothing else has written since that render, and the logo flow
+   * breaks the assumption constantly: a screen reads `data`, a generation route
+   * writes research to the same brand, the screen then saves its stale copy.
+   * Reading from the ref means the base is always the live draft.
+   */
+  const setData = React.useCallback((patch) => {
+    const cur = (draftRef.current && draftRef.current.data) || {};
+    setField('data', { ...cur, ...patch });
+  }, [setField]);
 
   const startNew = React.useCallback(async (input) => {
     const b = await apiCreateBrand(input || { step: 1 });
@@ -8805,7 +8829,7 @@ function BrandDraftProvider({ children }) {
     apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
   }, [route]);
 
-  const value = { brands, draft, user, billing, refreshBalance, setField, startNew, loadBrand, refresh };
+  const value = { brands, draft, user, billing, refreshBalance, setField, setData, startNew, loadBrand, refresh };
   return (
     <BrandDraftCtx.Provider value={value}>
       {children}
