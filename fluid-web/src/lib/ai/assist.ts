@@ -38,6 +38,13 @@ export interface AssistResult {
 
 const MODEL = "claude-opus-4-8";
 
+// The route this feeds (api/generate/assist) has a 60s maxDuration and makes
+// exactly one of these calls per request. Bounded well under that so a stuck
+// call surfaces as a clear timeout error instead of the platform silently
+// killing the function with no response body at all — the SDK otherwise
+// defaults to a 10-minute timeout with its own retries on top.
+const CALL_TIMEOUT_MS = 45_000;
+
 function firstText(response: Anthropic.Message): string {
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -48,12 +55,15 @@ function firstText(response: Anthropic.Message): string {
 
 async function ask(system: string, user: string, maxTokens = 700): Promise<string> {
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: user }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
   return firstText(response);
 }
 

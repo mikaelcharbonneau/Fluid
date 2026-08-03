@@ -109,6 +109,16 @@ export interface RefineBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// api/generate/logo/refine runs on a 270s clock. Both text calls below share
+// that budget with the per-version renders that follow (each already capped
+// at 120s in images.ts). Bounded so a stuck call fails clearly with time
+// still left over, instead of running out the SDK's 10-minute default.
+const DESIGN_CALL_TIMEOUT_MS = 120_000;
+// The critique call already degrades gracefully on any failure (caught below,
+// marks ship unranked) — a shorter budget is fine here and leaves more of the
+// clock for rendering.
+const CRITIQUE_CALL_TIMEOUT_MS = 60_000;
+
 const DESIGNER_SYSTEM = `You are a senior identity designer at Fluid, a brand
 studio operating at the level of Pentagram or Wolff Olins. You are in the
 CONVERGENCE phase: producing finished, high-fidelity vector marks.
@@ -335,14 +345,22 @@ export async function generateLogoFinalists(
   const defaultTerritory = input.concept.territory;
   const activity = input.activity ?? silentActivity;
 
-  const call = async (system: string, prompt: string, maxTokens: number) => {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: maxTokens,
-      thinking: { type: "adaptive" },
-      system,
-      messages: [{ role: "user", content: prompt }],
-    });
+  const call = async (
+    system: string,
+    prompt: string,
+    maxTokens: number,
+    timeoutMs: number,
+  ) => {
+    const response = await client.messages.create(
+      {
+        model: MODEL,
+        max_tokens: maxTokens,
+        thinking: { type: "adaptive" },
+        system,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { timeout: timeoutMs },
+    );
     // Thinking is on for these calls and used to be discarded entirely.
     const reasoning = response.content
       .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
@@ -368,7 +386,12 @@ export async function generateLogoFinalists(
     const designing = activity.phase(
       `Drawing ${input.versions.length} version${input.versions.length === 1 ? "" : "s"} of "${input.concept.name}"`,
     );
-    const text = await call(DESIGNER_SYSTEM, buildRefinePrompt(input), 12000);
+    const text = await call(
+      DESIGNER_SYSTEM,
+      buildRefinePrompt(input),
+      12000,
+      DESIGN_CALL_TIMEOUT_MS,
+    );
     designing();
     input.clock?.lap("refine");
 
@@ -419,7 +442,9 @@ export async function generateLogoFinalists(
         `Score and rank every candidate as a JSON array.`,
       ].join("\n");
       const judging = activity.phase("Creative-director critique");
-      verdicts = extractVerdicts(await call(CRITIC_SYSTEM, critiquePrompt, 3000));
+      verdicts = extractVerdicts(
+        await call(CRITIC_SYSTEM, critiquePrompt, 3000, CRITIQUE_CALL_TIMEOUT_MS),
+      );
       judging();
       for (const v of verdicts) {
         activity.emit("note", `${v.score}/100 — ${v.name}: ${v.note}`);

@@ -27,6 +27,11 @@ export interface LogoBrief {
 const MODEL = "claude-opus-4-8";
 const COUNT = 3;
 
+// api/generate/logo has a 120s maxDuration and makes one call; bounded well
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 100_000;
+
 // We use a plain delimiter format (not JSON) because SVG is full of quotes and
 // slashes that make JSON-in-JSON escaping fragile and error-prone.
 const SYSTEM = `You are Fluid, an expert logo designer. Given a brand brief you
@@ -130,12 +135,15 @@ export async function generateBrandLogos(
   const client = new Anthropic();
   // No extended thinking here: SVG generation doesn't need it and it materially
   // reduces latency, which kept logo generation from finishing in time.
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 8000,
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

@@ -27,6 +27,13 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const MODEL = "claude-opus-4-8";
 
+// Called many-at-a-time from a bounded worker pool (api/logo-references/tag)
+// against a shared route-level deadline. A single vision call taking anywhere
+// near this long would already be anomalous; bounding it here keeps one stuck
+// call from quietly occupying a pool lane for the SDK's 10-minute default
+// while the rest of the batch waits.
+const CALL_TIMEOUT_MS = 60_000;
+
 export interface ReferenceCaption {
   /** How the mark is constructed and drawn. Always present. */
   technique: string;
@@ -128,19 +135,22 @@ export async function captionReferenceImage(
   imageUrl: string,
 ): Promise<ReferenceCaption | null> {
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 700,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "url", url: imageUrl } },
-          { type: "text", text: PROMPT },
-        ],
-      },
-    ],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 700,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "url", url: imageUrl } },
+            { type: "text", text: PROMPT },
+          ],
+        },
+      ],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

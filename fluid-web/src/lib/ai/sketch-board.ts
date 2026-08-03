@@ -66,6 +66,13 @@ export interface BoardBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// api/generate/logo/board reserves at least 200s of its 280s clock budget
+// before calling generateSketchBoard, which is this design call followed by
+// nine parallel renders (each already capped at 120s in images.ts). Bounded
+// so a stuck design call fails clearly with time still left for those renders
+// to run, instead of running out the SDK's 10-minute default on its own.
+const DESIGN_TIMEOUT_MS = 150_000;
+
 // Nine concepts with an art-direction paragraph each is a long output; thinking
 // is where the differentiation between slots actually happens.
 const MAX_TOKENS = 16000;
@@ -373,13 +380,16 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   const activity = input.activity ?? silentActivity;
 
   const designed = activity.phase(`Designing ${input.slots.length} concepts`);
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      thinking: { type: "adaptive" },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: DESIGN_TIMEOUT_MS },
+  );
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)

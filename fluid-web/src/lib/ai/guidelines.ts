@@ -32,6 +32,11 @@ export interface GuidelinesBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// api/generate/guidelines has a 60s maxDuration and makes one call; bounded
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 50_000;
+
 const SYSTEM = `You are Fluid, an expert brand strategist writing a brand's core
 guidelines. You are given everything already decided about the brand. Write a
 concise, usable guide — specific to THIS brand, never generic boilerplate.
@@ -135,13 +140,16 @@ export async function generateBrandGuidelines(
   }
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 6000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 6000,
+      thinking: { type: "adaptive" },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
