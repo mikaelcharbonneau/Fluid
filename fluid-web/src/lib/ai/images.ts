@@ -9,6 +9,7 @@
 // Recraft's vectorizer traces most cleanly.
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const MODEL = "gpt-image-2";
@@ -196,9 +197,37 @@ export async function renderLogoImage(opts: {
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
 
+// Every image we ever hand back to a client is one we ourselves stored in
+// `storeImage` above, so its URL always lives under our own Supabase project.
+// `logo_finalists[].image_url` reaches here by way of a client-writable brand
+// `data` patch, though — without this check, a user could point it at an
+// internal or arbitrary host and have our server fetch it on their behalf
+// (SSRF), with the response echoed back through the caller's error text.
+const ALLOWED_IMAGE_HOST = (() => {
+  try {
+    return new URL(SUPABASE_URL).host;
+  } catch {
+    return "";
+  }
+})();
+
+function assertFetchableImageUrl(url: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid image URL.");
+  }
+  if (parsed.protocol !== "https:" || parsed.host !== ALLOWED_IMAGE_HOST) {
+    throw new Error("Image URL is not from a trusted source.");
+  }
+  return parsed;
+}
+
 // Fetch a stored image back as bytes — needed to hand a concept to Recraft.
 export async function fetchImageBytes(url: string): Promise<Buffer> {
-  const res = await fetch(url);
+  const parsed = assertFetchableImageUrl(url);
+  const res = await fetch(parsed);
   if (!res.ok) throw new Error(`Could not read image (${res.status}).`);
   return Buffer.from(await res.arrayBuffer());
 }
