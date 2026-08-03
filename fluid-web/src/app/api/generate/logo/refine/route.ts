@@ -106,7 +106,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!(await hasTokens(user.id, TOKEN_COST.asset))) {
+  // A misconfigured server (a missing service-role key, say) makes this throw,
+  // and an unhandled throw here is a bare 500 with no body — which the client
+  // can only report as a generic failure. Name the cause instead.
+  let affordable: boolean;
+  try {
+    affordable = await hasTokens(user.id, TOKEN_COST.asset);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not check your token balance." },
+      { status: 500 },
+    );
+  }
+  if (!affordable) {
     return NextResponse.json(
       { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
       { status: 402 },
