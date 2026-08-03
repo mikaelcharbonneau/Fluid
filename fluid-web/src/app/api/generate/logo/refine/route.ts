@@ -14,6 +14,8 @@ import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { getLogoConfig } from "@/lib/logo-styles";
 import { startClock } from "@/lib/ai/budget";
+import { streamActivity } from "@/lib/sse";
+import type { Activity } from "@/lib/ai/activity";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -125,7 +127,14 @@ export async function POST(request: Request) {
     sameVersions(cachedPlan.versions ?? [], versions);
   const plan = reusable ? cachedPlan : null;
 
-  try {
+  return streamActivity(async (activity: Activity) => {
+    activity.emit(
+      "note",
+      plan
+        ? `Resuming "${concept.name}" from a cached plan — the thinking is already paid for`
+        : `Developing "${concept.name}" into ${versions.length} version${versions.length === 1 ? "" : "s"}`,
+      versions.map((v, i) => `Version ${i + 1}: ${v.colors.join(", ")}`).join("\n"),
+    );
     const finalists = await generateLogoFinalists({
       brandId,
       brief: String(brand.brief),
@@ -137,6 +146,7 @@ export async function POST(request: Request) {
       styleContext: styleContext(brand, { omitPlatform: true }),
       config: getLogoConfig(data),
       clock,
+      activity,
       plan,
       // Cached the moment the thinking is done, so a run killed while
       // rendering leaves something for the retry to start from.
@@ -172,11 +182,15 @@ export async function POST(request: Request) {
     const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
       console.error("Failed to cache logo finalists:", saveError.message);
+      activity.emit("warn", `The marks rendered but could not be saved: ${saveError.message}`);
+    } else {
+      activity.emit("note", `Saved — ${finalists.length} finished mark${finalists.length === 1 ? "" : "s"}`);
     }
 
-    return NextResponse.json({ finalists });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Logo refinement failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+    return { finalists };
+  }, {
+    onError: (err) => ({
+      message: err instanceof Error ? err.message : "Logo refinement failed.",
+    }),
+  });
 }

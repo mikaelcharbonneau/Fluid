@@ -17,6 +17,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
 import type { Clock } from "./budget";
+import { silentActivity, summariseThinking, type Activity } from "./activity";
 import type { CreativePlatform } from "./platform";
 import { BOARD_SIZE, type BoardSlot, slotStyleName, slotTypeName } from "../logo-board";
 import { captionBrief } from "./caption-reference";
@@ -60,6 +61,7 @@ export interface BoardBrief {
   } | null;
   avoidNames?: string[] | null; // concepts already on the board — don't repeat
   clock?: Clock | null;
+  activity?: Activity | null; // running commentary for the client
 }
 
 const MODEL = "claude-opus-4-8";
@@ -368,6 +370,9 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   }
   const client = new Anthropic();
 
+  const activity = input.activity ?? silentActivity;
+
+  const designed = activity.phase(`Designing ${input.slots.length} concepts`);
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
@@ -379,12 +384,28 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n");
+  designed();
+
+  // Thinking is enabled on this call and was previously dropped on the floor.
+  const reasoning = response.content
+    .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+    .map((b) => b.thinking)
+    .join("\n");
+  if (reasoning.trim()) {
+    const { label, detail } = summariseThinking(reasoning);
+    activity.emit("thinking", label, detail);
+  }
   input.clock?.lap("design");
 
   const paired = assignToSlots(parseConcepts(text), input.slots);
   if (paired.length === 0) {
     throw new Error("The studio returned no usable concepts.");
   }
+  activity.emit(
+    "note",
+    `${paired.length} concepts designed`,
+    paired.map(({ slot, concept }) => `${slot.index}. ${concept.name} — ${concept.idea}`).join("\n"),
+  );
 
   // A shared stamp keeps ids unique across presses while staying readable in
   // the storage paths (<brandId>/board/<stamp>-<slot>.png).
@@ -394,6 +415,7 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
 
   // All nine renders at once. Each has its own timeout inside renderLogoImage,
   // so one stuck request is dropped rather than stalling the board.
+  const drawing = activity.phase(`Rendering ${paired.length} sketches`);
   const rendered = await Promise.allSettled(
     paired.map(async ({ slot, concept }) => {
       const id = `sk_${stamp}_${slot.index}`;
@@ -404,7 +426,14 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
         direction: concept.art,
         quality: RENDER_QUALITY,
         render: "pencil",
+        onPrompt: (prompt, model) =>
+          activity.emit(
+            "prompt",
+            `Rendering "${concept.name}" (${model})`,
+            prompt,
+          ),
       });
+      activity.emit("note", `Drew "${concept.name}"`);
       const sketch: BoardSketch = {
         id,
         slot: slot.index,
@@ -426,12 +455,20 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
       return sketch;
     }),
   );
+  drawing();
   input.clock?.lap("render");
 
   const sketches: BoardSketch[] = [];
   for (const result of rendered) {
     if (result.status === "fulfilled") sketches.push(result.value);
-    else console.error("A board sketch failed to render:", result.reason);
+    else {
+      console.error("A board sketch failed to render:", result.reason);
+      activity.emit(
+        "warn",
+        "A sketch failed to render and was dropped",
+        result.reason instanceof Error ? result.reason.message : String(result.reason),
+      );
+    }
   }
   if (sketches.length === 0) {
     throw new Error("Every sketch failed to render. Please try again.");

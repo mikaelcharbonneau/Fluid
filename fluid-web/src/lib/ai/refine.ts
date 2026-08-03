@@ -26,6 +26,7 @@ import type { CreativePlatform } from "./platform";
 import type { BoardSketch } from "./sketch-board";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
 import type { RefineVersion } from "../logo-refine";
+import { silentActivity, summariseThinking, type Activity } from "./activity";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -97,6 +98,7 @@ export interface RefineBrief {
   styleContext?: string | null;
   config?: LogoConfig | null; // the client's Step 4 brief
   clock?: Clock | null; // phase timing, so the slow step shows up in the logs
+  activity?: Activity | null; // running commentary for the client
   // A plan from an earlier attempt that ran out of time. Present means the
   // design stages are skipped and this run goes straight to rendering.
   plan?: FinalistPlan | null;
@@ -331,6 +333,7 @@ export async function generateLogoFinalists(
   }
   const client = new Anthropic();
   const defaultTerritory = input.concept.territory;
+  const activity = input.activity ?? silentActivity;
 
   const call = async (system: string, prompt: string, maxTokens: number) => {
     const response = await client.messages.create({
@@ -340,6 +343,15 @@ export async function generateLogoFinalists(
       system,
       messages: [{ role: "user", content: prompt }],
     });
+    // Thinking is on for these calls and used to be discarded entirely.
+    const reasoning = response.content
+      .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+      .map((b) => b.thinking)
+      .join("\n");
+    if (reasoning.trim()) {
+      const { label, detail } = summariseThinking(reasoning);
+      activity.emit("thinking", label, detail);
+    }
     return response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
@@ -353,7 +365,11 @@ export async function generateLogoFinalists(
     // 1. Develop the chosen concept into the requested versions. One call: at
     // most MAX_REFINE_VERSIONS marks, and they have to differ from each other,
     // which only works if one response writes them all.
+    const designing = activity.phase(
+      `Drawing ${input.versions.length} version${input.versions.length === 1 ? "" : "s"} of "${input.concept.name}"`,
+    );
     const text = await call(DESIGNER_SYSTEM, buildRefinePrompt(input), 12000);
+    designing();
     input.clock?.lap("refine");
 
     const pool: Candidate[] = [];
@@ -402,9 +418,15 @@ export async function generateLogoFinalists(
         ``,
         `Score and rank every candidate as a JSON array.`,
       ].join("\n");
+      const judging = activity.phase("Creative-director critique");
       verdicts = extractVerdicts(await call(CRITIC_SYSTEM, critiquePrompt, 3000));
+      judging();
+      for (const v of verdicts) {
+        activity.emit("note", `${v.score}/100 — ${v.name}: ${v.note}`);
+      }
     } catch {
       verdicts = [];
+      activity.emit("warn", "The critique failed — the marks are unranked but intact");
     }
     input.clock?.lap("critique");
 
@@ -422,6 +444,7 @@ export async function generateLogoFinalists(
   // from it — this is what makes "trying again resumes from there" true.
   let plan = input.plan?.pool?.length ? input.plan : null;
   if (plan) {
+    activity.emit("note", `Reusing ${plan.pool.length} designed marks from the cached plan`);
     input.clock?.lap("resumed from cached plan");
   } else {
     plan = await design();
@@ -445,6 +468,7 @@ export async function generateLogoFinalists(
   // so it reaches this guard with the whole budget intact — which is the point
   // of caching the plan.
   input.clock?.guard("render the finished marks", 150_000);
+  const drawing = activity.phase(`Rendering ${Math.min(ordered.length, input.versions.length)} finished marks`);
   const rendered = await Promise.allSettled(
     ordered.slice(0, input.versions.length).map(async (c, i) => {
       const id = `fin_${Date.now().toString(36)}_${i + 1}`;
@@ -454,7 +478,14 @@ export async function generateLogoFinalists(
         slot: id,
         direction: c.art,
         quality: "high",
+        onPrompt: (prompt, model) =>
+          activity.emit(
+            "prompt",
+            `Rendering version ${c.version} — "${c.name}" (${model})`,
+            prompt,
+          ),
       });
+      activity.emit("note", `Rendered version ${c.version} — "${c.name}"`);
       const v = verdictFor.get(c.name.toLowerCase());
       return {
         id,
@@ -473,9 +504,19 @@ export async function generateLogoFinalists(
     }),
   );
 
+  drawing();
   const finalists = rendered
     .filter((r): r is PromiseFulfilledResult<LogoFinalist> => r.status === "fulfilled")
     .map((r) => r.value);
+  for (const r of rendered) {
+    if (r.status === "rejected") {
+      activity.emit(
+        "warn",
+        "A mark failed to render and was dropped",
+        r.reason instanceof Error ? r.reason.message : String(r.reason),
+      );
+    }
+  }
   if (finalists.length === 0) {
     const firstError = rendered.find(
       (r): r is PromiseRejectedResult => r.status === "rejected",

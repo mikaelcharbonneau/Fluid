@@ -181,11 +181,17 @@ export async function renderLogoImage(opts: {
   direction: string;
   quality?: "low" | "medium" | "high";
   render?: "vector" | "pencil";
+  // Reports the exact text this function is about to send. The wrapper below
+  // is as much a part of what gets drawn as the art direction is, so a caller
+  // reconstructing the prompt to show it would eventually show a lie — the
+  // only trustworthy copy is the one handed to the renderer.
+  onPrompt?: (prompt: string, model: string) => void;
 }): Promise<RenderedImage> {
   const prompt =
     opts.render === "pencil"
       ? pencilSketchPrompt(opts.direction)
       : logoImagePrompt(opts.direction);
+  opts.onPrompt?.(prompt, MODEL);
   const bytes = await generatePng(prompt, opts.quality ?? "medium");
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
