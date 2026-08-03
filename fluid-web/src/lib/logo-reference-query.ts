@@ -221,7 +221,7 @@ export function readAxes(
 //
 // This used to be the only ranking path: the route loaded every matching row
 // and scored it here. That's now done in SQL (see
-// supabase/migrations/0013_logo_reference_ranked_rpc.sql and
+// supabase/migrations/0014_logo_reference_ranked_rpc.sql and
 // fetchRankedReferences below) so a growing catalogue doesn't have to be
 // pulled into function memory on every request. This function is kept,
 // deliberately, as the route's fallback for when the RPC call fails (e.g. the
@@ -341,14 +341,14 @@ const queryRankedReferences = unstable_cache(
 );
 
 // The SQL-backed equivalent of rankReferences(): filtering, scoring and
-// limiting all happen in the database (supabase/migrations/0013_...), so this
+// limiting all happen in the database (supabase/migrations/0014_...), so this
 // only has to map the already-ranked, already-limited rows onto the response
 // shape and recompute `matched` for display — recomputing that from `wanted`
 // against the (at most `limit`) returned rows is cheap and keeps the "which
 // attributes actually matched" logic in one place rather than duplicating it
 // in SQL.
 //
-// Throws if the RPC call fails (e.g. the 0013 migration hasn't reached this
+// Throws if the RPC call fails (e.g. the 0014 migration hasn't reached this
 // environment yet) — callers should catch and fall back to the full-scan +
 // rankReferences() path. See app/api/logo-references/route.ts.
 export async function fetchRankedReferences(

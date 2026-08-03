@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const wanted = attributesForStyles(styles);
 
   // Filtering, scoring and limiting all happen in SQL now (see
-  // supabase/migrations/0013_logo_reference_ranked_rpc.sql), behind a short,
+  // supabase/migrations/0014_logo_reference_ranked_rpc.sql), behind a short,
   // bounded cache — the catalogue is heading for thousands of rows, and
   // pulling all of them into function memory on every request stops paying
   // for itself well before then.
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       total,
     });
   } catch (rpcError) {
-    // The 0013 migration may not have reached every environment yet (or the
+    // The 0014 migration may not have reached every environment yet (or the
     // RPC failed for some other transient reason). Fall back to the original
     // full-scan-plus-in-memory ranking rather than 500ing — slower, but
     // correct, and it stops happening the moment the migration lands. This
