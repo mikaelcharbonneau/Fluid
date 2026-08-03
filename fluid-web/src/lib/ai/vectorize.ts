@@ -17,15 +17,15 @@ const RECRAFT_URL = "https://external.api.recraft.ai/v1/images/vectorize";
 const MAX_BYTES = 5 * 1024 * 1024;
 
 // A single trace is a small, synchronous op on Recraft's side — nothing here
-// should ever legitimately take anywhere near this long. Bounded well under
-// the route's 120s maxDuration so a hung request fails with a clear error
-// instead of taking the whole request down with it, and there's still room
-// left for the follow-up SVG download and the Supabase upload after it.
+// should ever legitimately take anywhere near this long. This is a
+// non-idempotent POST, so it gets one 60s attempt and no ambiguous retry.
+// That leaves route time for the follow-up SVG download and Supabase upload.
 const VECTORIZE_TIMEOUT_MS = 60_000;
 // The result download is a plain static-file GET off Recraft's CDN — much
 // tighter budget is reasonable, and it stays well within what's left of the
 // route's deadline after the trace call above.
 const DOWNLOAD_TIMEOUT_MS = 20_000;
+const DOWNLOAD_TOTAL_TIMEOUT_MS = 30_000;
 
 // Guards against buffering an absurdly large body before the real MAX_BYTES
 // check ever runs. Sized generously above MAX_BYTES so it never rejects a
@@ -70,7 +70,13 @@ export async function vectorizeImage(opts: {
       headers: { Authorization: `Bearer ${apiKey()}` },
       body: form, // fetch sets the multipart boundary itself
     },
-    { timeoutMs: VECTORIZE_TIMEOUT_MS, label: "Recraft vectorize" },
+    {
+      timeoutMs: VECTORIZE_TIMEOUT_MS,
+      totalTimeoutMs: VECTORIZE_TIMEOUT_MS,
+      maxRetries: 0,
+      retryable: false,
+      label: "Recraft vectorize",
+    },
   );
 
   if (!res.ok) {
@@ -90,7 +96,13 @@ export async function vectorizeImage(opts: {
   const svgRes = await vendorFetch(
     svgUrl,
     {},
-    { timeoutMs: DOWNLOAD_TIMEOUT_MS, label: "Recraft SVG download" },
+    {
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      totalTimeoutMs: DOWNLOAD_TOTAL_TIMEOUT_MS,
+      maxRetries: 1,
+      retryable: true,
+      label: "Recraft SVG download",
+    },
   );
   if (!svgRes.ok) throw new Error("Could not download the vectorized SVG.");
 

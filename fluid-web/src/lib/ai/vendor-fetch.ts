@@ -6,8 +6,8 @@
 // doing along with it (see images.ts's RENDER_TIMEOUT_MS comment for the
 // concrete failure mode this caused for OpenAI renders). This module gives
 // every such call the same conservative shape: a deadline that always fires,
-// and a small retry budget for the handful of statuses that are genuinely
-// safe to retry blindly.
+// and a small retry budget only when the caller declares the operation safe
+// to retry.
 //
 // The retry set and backoff shape are deliberately unambitious — matched to
 // what images.ts's requestPng/generatePng already does for OpenAI, not an
@@ -30,14 +30,19 @@ const MAX_DELAY_MS = 8_000;
 
 export interface VendorFetchOptions {
   /**
-   * Deadline for a single attempt, in ms. Applied fresh on every attempt
-   * (including retries) via `AbortSignal.timeout`, the same shape
-   * images.ts's requestPng already uses — a request that times out once gets
-   * a full new window on retry, it isn't racing a shrinking overall budget.
+   * Deadline for a single attempt, in ms. Applied fresh on every attempt via
+   * `AbortSignal.timeout`, but never allowed to outlive `totalTimeoutMs`.
    */
   timeoutMs: number;
-  /** Retries after the first attempt. Default 2. */
+  /** Absolute budget for all attempts and backoff. Defaults to timeoutMs. */
+  totalTimeoutMs?: number;
+  /** Retries after the first attempt. Default 2 when the total budget allows. */
   maxRetries?: number;
+  /**
+   * Explicitly enables retries for a request that is known to be idempotent.
+   * GET and HEAD default to true; every other method defaults to false.
+   */
+  retryable?: boolean;
   /** Base backoff before the first retry, in ms; doubles per subsequent
    * retry and is capped at MAX_DELAY_MS, with +-50% jitter. */
   baseDelayMs?: number;
@@ -110,10 +115,17 @@ export async function vendorFetch(
   const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = opts.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const label = opts.label ?? url;
+  const method = (init.method ?? "GET").toUpperCase();
+  const retryable = opts.retryable ?? (method === "GET" || method === "HEAD");
+  const deadlineAt = Date.now() + Math.max(1, opts.totalTimeoutMs ?? opts.timeoutMs);
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const deadline = AbortSignal.timeout(opts.timeoutMs);
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      throw new Error(`${label} exceeded its ${opts.totalTimeoutMs ?? opts.timeoutMs}ms retry budget.`);
+    }
+    const deadline = AbortSignal.timeout(Math.min(opts.timeoutMs, remainingMs));
     const signal = combineSignals(init.signal, deadline);
 
     let res: Response;
@@ -121,8 +133,12 @@ export async function vendorFetch(
       res = await fetch(url, { ...init, signal });
     } catch (err) {
       lastError = err;
-      if (attempt < maxRetries) {
-        await sleep(backoffDelay(attempt, baseDelayMs));
+      // A caller-owned abort means the enclosing request/job ended. Retrying
+      // would detach this request from that lifecycle and exceed its budget.
+      if (init.signal?.aborted) throw err;
+      const delay = backoffDelay(attempt, baseDelayMs);
+      if (retryable && attempt < maxRetries && delay < deadlineAt - Date.now()) {
+        await sleep(delay);
         continue;
       }
       const reason = err instanceof Error ? err.message : String(err);
@@ -131,11 +147,12 @@ export async function vendorFetch(
       );
     }
 
-    if (res.ok || !RETRY_STATUSES.has(res.status) || attempt === maxRetries) {
+    if (res.ok || !retryable || !RETRY_STATUSES.has(res.status) || attempt === maxRetries) {
       return res;
     }
 
     const delay = retryAfterMs(res) ?? backoffDelay(attempt, baseDelayMs);
+    if (delay >= deadlineAt - Date.now()) return res;
     await sleep(delay);
   }
 
