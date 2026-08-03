@@ -149,11 +149,27 @@ export async function POST(request: Request) {
   // A preview spends nothing, so it must not be refused for having nothing to
   // spend — reading the prompts is exactly what you want to do while out of
   // tokens.
-  if (!preview && !(await hasTokens(user.id, TOKEN_COST.asset))) {
-    return NextResponse.json(
-      { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
-      { status: 402 },
-    );
+  //
+  // The check itself is wrapped because a misconfigured server (a missing
+  // service-role key, say) makes it throw, and an unhandled throw here is a
+  // bare 500 with no body — which the client can only report as a generic
+  // failure. Name the cause instead.
+  if (!preview) {
+    let affordable: boolean;
+    try {
+      affordable = await hasTokens(user.id, TOKEN_COST.asset);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Could not check your token balance." },
+        { status: 500 },
+      );
+    }
+    if (!affordable) {
+      return NextResponse.json(
+        { error: "You're out of tokens. Top up in Settings → Billing.", code: "no_tokens" },
+        { status: 402 },
+      );
+    }
   }
 
   const data = (brand.data as Record<string, unknown>) ?? {};

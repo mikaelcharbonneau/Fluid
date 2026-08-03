@@ -44,6 +44,16 @@ export function streamActivity(
 
       const activity = createActivity((event) => send({ type: "activity", event }));
 
+      // Events fire at phase boundaries, and a phase can be long: category
+      // research spends nearly two minutes inside one model call. That is two
+      // minutes of a connection with nothing on it, which proxies, load
+      // balancers and browsers are all entitled to treat as dead. A comment
+      // line every 15s keeps it demonstrably alive without appearing in the
+      // log — the client skips any line that is not `data:`.
+      const heartbeat = setInterval(() => {
+        if (!closed) controller.enqueue(encoder.encode(`: keepalive\n\n`));
+      }, 15_000);
+
       try {
         const data = await job(activity);
         send({ type: "result", data });
@@ -62,6 +72,7 @@ export function streamActivity(
         } });
         send({ type: "error", error: message, code: mapped?.code });
       } finally {
+        clearInterval(heartbeat);
         closed = true;
         controller.close();
       }
