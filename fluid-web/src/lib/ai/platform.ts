@@ -33,6 +33,13 @@ export interface PlatformBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// Both callers (logo/board, logo/research) reserve at least 60s of their
+// budget before making this call. Bounded a bit above that reservation so a
+// stuck call fails clearly well inside the caller's own clock guard, instead
+// of running out the SDK's 10-minute default and blowing the whole route's
+// deadline on one step.
+const CALL_TIMEOUT_MS = 90_000;
+
 const SYSTEM = `You are the strategy director of Fluid, a brand studio operating
 at the level of Pentagram or Wolff Olins. Before any designer sketches, you
 write the creative platform: the single organizing idea behind the brand, and
@@ -127,13 +134,16 @@ export async function generateCreativePlatform(
     throw new Error("ANTHROPIC_API_KEY is not configured.");
   }
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 2000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 2000,
+      thinking: { type: "adaptive" },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)

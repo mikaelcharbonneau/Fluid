@@ -29,6 +29,11 @@ export interface TypographyBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// api/generate/typography has a 60s maxDuration and makes one call; bounded
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 50_000;
+
 const CATEGORIES = ["serif", "sans-serif", "display", "monospace"];
 
 const SYSTEM = `You are Fluid, an expert brand designer specializing in typography.
@@ -115,13 +120,16 @@ export async function generateBrandTypography(
   }
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 3000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 3000,
+      thinking: { type: "adaptive" },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

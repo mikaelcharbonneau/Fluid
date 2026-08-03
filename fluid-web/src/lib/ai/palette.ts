@@ -28,6 +28,11 @@ export interface PaletteBrief {
 
 const MODEL = "claude-opus-4-8";
 
+// api/generate/palette has a 60s maxDuration and makes one call; bounded
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 50_000;
+
 const SYSTEM = `You are Fluid, an expert brand designer specializing in color.
 Given a brand brief, you design a small, coherent color palette.
 
@@ -122,13 +127,16 @@ export async function generateBrandPalette(
   }
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 4000,
+      thinking: { type: "adaptive" },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

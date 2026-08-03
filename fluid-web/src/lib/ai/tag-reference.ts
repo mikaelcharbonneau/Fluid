@@ -13,6 +13,13 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const MODEL = "claude-opus-4-8";
 
+// Called many-at-a-time from a bounded worker pool (api/logo-references/tag)
+// against a shared route-level deadline. A single vision call taking anywhere
+// near this long would already be anomalous; bounding it here keeps one stuck
+// call from quietly occupying a pool lane for the SDK's 10-minute default
+// while the rest of the batch waits.
+const CALL_TIMEOUT_MS = 60_000;
+
 // The seven mark types, matching the CHECK constraint on logo_references.
 export const MARK_TYPES = [
   "wordmark",
@@ -194,19 +201,22 @@ export function parseTagResponse(raw: string): TaggedReference | null {
 // which paths still need a pass; returns null when the answer was unusable.
 export async function tagReferenceImage(imageUrl: string): Promise<TaggedReference | null> {
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 400,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "url", url: imageUrl } },
-          { type: "text", text: prompt() },
-        ],
-      },
-    ],
-  });
+  const response = await client.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 400,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "url", url: imageUrl } },
+            { type: "text", text: prompt() },
+          ],
+        },
+      ],
+    },
+    { timeout: CALL_TIMEOUT_MS },
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
