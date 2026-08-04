@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { styleContext } from "@/lib/ai/step2";
-import { getPlatform } from "@/lib/ai/platform";
+import { getPlatform, type CreativePlatform } from "@/lib/ai/platform";
 import type { BoardSketch } from "@/lib/ai/sketch-board";
 import {
   generateLogoFinalists,
@@ -19,6 +19,22 @@ import type { Activity } from "@/lib/ai/activity";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+// The standalone logo flow deliberately skips the old research/platform phase.
+// Refinement still benefits from a stable brand idea, but it must not block a
+// real board simply because that legacy record was never created.
+function refinementPlatform(
+  stored: CreativePlatform | null,
+  brief: string,
+): CreativePlatform {
+  if (stored) return stored;
+  return {
+    brand_idea: brief.trim(),
+    personality: [],
+    territories: [],
+    design_notes: "Develop the selected concept faithfully; do not introduce a new logo direction.",
+  };
+}
 
 // POST /api/generate/logo/refine — Phase 2 of the logo studio: develop ONE
 // chosen concept into the versions the client briefed, each in the colours
@@ -75,7 +91,7 @@ export async function POST(request: Request) {
   }
 
   const data = (brand.data as Record<string, unknown>) ?? {};
-  const platform = getPlatform(data);
+  const platform = refinementPlatform(getPlatform(data), String(brand.brief));
 
   // Concepts come from the board — the only place they have ever come from
   // since the wizard's own logo step became this same studio. The older
@@ -93,7 +109,7 @@ export async function POST(request: Request) {
     conceptId || storedChoice || (storedLikes.length === 1 ? storedLikes[0] : "");
   const concept = sketches.find((s) => s.id === wantedId) ?? null;
 
-  if (!platform || sketches.length === 0) {
+  if (sketches.length === 0) {
     return NextResponse.json(
       { error: "Sketch concepts first, then refine the one you want." },
       { status: 400 },
