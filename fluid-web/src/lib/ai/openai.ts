@@ -27,6 +27,7 @@ function outputText(response: OpenAIResponse): string {
 export async function generateOpenAIText({
   instructions,
   input,
+  model,
   maxOutputTokens = 4_000,
   reasoningEffort = "medium",
   timeoutMs = 120_000,
@@ -34,6 +35,7 @@ export async function generateOpenAIText({
 }: {
   instructions: string;
   input: string | unknown[];
+  model?: string;
   maxOutputTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
   timeoutMs?: number;
@@ -47,7 +49,7 @@ export async function generateOpenAIText({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5",
+      model: model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5",
       instructions,
       input,
       reasoning: { effort: reasoningEffort },

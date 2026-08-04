@@ -21,11 +21,11 @@ export interface NameBrief {
 }
 
 const COUNT = 50;
+const MODEL = "gpt-5.6-luna";
 
-// api/generate/names has a 60s maxDuration and makes one call; bounded under
-// that so a stuck call fails with a clear error instead of the platform
-// killing the function mid-response (the SDK's own default is 10 minutes).
-const CALL_TIMEOUT_MS = 50_000;
+// Leave enough room for the route to persist the results after the OpenAI
+// response returns, while failing before Vercel's function deadline.
+const CALL_TIMEOUT_MS = 105_000;
 
 const SYSTEM = `You are Fluid, an expert brand strategist and naming consultant.
 Given a short brand brief, you generate a large, varied set of distinct,
@@ -115,8 +115,9 @@ export async function generateBrandNames(
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
+    model: MODEL,
     maxOutputTokens: 8_000,
-    reasoningEffort: "medium",
+    reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
   });
 
