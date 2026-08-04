@@ -129,7 +129,7 @@ export async function generateCreativePlatform(
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     maxOutputTokens: 2_000,
-    reasoningEffort: "medium",
+    reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
   });
   return extractPlatform(text);

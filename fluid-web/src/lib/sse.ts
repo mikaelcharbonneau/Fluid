@@ -58,6 +58,7 @@ export function streamActivity(
         const data = await job(activity);
         send({ type: "result", data });
       } catch (err) {
+        console.error("Generation stream failed:", err);
         const mapped = options.onError?.(err);
         const message =
           mapped?.message ??
