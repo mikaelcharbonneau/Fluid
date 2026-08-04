@@ -18,10 +18,10 @@ function parseList(raw: string | null): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, 8);
+    .slice(0, 1);
 }
 
-// GET /api/logo-references?types=wordmark,abstract&styles=placeholder-03&limit=12
+// GET /api/logo-references?types=wordmark&styles=placeholder-03&limit=12
 //
 // The Step 4 gallery. Returns real catalogued marks filtered to the mark types
 // chosen in Step 3 and ranked against the visual directions chosen in Step 2,

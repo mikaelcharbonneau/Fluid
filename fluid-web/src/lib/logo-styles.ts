@@ -220,17 +220,15 @@ export interface LogoConfig {
   standalone_style?: string | null;
   instructions?: string | null;
 
-  // The standalone flow lets the client choose up to three mark types and
-  // three visual directions, and every concept is drawn from ONE of each. The
-  // full selections are stored so successive concepts can rotate through them
-  // — see selectionForAttempt below.
+  // The standalone flow keeps one mark type and one visual direction for a
+  // coherent board. Arrays remain for backwards-compatible stored drafts.
   mark_types?: string[] | null;
   standalone_styles?: string[] | null;
 }
 
 // Keep only ids that name a real mark type, preserving order and dropping
 // duplicates. MARK_TYPE_AI is allowed: it means "the studio decides".
-export function normalizeMarkTypes(raw: unknown, limit = 3): string[] {
+export function normalizeMarkTypes(raw: unknown, limit = 1): string[] {
   const list = Array.isArray(raw) ? raw : [];
   const out: string[] = [];
   for (const item of list) {
@@ -241,7 +239,7 @@ export function normalizeMarkTypes(raw: unknown, limit = 3): string[] {
   return out;
 }
 
-export function normalizeStandaloneStyles(raw: unknown, limit = 2): string[] {
+export function normalizeStandaloneStyles(raw: unknown, limit = 1): string[] {
   const list = Array.isArray(raw) ? raw : [];
   const out: string[] = [];
   for (const item of list) {
@@ -276,10 +274,8 @@ export function selectionForAttempt(
   };
 }
 
-// Identity of the client's *selection*, used to decide whether an existing
-// board is still valid. It deliberately ignores which concept is being drawn
-// right now: rotating through the same selection must not wipe the board,
-// which is what comparing the single mark_type field would have done.
+// Identity of the client's selection, used to decide whether an existing board
+// is still valid. Arrays preserve compatibility with older stored drafts.
 export function logoConfigSignature(config: LogoConfig): string {
   const types = config.mark_types?.length
     ? [...config.mark_types].sort()
