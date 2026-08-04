@@ -71,10 +71,6 @@ export interface BoardBrief {
 // to run, instead of running out the SDK's 10-minute default on its own.
 const DESIGN_TIMEOUT_MS = 150_000;
 
-// Six structured concept briefs fit comfortably below the model's 8k output
-// ceiling. Keeping this bounded also leaves room for the six image renders.
-const MAX_TOKENS = 8_000;
-
 // Croquis, so fidelity is not the point — but "low" mangles letterforms badly
 // enough to break every wordmark on the board, which is most of what clients
 // ask for. Medium is the floor at which type stays readable.
@@ -389,7 +385,6 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
-    maxOutputTokens: MAX_TOKENS,
     reasoningEffort: "high",
     timeoutMs: DESIGN_TIMEOUT_MS,
   });

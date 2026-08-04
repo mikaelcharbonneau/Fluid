@@ -28,7 +28,7 @@ export async function generateOpenAIText({
   instructions,
   input,
   model,
-  maxOutputTokens = 4_000,
+  maxOutputTokens,
   reasoningEffort = "medium",
   timeoutMs = 120_000,
   json = false,
@@ -53,7 +53,7 @@ export async function generateOpenAIText({
       instructions,
       input,
       reasoning: { effort: reasoningEffort },
-      max_output_tokens: maxOutputTokens,
+      ...(maxOutputTokens ? { max_output_tokens: maxOutputTokens } : {}),
       ...(json ? { text: { format: { type: "json_object" } } } : {}),
     }),
   });
@@ -65,6 +65,9 @@ export async function generateOpenAIText({
 
   const payload = await response.json() as OpenAIResponse;
   if (payload.status && payload.status !== "completed") {
+    if (payload.incomplete_details?.reason === "max_output_tokens") {
+      throw new Error("OpenAI stopped before completing the response because it reached its output-token limit.");
+    }
     throw new Error(payload.error?.message ?? payload.incomplete_details?.reason ?? `OpenAI generation ended as ${payload.status}.`);
   }
   const text = outputText(payload);
