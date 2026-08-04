@@ -4795,22 +4795,23 @@ const DirA_Step2_Name = () => {
 // finalists mirror into data.logos so Step 5 / export work unchanged.
 // =====================================================================
 
-// A low-fi croquis card: ink sketch on paper, with a like control. The
-// idea is the star — rough rendering keeps the focus on direction.
+// A low-fi croquis card with a like control. The asset is presented directly
+// on the card so transparent sketches do not sit inside a second visual frame.
 const ASketchCard = ({ sketch, liked, onLike, onImageError }) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12,
     boxShadow: liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     display:'flex', flexDirection:'column', gap:10, position:'relative',
   }}>
-    {/* Paper canvas */}
+    {/* Layout-only region: the generated asset is transparent and sits directly
+        against the card instead of on a paper-colored inset surface. */}
     <div style={{
-      background:'#FBFAF6', borderRadius: 10, height: 120,
+      height: 120,
       display:'flex', alignItems:'center', justifyContent:'center',
-      boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
+      overflow:'hidden',
     }}>
       <img src={sketch.image_url} alt={sketch.name} loading="lazy" onError={onImageError}
-        style={{width:'100%', height:'100%', objectFit:'contain', borderRadius:8, display:'block'}}/>
+        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>

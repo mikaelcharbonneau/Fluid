@@ -563,7 +563,7 @@ export function referenceCroquisPrompt(
     "",
     "Output requirements - absolute:",
     ...outputRequirement,
-    "- Isolate the logo on a transparent background. Do not show paper, a canvas, a page, or any background color or texture.",
+    "- Return a true transparent-alpha background. The empty area must be invisible, not represented by a checkerboard or transparency grid. Do not show paper, a canvas, a page, a panel, or any background color or texture.",
     "- Render the logo in dark, high-contrast near-black graphite with restrained hand-drawn texture.",
     "- Do not include annotations, labels, captions, arrows, keywords, diagrams, alternate explorations, detail studies, grids, guides, borders, objects, figures, or mockups.",
     isLettermark
