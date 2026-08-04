@@ -2401,6 +2401,7 @@ const DirA_LogoSketches = () => {
   const [likes, setLikes] = React.useState(data.logo_board_likes || []);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [assetError, setAssetError] = React.useState(false);
   const [notice, setNotice] = React.useState('');
   const initialBatchOffset = Number(data.logo_reference_batch_offset);
   const [remainingReferences, setRemainingReferences] = React.useState(
@@ -2421,7 +2422,7 @@ const DirA_LogoSketches = () => {
   // that queue to the first six references.
   const draw = async ({ fresh = false } = {}) => {
     if (!brandId || loading || !briefReady) return;
-    setLoading(true); setError(''); setNotice('');
+    setLoading(true); setError(''); setAssetError(false); setNotice('');
     const res = await apiGenerateLogoBoard(brandId, {
       mark_types: requestTypes,
       standalone_styles: chosenStyles,
@@ -2448,6 +2449,20 @@ const DirA_LogoSketches = () => {
         notices.push(`${res.remaining} liked reference${res.remaining === 1 ? '' : 's'} remain in the queue.`);
       }
       setNotice(notices.join(' '));
+    }
+    setLoading(false);
+  };
+
+  const repairImages = async () => {
+    if (!brandId || loading) return;
+    setLoading(true); setError('');
+    const res = await apiRepairLogoBoard(brandId);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setBoard(res.board);
+      persist(res.board, likes);
+      setAssetError(false);
     }
     setLoading(false);
   };
@@ -2568,6 +2583,20 @@ const DirA_LogoSketches = () => {
           </div>
         )}
 
+        {assetError && !error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>Some concept images could not load.</span>
+            <button type="button" onClick={repairImages} disabled={loading} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',fontSize:11.5,
+              fontWeight:600,border:0,cursor:loading ? 'default' : 'pointer',opacity:loading ? .6 : 1,
+            }}>{loading ? 'Repairing…' : 'Repair images'}</button>
+          </div>
+        )}
+
         {board.length === 0 && !loading && briefReady && !error && (
           <div style={{
             padding:'48px 24px',textAlign:'center',borderRadius:16,
@@ -2587,7 +2616,7 @@ const DirA_LogoSketches = () => {
         {(board.length > 0 || loading) && (
           <div className="home-grid-3" style={{display:'grid',gap:12}}>
             {board.map((s) => (
-              <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
+              <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} onImageError={() => setAssetError(true)} />
             ))}
             {loading && Array.from({ length: BOARD_SIZE }).map((_, i) => (
               <div key={`pending-${i}`} style={{
@@ -4768,7 +4797,7 @@ const DirA_Step2_Name = () => {
 
 // A low-fi croquis card: ink sketch on paper, with a like control. The
 // idea is the star — rough rendering keeps the focus on direction.
-const ASketchCard = ({ sketch, liked, onLike }) => (
+const ASketchCard = ({ sketch, liked, onLike, onImageError }) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12,
     boxShadow: liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4780,7 +4809,7 @@ const ASketchCard = ({ sketch, liked, onLike }) => (
       display:'flex', alignItems:'center', justifyContent:'center',
       boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
     }}>
-      <img src={sketch.image_url} alt={sketch.name} loading="lazy"
+      <img src={sketch.image_url} alt={sketch.name} loading="lazy" onError={onImageError}
         style={{width:'100%', height:'100%', objectFit:'contain', borderRadius:8, display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
@@ -8609,6 +8638,19 @@ async function apiGenerateLogoBoard(brandId, config, fresh) {
   if (out.error) return { error: out.error, code: out.code };
   const j = out.data || {};
   return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0, remaining: j.remaining };
+}
+
+async function apiRepairLogoBoard(brandId) {
+  const out = await runStreamed(
+    'Repairing concept images',
+    () => fetch('/api/generate/logo/board/repair', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    }),
+    'Could not repair the concept images.',
+  );
+  if (out.error) return { error: out.error, code: out.code };
+  return { board: (out.data || {}).board || [] };
 }
 
 // Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,

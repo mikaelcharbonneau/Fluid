@@ -253,6 +253,7 @@ export async function POST(request: Request) {
     const nextPatch = {
       logo_board: board,
       logo_board_likes: [],
+      logo_board_output_version: "native-transparent-v1",
       logo_reference_batch_offset: batchOffset + batch.length,
       logo_reference_batch_paths: batch.map((reference) => reference.imagePath),
       logo_board_config: {

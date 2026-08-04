@@ -4,10 +4,10 @@
 // every generated image is uploaded to the public `brand-assets` bucket and
 // only its URL is persisted on the brand record.
 //
-// gpt-image-2 is requested with an opaque field. Reference-led croquis can
-// opt into an alpha pass before storage so they are presented as isolated marks.
+// Reference-led croquis request a native transparent PNG. Some image-model
+// deployments reject that setting, so those calls fall back to opaque output
+// rather than dropping the entire board.
 
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
@@ -98,6 +98,7 @@ const RENDER_TIMEOUT_MS = 120_000;
 // deadline of its own to respect.
 const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
 const RETRY_DELAY_MS = 4_000;
+type ImageBackground = "opaque" | "transparent";
 
 function retryDelay(): number {
   return RETRY_DELAY_MS + Math.floor(Math.random() * RETRY_DELAY_MS);
@@ -106,6 +107,7 @@ function retryDelay(): number {
 async function requestPng(
   prompt: string,
   quality: "low" | "medium" | "high",
+  background: ImageBackground,
 ): Promise<Response> {
   return fetch(OPENAI_URL, {
     method: "POST",
@@ -120,18 +122,36 @@ async function requestPng(
       size: "1024x1024",
       quality,
       n: 1,
-      background: "opaque", // transparent is unsupported on gpt-image-2
+      background,
       output_format: "png",
     }),
   });
 }
 
 // Generate one image. Returns raw PNG bytes.
-async function generatePng(prompt: string, quality: "low" | "medium" | "high"): Promise<Buffer> {
-  let res = await requestPng(prompt, quality);
+async function generatePng(
+  prompt: string,
+  quality: "low" | "medium" | "high",
+  background: ImageBackground,
+): Promise<Buffer> {
+  let res = await requestPng(prompt, quality, background);
   if (!res.ok && RETRY_STATUSES.has(res.status)) {
     await new Promise((resolve) => setTimeout(resolve, retryDelay()));
-    res = await requestPng(prompt, quality);
+    res = await requestPng(prompt, quality, background);
+  }
+
+  // gpt-image-2 historically rejected transparent output. Keep the board
+  // reliable for accounts on that deployment while preferring native alpha
+  // wherever it is now available.
+  if (!res.ok && background === "transparent") {
+    const detail = await res.text().catch(() => "");
+    if (res.status === 400 && /background|transparent/i.test(detail)) {
+      res = await requestPng(prompt, quality, "opaque");
+    } else {
+      throw new Error(
+        `Image generation failed (${res.status}): ${detail.slice(0, 300)}`,
+      );
+    }
   }
 
   if (!res.ok) {
@@ -153,38 +173,6 @@ async function generatePng(prompt: string, quality: "low" | "medium" | "high"): 
     return Buffer.from(await img.arrayBuffer());
   }
   throw new Error("Image generation returned no image data.");
-}
-
-// The image endpoint returns croquis over a white raster field. Convert that
-// field to alpha and remap graphite to dark charcoal so an isolated sketch
-// remains legible on any surface. This path is intentionally limited to the
-// reference-led board; finished logo and refinement renders keep their pixels.
-async function isolateGraphiteInk(bytes: Buffer): Promise<Buffer> {
-  const { data, info } = await sharp(bytes)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  for (let offset = 0; offset < data.length; offset += 4) {
-    const sourceAlpha = data[offset + 3];
-    const luminance =
-      0.2126 * data[offset] +
-      0.7152 * data[offset + 1] +
-      0.0722 * data[offset + 2];
-    const graphiteAlpha = Math.max(0, Math.min(255, Math.round((223 - luminance) * 2)));
-    const alpha = Math.round((sourceAlpha * graphiteAlpha) / 255);
-
-    data[offset] = 20;
-    data[offset + 1] = 20;
-    data[offset + 2] = 20;
-    data[offset + 3] = alpha;
-  }
-
-  return sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  })
-    .png()
-    .toBuffer();
 }
 
 // Upload bytes to the public bucket and return its URL.
@@ -216,8 +204,7 @@ export async function renderLogoImage(opts: {
   prompt?: string;
   quality?: "low" | "medium" | "high";
   render?: "vector" | "pencil";
-  /** Remove the opaque render field and store the resulting PNG with alpha. */
-  transparentBackground?: boolean;
+  background?: ImageBackground;
   // Reports the exact text this function is about to send. The wrapper below
   // is as much a part of what gets drawn as the art direction is, so a caller
   // reconstructing the prompt to show it would eventually show a lie — the
@@ -230,9 +217,12 @@ export async function renderLogoImage(opts: {
       ? pencilSketchPrompt(opts.direction ?? "")
       : logoImagePrompt(opts.direction ?? ""));
   opts.onPrompt?.(prompt, MODEL);
-  const bytes = await generatePng(prompt, opts.quality ?? "medium");
-  const storedBytes = opts.transparentBackground ? await isolateGraphiteInk(bytes) : bytes;
-  return storeImage(storedBytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
+  const bytes = await generatePng(
+    prompt,
+    opts.quality ?? "medium",
+    opts.background ?? "opaque",
+  );
+  return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
 
 // Every image we ever hand back to a client is one we ourselves stored in
