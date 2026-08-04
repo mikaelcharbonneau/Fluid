@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { styleContext } from "@/lib/ai/step2";
-import { getResearch } from "@/lib/ai/research";
 import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import {
   generateSketchBoard,
@@ -20,7 +19,6 @@ import {
   slotStyleName,
   slotTypeName,
   BOARD_SIZE,
-  MAX_REFERENCE_LIKES,
   type LikedReference,
 } from "@/lib/logo-board";
 import { readCaption } from "@/lib/ai/caption-reference";
@@ -32,14 +30,14 @@ export const maxDuration = 300;
 // The references the client liked in Step 4, as design briefs.
 //
 // Order is the client's own like order, and it is load-bearing: planBoard deals
-// references round-robin across the nine slots, so the first-liked reference
+// references round-robin across the six slots, so the first-liked reference
 // gets the first slot. Preserving it makes the board reproducible from the
 // client's point of view rather than shuffled by whatever order Postgres
 // returns rows in.
 //
-// Uncaptioned references are dropped rather than passed empty. Every liked
-// reference is promised a sketch, but a reference with no caption has nothing
-// to say — it would claim a slot and brief it with silence.
+// Every liked reference has a cached visual analysis, generated when it enters
+// the library. Keeping that analysis separate from its source image lets the
+// concept model apply the design principle without recreating the source mark.
 async function loadLikedReferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   data: Record<string, unknown>,
@@ -47,7 +45,6 @@ async function loadLikedReferences(
   const likedPaths = Array.isArray(data.logo_reference_likes)
     ? (data.logo_reference_likes as unknown[])
         .filter((x): x is string => typeof x === "string")
-        .slice(0, MAX_REFERENCE_LIKES)
     : [];
   if (!likedPaths.length) return [];
 
@@ -78,16 +75,15 @@ async function loadLikedReferences(
 
 // POST /api/generate/logo/board — the standalone logo flow's divergence step.
 //
-// One press draws a whole board: nine pencil croquis distributed across the
+// One press draws a six-concept board distributed across the
 // (style world × mark type) pairings the client chose, never blended into
-// hybrids. One design call writes all nine; nine renders run in parallel.
+// hybrids. One design call writes six; six renders run in parallel.
 //
 // Body: { brandId, config: { mark_types, standalone_styles, instructions },
 //         reset?: boolean }
 //
-// Presses APPEND. A board grows until the client asks to start over, so a
-// second press is nine more directions to compare against the first rather
-// than a replacement for it.
+// Each press consumes the next ordered reference batch and replaces the board.
+// Starting over resets the queue to the first six likes.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -178,14 +174,13 @@ export async function POST(request: Request) {
 
   if (preview) {
     // The platform is part of the prompt, so a preview built without it would
-    // not be the prompt. It is cached by /logo/research, which the client
-    // already calls before drawing.
+    // not match the real request. A board generation caches it on the brand.
     const platform = getPlatform(data);
     if (!platform) {
       return NextResponse.json(
         {
           error:
-            "No creative platform cached for this brand yet — call /api/generate/logo/research first. Previewing without it would show a prompt the studio would never actually send.",
+            "No creative platform is cached yet. Generate the first board before previewing later batches.",
         },
         { status: 409 },
       );
@@ -195,7 +190,13 @@ export async function POST(request: Request) {
       loadReferenceTaste(supabase, data),
       loadLikedReferences(supabase, data),
     ]);
-    const slots = planBoard(standaloneStyles, markTypes, likedReferences, BOARD_SIZE);
+    const savedOffset = Number(data.logo_reference_batch_offset);
+    const batchOffset = reset || !Number.isInteger(savedOffset) || savedOffset < 0 ? 0 : savedOffset;
+    const batch = likedReferences.slice(batchOffset, batchOffset + BOARD_SIZE);
+    if (!batch.length) {
+      return NextResponse.json({ error: "You've explored every liked reference." }, { status: 409 });
+    }
+    const slots = planBoard(standaloneStyles, markTypes, batch, BOARD_SIZE);
     const prior = reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
 
     const { system, user: userPrompt, model } = previewBoardPrompt({
@@ -226,7 +227,7 @@ export async function POST(request: Request) {
       })),
       likes: {
         total: Array.isArray(data.logo_reference_likes) ? data.logo_reference_likes.length : 0,
-        briefed: likedReferences.length,
+        briefed: batch.length,
       },
       axes: referenceTaste?.axes ?? [],
       // The image model receives the ART line of each concept wrapped in the
@@ -239,7 +240,7 @@ export async function POST(request: Request) {
         model: IMAGE_MODEL,
         // Split, because only one of these two is worth iterating on. `art` is
         // what the designer wrote for this concept and is different every time;
-        // the rest is a fixed rendering instruction identical across all nine.
+        // the rest is a fixed rendering instruction identical across all six.
         // Reading them merged makes the boilerplate look like output.
         art: s.art,
         prompt: pencilSketchPrompt(s.art),
@@ -253,11 +254,6 @@ export async function POST(request: Request) {
   // From here the run is long enough to be worth watching, so the response
   // becomes a stream of what it is doing and ends with the board.
   return streamActivity(async (activity: Activity) => {
-    // Research is generated by /logo/research, which the client calls first.
-    // It is an aid rather than a prerequisite, so a board is still drawn
-    // without it — but it is never generated here, because nine renders need
-    // every second of the budget this route has.
-    const research = getResearch(data);
     // The board prompt states the creative platform itself, so styleContext
     // must not state it again. (Where it feeds generateCreativePlatform below,
     // there is no platform yet to omit.)
@@ -290,7 +286,6 @@ export async function POST(request: Request) {
     }
 
     const prior = reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
-    const priorLikes = reset ? [] : ((data.logo_board_likes as string[] | undefined) ?? []);
 
     // Two readings of the same Step 4 picks, doing different jobs. The axes
     // tune HOW every mark is drawn; the captions brief WHAT thinking each
@@ -299,7 +294,13 @@ export async function POST(request: Request) {
       loadReferenceTaste(supabase, data),
       loadLikedReferences(supabase, data),
     ]);
-    const slots = planBoard(standaloneStyles, markTypes, likedReferences, BOARD_SIZE);
+    const savedOffset = Number(data.logo_reference_batch_offset);
+    const batchOffset = reset || !Number.isInteger(savedOffset) || savedOffset < 0 ? 0 : savedOffset;
+    const batch = likedReferences.slice(batchOffset, batchOffset + BOARD_SIZE);
+    if (!batch.length) {
+      throw new Error("You've explored every liked reference. Return to the gallery to like more directions or start again from the first batch.");
+    }
+    const slots = planBoard(standaloneStyles, markTypes, batch, BOARD_SIZE);
     activity.emit(
       "note",
       `Board planned — ${slots.length} concepts across ${new Set(slots.map(slotStyleName)).size} style worlds`,
@@ -320,8 +321,8 @@ export async function POST(request: Request) {
       nameMeaning:
         typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
       referenceTaste,
-      // Names already on the board, so a second press explores rather than
-      // redraws what the client has already seen.
+      // Earlier names keep the next batch from converging on a concept the
+      // client has already seen.
       avoidNames: prior.map((s) => s.name),
       clock,
       activity,
@@ -329,11 +330,13 @@ export async function POST(request: Request) {
 
     await spendTokens(user.id, TOKEN_COST.asset);
 
-    const board = [...prior, ...drawn];
+    const board = drawn;
     const nextPatch = {
       creative_platform: platform,
       logo_board: board,
-      logo_board_likes: priorLikes,
+      logo_board_likes: [],
+      logo_reference_batch_offset: batchOffset + batch.length,
+      logo_reference_batch_paths: batch.map((reference) => reference.imagePath),
       logo_board_config: {
         mark_types: markTypes,
         standalone_styles: standaloneStyles,
@@ -353,11 +356,9 @@ export async function POST(request: Request) {
       board,
       drawn: drawn.length,
       requested: slots.length,
-      // How many of the client's likes actually briefed a concept. Below the
-      // number they liked means some of their picks aren't captioned yet, and
-      // the screen says so rather than quietly ignoring them.
-      briefed: likedReferences.length,
-      research,
+      briefed: batch.length,
+      batchOffset,
+      remaining: Math.max(0, likedReferences.length - batchOffset - batch.length),
     };
   }, {
     onError: (err) => ({

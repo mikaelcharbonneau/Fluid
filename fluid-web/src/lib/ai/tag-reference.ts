@@ -9,9 +9,7 @@
 // is filtered against it — anything invented is dropped rather than admitted,
 // because one-off attributes match nothing and dilute the ones that do.
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const MODEL = "claude-opus-4-8";
+import { generateOpenAIText } from "./openai";
 
 // Called many-at-a-time from a bounded worker pool (api/logo-references/tag)
 // against a shared route-level deadline. A single vision call taking anywhere
@@ -200,27 +198,19 @@ export function parseTagResponse(raw: string): TaggedReference | null {
 // Catalogue one image. Throws on transport failure so the caller can record
 // which paths still need a pass; returns null when the answer was unusable.
 export async function tagReferenceImage(imageUrl: string): Promise<TaggedReference | null> {
-  const client = new Anthropic();
-  const response = await client.messages.create(
-    {
-      model: MODEL,
-      max_tokens: 400,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "url", url: imageUrl } },
-            { type: "text", text: prompt() },
-          ],
-        },
+  const text = await generateOpenAIText({
+    instructions: "Analyse the supplied logo image according to the user's instructions.",
+    input: [{
+      role: "user",
+      content: [
+        { type: "input_image", image_url: imageUrl, detail: "high" },
+        { type: "input_text", text: prompt() },
       ],
-    },
-    { timeout: CALL_TIMEOUT_MS },
-  );
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+    }],
+    json: true,
+    maxOutputTokens: 400,
+    reasoningEffort: "low",
+    timeoutMs: CALL_TIMEOUT_MS,
+  });
   return parseTagResponse(text);
 }

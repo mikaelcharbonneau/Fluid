@@ -84,12 +84,12 @@ export function pencilSketchPrompt(direction: string): string {
 }
 
 // A render that hangs would otherwise stall until the whole function is killed
-// at maxDuration — taking the eight healthy concepts down with it. Capping each
+// at maxDuration — taking the healthy concepts down with it. Capping each
 // request means a stuck one is dropped and the board still ships.
 const RENDER_TIMEOUT_MS = 120_000;
 
-// A nine-up board fires nine renders at once, which is exactly the shape that
-// trips a per-minute image quota — and a 429 on three of nine would otherwise
+// A six-up board fires six renders at once, which can still trip a per-minute
+// image quota — and a 429 on some of them would otherwise
 // hand the client a board with holes in it for no reason but timing. One
 // retry, backed off with jitter so the retries don't re-collide.
 //

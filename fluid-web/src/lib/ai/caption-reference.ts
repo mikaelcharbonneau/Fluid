@@ -23,9 +23,7 @@
 // the brand name outright. Captions that fail the test are the failure mode
 // worth watching for in any batch.
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const MODEL = "claude-opus-4-8";
+import { generateOpenAIText } from "./openai";
 
 // Called many-at-a-time from a bounded worker pool (api/logo-references/tag)
 // against a shared route-level deadline. A single vision call taking anywhere
@@ -134,28 +132,20 @@ export function parseCaptionResponse(raw: string): ReferenceCaption | null {
 export async function captionReferenceImage(
   imageUrl: string,
 ): Promise<ReferenceCaption | null> {
-  const client = new Anthropic();
-  const response = await client.messages.create(
-    {
-      model: MODEL,
-      max_tokens: 700,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "url", url: imageUrl } },
-            { type: "text", text: PROMPT },
-          ],
-        },
+  const text = await generateOpenAIText({
+    instructions: "Analyze the supplied reference image according to the user's instructions.",
+    input: [{
+      role: "user",
+      content: [
+        { type: "input_image", image_url: imageUrl, detail: "high" },
+        { type: "input_text", text: PROMPT },
       ],
-    },
-    { timeout: CALL_TIMEOUT_MS },
-  );
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+    }],
+    maxOutputTokens: 700,
+    reasoningEffort: "low",
+    timeoutMs: CALL_TIMEOUT_MS,
+    json: true,
+  });
   return parseCaptionResponse(text);
 }
 

@@ -13,7 +13,7 @@ for the product overview.
 
 - Next.js (App Router), React, TypeScript
 - Supabase — auth + Postgres (brands, subscriptions/token balance)
-- Anthropic API (`@anthropic-ai/sdk`) — all AI generation
+- OpenAI API (Responses API and GPT-Image) — all AI generation
 - Stripe — billing and token refills
 
 ## Getting started
@@ -24,7 +24,7 @@ Install dependencies:
 npm install
 ```
 
-Pull environment variables from Vercel (this project's Supabase, Anthropic,
+Pull environment variables from Vercel (this project's Supabase, OpenAI,
 and Stripe secrets already live there):
 
 ```bash
@@ -34,7 +34,7 @@ npx vercel env pull .env.local
 
 Alternatively, copy `.env.example` to `.env.local` and fill in each value by
 hand — see that file for where each key comes from (Supabase dashboard,
-Anthropic console, Stripe dashboard).
+OpenAI platform, Stripe dashboard).
 
 Run the dev server:
 
@@ -52,7 +52,7 @@ src/app/
   login/ signup/ ...     auth pages
   app/Prototype.jsx      the wizard + dashboard UI — single-file, all screens
                           in one module scope (ported from the original
-                          Claude Design export; see AGENTS.md)
+                          original design export; see AGENTS.md)
   api/
     generate/            one route per AI generation: names, logo, palette,
                           typography, guidelines, inline assist
@@ -61,7 +61,7 @@ src/app/
     auth/                 Supabase auth endpoints
 
 src/lib/
-  ai/                    one module per generation type — prompt + Claude
+  ai/                    one module per generation type — prompt + OpenAI
                           call + response parsing for each (logo.ts, names.ts,
                           palette.ts, typography.ts, guidelines.ts, assist.ts)
   supabase/              server / admin Supabase clients

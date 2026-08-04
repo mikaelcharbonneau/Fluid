@@ -1,23 +1,23 @@
-// Divergence — nine pencil croquis in one press.
+// Divergence — six pencil croquis in one press.
 //
-// The standalone logo flow shows the client a board, not a queue. Nine concepts
+// The standalone logo flow shows the client a board, not a queue. Six concepts
 // arrive together, each one drawn wholly inside a single (style world × mark
 // type) pairing planned by logo-board.ts, so the board presents distinct
-// directions to choose between rather than nine shades of the same compromise.
+// directions to choose between rather than many shades of the same compromise.
 //
-// Shape of the work: ONE design call writes all nine concepts (it needs to see
-// the whole board to keep the nine genuinely different from each other), then
-// nine renders run in parallel. A render that fails or hangs is dropped and the
-// rest of the board still ships — eight sketches beat an error page.
+// Shape of the work: ONE design call writes all six concepts (it needs to see
+// the whole board to keep the directions genuinely different), then six renders
+// run in parallel. A render that fails or hangs is dropped and the rest of the
+// board still ships.
 //
 // Rendering is deliberately low fidelity: graphite on paper. The client is
 // choosing an IDEA here, and a polished render invites them to judge an
 // execution that does not exist yet.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
 import type { Clock } from "./budget";
-import { silentActivity, summariseThinking, type Activity } from "./activity";
+import { silentActivity, type Activity } from "./activity";
+import { generateOpenAIText } from "./openai";
 import type { CreativePlatform } from "./platform";
 import { BOARD_SIZE, type BoardSlot, slotStyleName, slotTypeName } from "../logo-board";
 import { captionBrief } from "./caption-reference";
@@ -64,16 +64,14 @@ export interface BoardBrief {
   activity?: Activity | null; // running commentary for the client
 }
 
-const MODEL = "claude-opus-4-8";
-
 // api/generate/logo/board reserves at least 200s of its 280s clock budget
 // before calling generateSketchBoard, which is this design call followed by
-// nine parallel renders (each already capped at 120s in images.ts). Bounded
+// six parallel renders (each already capped at 120s in images.ts). Bounded
 // so a stuck design call fails clearly with time still left for those renders
 // to run, instead of running out the SDK's 10-minute default on its own.
 const DESIGN_TIMEOUT_MS = 150_000;
 
-// Nine concepts with an art-direction paragraph each is a long output; thinking
+// Six concepts with an art-direction paragraph each is a long output; thinking
 // is where the differentiation between slots actually happens.
 const MAX_TOKENS = 16000;
 
@@ -105,7 +103,7 @@ that concept must live wholly inside them:
   board exists to offer.
 - Two slots sharing a world and a type must still be two genuinely different
   ideas — a different subject, structure or move, not the same concept redrawn.
-- Read every slot before writing any of them. Nine concepts that overlap are a
+- Read every slot before writing any of them. Six concepts that overlap are a
   failure even when each is individually decent.
 
 MOST SLOTS ALSO CARRY A DESIGN BRIEF read off a real mark the client liked.
@@ -145,8 +143,8 @@ illustrator could execute it without seeing your head. Describe ONLY the mark
 itself — never the background, framing, medium, or rendering style.>`;
 
 // The style and type guidance each appear once as a legend rather than being
-// repeated on all nine slots: the same text nine times reads to the model as
-// nine separate instructions and wastes the budget that should go on making
+// repeated on all six slots: the same text six times reads to the model as
+// six separate instructions and wastes the budget that should go on making
 // the concepts differ.
 function legend(slots: readonly BoardSlot[]): string[] {
   const lines: string[] = [];
@@ -207,6 +205,19 @@ function buildUserPrompt(input: BoardBrief): string {
   ];
 
   lines.push(...legend(input.slots));
+
+  if (input.slots.some((slot) => slot.markType?.id === "combination")) {
+    const name = input.name?.trim() || "the brand name";
+    const initial = input.name?.trim().slice(0, 1).toUpperCase() || "the initial";
+    lines.push(
+      ``,
+      `COMBINATION MARK CONSTRUCTION:`,
+      `Every combination-mark slot must pair a fresh, ownable symbol with the wordmark “${name}”.`,
+      `The symbol may use the initial “${initial}” only when that creates a specific visual device; an initial in an ordinary typeface is not a concept.`,
+      `Design the symbol and wordmark as a deliberate lockup: define their relationship, spacing, baseline, scale, and shared visual logic in ART.`,
+      `For each liked reference, transfer only its stated visual principles into an original mark for this brand. Never copy, trace, imitate, or reconstruct the reference’s composition, silhouette, or distinctive letterforms.`,
+    );
+  }
 
   // Design briefs, read off the marks the client liked. Numbered and listed
   // once, then referenced per slot: one reference usually covers two slots,
@@ -294,7 +305,7 @@ export function previewBoardPrompt(input: BoardBrief): {
   user: string;
   model: string;
 } {
-  return { system: SYSTEM, user: buildUserPrompt(input), model: MODEL };
+  return { system: SYSTEM, user: buildUserPrompt(input), model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5" };
 }
 
 export interface ParsedConcept {
@@ -372,39 +383,17 @@ export function assignToSlots(
 }
 
 export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketch[]> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-  const client = new Anthropic();
-
   const activity = input.activity ?? silentActivity;
 
   const designed = activity.phase(`Designing ${input.slots.length} concepts`);
-  const response = await client.messages.create(
-    {
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      thinking: { type: "adaptive" },
-      system: SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(input) }],
-    },
-    { timeout: DESIGN_TIMEOUT_MS },
-  );
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: MAX_TOKENS,
+    reasoningEffort: "high",
+    timeoutMs: DESIGN_TIMEOUT_MS,
+  });
   designed();
-
-  // Thinking is enabled on this call and was previously dropped on the floor.
-  const reasoning = response.content
-    .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
-    .map((b) => b.thinking)
-    .join("\n");
-  if (reasoning.trim()) {
-    const { label, detail } = summariseThinking(reasoning);
-    activity.emit("thinking", label, detail);
-  }
   input.clock?.lap("design");
 
   const paired = assignToSlots(parseConcepts(text), input.slots);
@@ -423,7 +412,7 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   const territoryName = (key: string) =>
     input.platform.territories.find((t) => t.key === key)?.name ?? key;
 
-  // All nine renders at once. Each has its own timeout inside renderLogoImage,
+  // All six renders at once. Each has its own timeout inside renderLogoImage,
   // so one stuck request is dropped rather than stalling the board.
   const drawing = activity.phase(`Rendering ${paired.length} sketches`);
   const rendered = await Promise.allSettled(
