@@ -136,7 +136,8 @@ IDEA: <one sentence: the concept and why it expresses the territory>
 ART: <a precise art-direction brief describing the mark to be drawn: the exact
 forms, their arrangement, proportion, weight and relative scale. Write it so an
 illustrator could execute it without seeing your head. Describe ONLY the mark
-itself — never the background, framing, medium, or rendering style.>`;
+itself — never the background, framing, medium, or rendering style. Maximum 60
+words.>`;
 
 // The style and type guidance each appear once as a legend rather than being
 // repeated on all six slots: the same text six times reads to the model as
@@ -385,7 +386,7 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
-    reasoningEffort: "high",
+    reasoningEffort: "low",
     timeoutMs: DESIGN_TIMEOUT_MS,
   });
   designed();
