@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { styleContext } from "@/lib/ai/step2";
-import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
 import {
-  generateSketchBoard,
-  previewBoardPrompt,
-  type BoardSketch,
+  generateReferenceCroquisBoard,
+  referenceCroquisPrompt,
 } from "@/lib/ai/sketch-board";
-import { pencilSketchPrompt, IMAGE_MODEL } from "@/lib/ai/images";
-import { loadReferenceTaste } from "@/lib/ai/reference-taste";
+import { IMAGE_MODEL } from "@/lib/ai/images";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
@@ -21,8 +17,10 @@ import {
   BOARD_SIZE,
   type LikedReference,
 } from "@/lib/logo-board";
-import { readCaption } from "@/lib/ai/caption-reference";
+import { captionReferenceImage, readCaption, visualPrinciples } from "@/lib/ai/caption-reference";
 import { normalizeMarkTypes, normalizeStandaloneStyles } from "@/lib/logo-styles";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { referenceImageUrl } from "@/lib/logo-reference-query";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -35,9 +33,9 @@ export const maxDuration = 300;
 // client's point of view rather than shuffled by whatever order Postgres
 // returns rows in.
 //
-// Every liked reference has a cached visual analysis, generated when it enters
-// the library. Keeping that analysis separate from its source image lets the
-// concept model apply the design principle without recreating the source mark.
+// Every liked reference carries a detailed visual analysis. Older catalog rows
+// are upgraded on demand so their first use also gets the direct prompt this
+// flow promises, without requiring a blocking catalogue-wide backfill.
 async function loadLikedReferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   data: Record<string, unknown>,
@@ -60,12 +58,27 @@ async function loadLikedReferences(
         r.caption,
       ]),
     );
-    const out: LikedReference[] = [];
-    for (const imagePath of likedPaths) {
-      const caption = readCaption(byPath.get(imagePath));
-      if (caption) out.push({ imagePath, caption });
-    }
-    return out;
+    return (await Promise.all(likedPaths.map(async (imagePath) => {
+      let caption = readCaption(byPath.get(imagePath));
+      if (!caption?.visual_principles) {
+        const refreshed = await captionReferenceImage(referenceImageUrl(imagePath)).catch(() => null);
+        if (refreshed) {
+          caption = refreshed;
+          try {
+            await createAdminClient()
+              .from("logo_references")
+              .update({ caption: refreshed, updated_at: new Date().toISOString() })
+              .eq("image_path", imagePath);
+          } catch {
+            // The current board still has the description; caching can retry on
+            // a later board if the service client is unavailable.
+          }
+        }
+      }
+      return caption
+        ? { imagePath, caption, visualPrinciples: visualPrinciples(caption) }
+        : null;
+    }))).filter((reference): reference is LikedReference => reference !== null);
   } catch {
     // The gallery is an aid. Losing it costs the board its briefs, not its
     // existence.
@@ -77,7 +90,8 @@ async function loadLikedReferences(
 //
 // One press draws a six-concept board distributed across the
 // (style world × mark type) pairings the client chose, never blended into
-// hybrids. One design call writes six; six renders run in parallel.
+// hybrids. Each liked reference supplies one complete direct image prompt;
+// the six renders run in parallel.
 //
 // Body: { brandId, config: { mark_types, standalone_styles, instructions },
 //         reset?: boolean }
@@ -173,23 +187,7 @@ export async function POST(request: Request) {
   const clock = startClock("logo/board", 280_000);
 
   if (preview) {
-    // The platform is part of the prompt, so a preview built without it would
-    // not match the real request. A board generation caches it on the brand.
-    const platform = getPlatform(data);
-    if (!platform) {
-      return NextResponse.json(
-        {
-          error:
-            "No creative platform is cached yet. Generate the first board before previewing later batches.",
-        },
-        { status: 409 },
-      );
-    }
-
-    const [referenceTaste, likedReferences] = await Promise.all([
-      loadReferenceTaste(supabase, data),
-      loadLikedReferences(supabase, data),
-    ]);
+    const likedReferences = await loadLikedReferences(supabase, data);
     const savedOffset = Number(data.logo_reference_batch_offset);
     const batchOffset = reset || !Number.isInteger(savedOffset) || savedOffset < 0 ? 0 : savedOffset;
     const batch = likedReferences.slice(batchOffset, batchOffset + BOARD_SIZE);
@@ -197,103 +195,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You've explored every liked reference." }, { status: 409 });
     }
     const slots = planBoard(standaloneStyles, markTypes, batch, BOARD_SIZE);
-    const prior = reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
-
-    const { system, user: userPrompt, model } = previewBoardPrompt({
-      brandId,
-      brief: String(brand.brief),
-      name: brandName,
-      platform,
-      slots,
-      styleContext: styleContext(brand, { omitPlatform: true }),
-      instructions: instructions || null,
-      nameMeaning:
-        typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
-      referenceTaste,
-      avoidNames: prior.map((s) => s.name),
-    });
-
     return NextResponse.json({
       preview: true,
-      design: { model, system, user: userPrompt },
-      // What each slot was briefed with, flattened so a mis-paired caption is
-      // visible at a glance rather than buried in the prompt text.
       slots: slots.map((s) => ({
         index: s.index,
         style: s.style?.name ?? "Fluid's choice",
         markType: s.markType?.name ?? "Fluid's choice",
         reference: s.reference?.imagePath ?? null,
-        device: s.reference?.caption.device ?? null,
       })),
       likes: {
         total: Array.isArray(data.logo_reference_likes) ? data.logo_reference_likes.length : 0,
         briefed: batch.length,
       },
-      axes: referenceTaste?.axes ?? [],
-      // The image model receives the ART line of each concept wrapped in the
-      // pencil prompt. ART only exists after a real design call, so the board
-      // already drawn is the only place to see it — reconstructed here exactly
-      // as renderLogoImage would build it.
-      renders: prior.map((s) => ({
-        slot: s.slot,
-        name: s.name,
+      // These are the complete prompts sent to the image model. Each prompt
+      // carries the visual principles for its own liked reference.
+      renders: slots.map((s) => ({
+        slot: s.index,
         model: IMAGE_MODEL,
-        // Split, because only one of these two is worth iterating on. `art` is
-        // what the designer wrote for this concept and is different every time;
-        // the rest is a fixed rendering instruction identical across all six.
-        // Reading them merged makes the boilerplate look like output.
-        art: s.art,
-        prompt: pencilSketchPrompt(s.art),
+        reference: s.reference?.imagePath ?? null,
+        prompt: referenceCroquisPrompt({ brief: String(brand.brief), name: brandName }, s),
       })),
-      // The fixed wrapper, shown once with the ART slot marked, so it is
-      // obvious how little of each render prompt is actually about the concept.
-      renderTemplate: pencilSketchPrompt("{{ART}}"),
     });
   }
 
   // From here the run is long enough to be worth watching, so the response
   // becomes a stream of what it is doing and ends with the board.
   return streamActivity(async (activity: Activity) => {
-    // The board prompt states the creative platform itself, so styleContext
-    // must not state it again. (Where it feeds generateCreativePlatform below,
-    // there is no platform yet to omit.)
-    const ctx = styleContext(brand, { omitPlatform: true });
-
-    let platform = getPlatform(data);
-    if (platform) {
-      activity.emit("note", "Creative platform already cached — reusing it");
-    } else {
-      clock.guard("write the creative platform", 60_000);
-      const done = activity.phase("Writing the creative platform");
-      platform = await generateCreativePlatform({
-        brief: String(brand.brief),
-        name: brandName,
-        audience: brand.audience as string | null,
-        competitors: brand.competitors as string | null,
-        styleContext: ctx,
-      });
-      done();
-      activity.emit(
-        "thinking",
-        `Brand idea — ${platform.brand_idea}`,
-        [
-          `Brand idea: ${platform.brand_idea}`,
-          platform.personality.length ? `Personality: ${platform.personality.join(", ")}` : "",
-          platform.design_notes ? `Design notes: ${platform.design_notes}` : "",
-        ].filter(Boolean).join("\n"),
-      );
-      clock.lap("platform");
-    }
-
-    const prior = reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
-
-    // Two readings of the same Step 4 picks, doing different jobs. The axes
-    // tune HOW every mark is drawn; the captions brief WHAT thinking each
-    // individual concept answers. They are complementary, not competing.
-    const [referenceTaste, likedReferences] = await Promise.all([
-      loadReferenceTaste(supabase, data),
-      loadLikedReferences(supabase, data),
-    ]);
+    const likedReferences = await loadLikedReferences(supabase, data);
     const savedOffset = Number(data.logo_reference_batch_offset);
     const batchOffset = reset || !Number.isInteger(savedOffset) || savedOffset < 0 ? 0 : savedOffset;
     const batch = likedReferences.slice(batchOffset, batchOffset + BOARD_SIZE);
@@ -309,21 +237,12 @@ export async function POST(request: Request) {
         .join("\n"),
     );
 
-    clock.guard("draw the board", 200_000);
-    const drawn = await generateSketchBoard({
+    clock.guard("render reference-led croquis", 200_000);
+    const drawn = await generateReferenceCroquisBoard({
       brandId,
       brief: String(brand.brief),
       name: brandName,
-      platform,
       slots,
-      styleContext: ctx,
-      instructions: instructions || null,
-      nameMeaning:
-        typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
-      referenceTaste,
-      // Earlier names keep the next batch from converging on a concept the
-      // client has already seen.
-      avoidNames: prior.map((s) => s.name),
       clock,
       activity,
     });
@@ -332,7 +251,6 @@ export async function POST(request: Request) {
 
     const board = drawn;
     const nextPatch = {
-      creative_platform: platform,
       logo_board: board,
       logo_board_likes: [],
       logo_reference_batch_offset: batchOffset + batch.length,
@@ -352,7 +270,6 @@ export async function POST(request: Request) {
     }
 
     return {
-      platform,
       board,
       drawn: drawn.length,
       requested: slots.length,

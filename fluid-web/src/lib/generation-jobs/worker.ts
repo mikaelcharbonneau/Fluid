@@ -1,13 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { styleContext } from "@/lib/ai/step2";
-import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
-import { generateSketchBoard, type BoardSketch } from "@/lib/ai/sketch-board";
-import { loadReferenceTaste } from "@/lib/ai/reference-taste";
+import { generateReferenceCroquisBoard } from "@/lib/ai/sketch-board";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
 import { normalizeMarkTypes, normalizeStandaloneStyles } from "@/lib/logo-styles";
 import { BOARD_SIZE, planBoard, type LikedReference } from "@/lib/logo-board";
-import { readCaption } from "@/lib/ai/caption-reference";
+import { captionReferenceImage, readCaption, visualPrinciples } from "@/lib/ai/caption-reference";
+import { referenceImageUrl } from "@/lib/logo-reference-query";
 import {
   claimGenerationJob,
   completeGenerationJob,
@@ -77,12 +75,22 @@ async function loadLikedReferences(data: Record<string, unknown>): Promise<Liked
   const captions = new Map(
     ((rows ?? []) as { image_path: string; caption: unknown }[]).map((row) => [row.image_path, row.caption]),
   );
-  const references: LikedReference[] = [];
-  for (const imagePath of likedPaths) {
-    const caption = readCaption(captions.get(imagePath));
-    if (caption) references.push({ imagePath, caption });
-  }
-  return references;
+  return (await Promise.all(likedPaths.map(async (imagePath) => {
+    let caption = readCaption(captions.get(imagePath));
+    if (!caption?.visual_principles) {
+      const refreshed = await captionReferenceImage(referenceImageUrl(imagePath)).catch(() => null);
+      if (refreshed) {
+        caption = refreshed;
+        await admin
+          .from("logo_references")
+          .update({ caption: refreshed, updated_at: new Date().toISOString() })
+          .eq("image_path", imagePath);
+      }
+    }
+    return caption
+      ? { imagePath, caption, visualPrinciples: visualPrinciples(caption) }
+      : null;
+  }))).filter((reference): reference is LikedReference => reference !== null);
 }
 
 async function runBoard(job: GenerationJob, brand: BrandRecord) {
@@ -101,41 +109,20 @@ async function runBoard(job: GenerationJob, brand: BrandRecord) {
   }
 
   const clock = startClock("job/logo_board", 280_000);
-  const context = styleContext(brand, { omitPlatform: true });
-  let platform = getPlatform(data);
   await markProviderStarted(job.id, "provider: board generation", 10);
-  if (!platform) {
-    platform = await generateCreativePlatform({
-      brief: String(brand.brief),
-      name: chosenBrandName(brand),
-      audience: brand.audience ?? null,
-      competitors: brand.competitors ?? null,
-      styleContext: context,
-    });
-  }
-
-  const admin = createAdminClient();
-  const referenceTaste = await loadReferenceTaste(admin, data);
-  const prior = input.reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
   const slots = planBoard(input.styles, input.markTypes, batch, BOARD_SIZE);
-  await setGenerationProgress(job.id, "designing six concepts", 35);
-  const drawn = await generateSketchBoard({
+  await setGenerationProgress(job.id, "rendering six reference-led croquis", 35);
+  const drawn = await generateReferenceCroquisBoard({
     brandId: brand.id,
     brief: String(brand.brief),
     name: chosenBrandName(brand),
-    platform,
     slots,
-    styleContext: context,
-    instructions: input.instructions || null,
-    nameMeaning: typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
-    referenceTaste,
-    avoidNames: prior.map((sketch) => sketch.name),
     clock,
   });
 
   await setGenerationProgress(job.id, "saving concepts", 90);
+  const admin = createAdminClient();
   const nextPatch = {
-    creative_platform: platform,
     logo_board: drawn,
     logo_board_likes: [],
     logo_reference_batch_offset: batchOffset + batch.length,
@@ -150,7 +137,6 @@ async function runBoard(job: GenerationJob, brand: BrandRecord) {
   if (error) throw new Error(error.message);
 
   return {
-    platform,
     board: drawn,
     drawn: drawn.length,
     requested: slots.length,

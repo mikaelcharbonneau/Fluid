@@ -33,6 +33,8 @@ import { generateOpenAIText } from "./openai";
 const CALL_TIMEOUT_MS = 60_000;
 
 export interface ReferenceCaption {
+  /** A detailed visual reading used directly in the croquis image prompt. */
+  visual_principles: string | null;
   /** How the mark is constructed and drawn. Always present. */
   technique: string;
   /**
@@ -49,6 +51,13 @@ export interface ReferenceCaption {
 const PROMPT = `You are cataloguing a reference library of existing logos for a
 brand studio. Each caption teaches a generator how a mark WORKS, so the same
 thinking can be applied to a completely unrelated brand.
+
+VISUAL PRINCIPLES: Write a detailed 300-600 word description of the visible
+design language: composition, hierarchy, silhouette, geometry, spacing,
+weight, negative space, typography treatment, and overall character. Describe
+principles that can guide an original mark, never a recipe to reproduce this
+specific logo. Do not name the company, quote its wordmark, or identify any
+trademarked visual element.
 
 You are not describing a picture. You are naming design thinking.
 
@@ -95,16 +104,16 @@ One sentence. Write NONE if the mark is purely formal.
 
 Reply with ONLY a JSON object, no prose and no code fence. Use null, not the
 string "NONE", for an absent device or concept:
-{"technique":"...","device":null,"concept":null}`;
+{"visual_principles":"...","technique":"...","device":null,"concept":null}`;
 
 // Both a literal "NONE" and a JSON null mean absent — models reach for the
 // word the prompt used even when told to emit null.
-function optional(raw: unknown): string | null {
+function optional(raw: unknown, limit = 400): string | null {
   if (raw === null || raw === undefined) return null;
   const text = String(raw).trim();
   if (!text) return null;
   if (/^none$/i.test(text)) return null;
-  return text.slice(0, 400);
+  return text.slice(0, limit);
 }
 
 export function parseCaptionResponse(raw: string): ReferenceCaption | null {
@@ -123,6 +132,7 @@ export function parseCaptionResponse(raw: string): ReferenceCaption | null {
   if (!technique) return null;
 
   return {
+    visual_principles: optional(parsed.visual_principles, 6_000),
     technique,
     device: optional(parsed.device),
     concept: optional(parsed.concept),
@@ -141,7 +151,7 @@ export async function captionReferenceImage(
         { type: "input_text", text: PROMPT },
       ],
     }],
-    maxOutputTokens: 700,
+    maxOutputTokens: 2_000,
     reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
     json: true,
@@ -162,6 +172,10 @@ export function captionBrief(caption: ReferenceCaption): string {
   return parts.join(" ");
 }
 
+export function visualPrinciples(caption: ReferenceCaption): string {
+  return caption.visual_principles ?? captionBrief(caption);
+}
+
 // Read a caption back off a jsonb column. Rows predating the caption pass, and
 // rows whose captioning failed, both read as null.
 export function readCaption(raw: unknown): ReferenceCaption | null {
@@ -170,6 +184,7 @@ export function readCaption(raw: unknown): ReferenceCaption | null {
   const technique = optional(obj.technique);
   if (!technique) return null;
   return {
+    visual_principles: optional(obj.visual_principles, 6_000),
     technique,
     device: optional(obj.device),
     concept: optional(obj.concept),

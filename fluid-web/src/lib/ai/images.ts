@@ -179,7 +179,9 @@ export async function renderLogoImage(opts: {
   brandId: string;
   phase: string;
   slot: string;
-  direction: string;
+  direction?: string;
+  /** A complete prompt for a phase with its own rendering instructions. */
+  prompt?: string;
   quality?: "low" | "medium" | "high";
   render?: "vector" | "pencil";
   // Reports the exact text this function is about to send. The wrapper below
@@ -189,9 +191,10 @@ export async function renderLogoImage(opts: {
   onPrompt?: (prompt: string, model: string) => void;
 }): Promise<RenderedImage> {
   const prompt =
-    opts.render === "pencil"
-      ? pencilSketchPrompt(opts.direction)
-      : logoImagePrompt(opts.direction);
+    opts.prompt ??
+    (opts.render === "pencil"
+      ? pencilSketchPrompt(opts.direction ?? "")
+      : logoImagePrompt(opts.direction ?? ""));
   opts.onPrompt?.(prompt, MODEL);
   const bytes = await generatePng(prompt, opts.quality ?? "medium");
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
