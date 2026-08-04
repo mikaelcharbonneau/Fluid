@@ -35,6 +35,12 @@ claim/complete API stay unchanged.
   The original failed job remains immutable for audit; the new job reserves a
   fresh credit only after the prior reservation was refunded.
 
+## Current action
+
+The queue currently supports `logo_board`: one ordered batch of up to six
+reference-led croquis. The production UI may use the streaming board route;
+the queue exposes the same persisted work item for recovery-oriented clients.
+
 ## Provider policy
 
 The job runner owns retries at the work-item level. Provider call deadlines,

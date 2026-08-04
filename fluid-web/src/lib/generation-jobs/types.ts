@@ -1,7 +1,5 @@
 export const GENERATION_ACTIONS = [
-  "logo_research",
-  "logo_sketches",
-  "logo_refine",
+  "logo_board",
 ] as const;
 
 export type GenerationAction = (typeof GENERATION_ACTIONS)[number];
@@ -33,9 +31,7 @@ export interface GenerationJob {
 }
 
 export const JOB_CREDIT_COST: Record<GenerationAction, number> = {
-  logo_research: 0,
-  logo_sketches: 3,
-  logo_refine: 3,
+  logo_board: 3,
 };
 
 export function isGenerationAction(value: unknown): value is GenerationAction {

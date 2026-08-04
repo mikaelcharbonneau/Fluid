@@ -1,12 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { styleContext, delegatedChoices, getStep2, paletteBasis } from "@/lib/ai/step2";
-import { researchCategory, getResearch } from "@/lib/ai/research";
+import { styleContext } from "@/lib/ai/step2";
 import { generateCreativePlatform, getPlatform } from "@/lib/ai/platform";
-import { generateLogoSketches, type LogoSketch } from "@/lib/ai/sketches";
-import { generateLogoFinalists } from "@/lib/ai/refine";
+import { generateSketchBoard, type BoardSketch } from "@/lib/ai/sketch-board";
+import { loadReferenceTaste } from "@/lib/ai/reference-taste";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
-import { designStyleById, getLogoConfig, markTypeById, type LogoConfig } from "@/lib/logo-styles";
+import { normalizeMarkTypes, normalizeStandaloneStyles } from "@/lib/logo-styles";
+import { BOARD_SIZE, planBoard, type LikedReference } from "@/lib/logo-board";
+import { readCaption } from "@/lib/ai/caption-reference";
 import {
   claimGenerationJob,
   completeGenerationJob,
@@ -30,22 +31,18 @@ type BrandRecord = {
 
 class NonRetryableGenerationError extends Error {}
 
-function inputStrings(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string").slice(0, 20)
-    : [];
-}
-
-function parseSketchConfig(value: unknown): LogoConfig {
+function boardInput(value: unknown) {
   const raw = value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  const stringValue = (entry: unknown) => typeof entry === "string" ? entry.trim() : "";
+  const config = raw.config && typeof raw.config === "object" && !Array.isArray(raw.config)
+    ? raw.config as Record<string, unknown>
+    : {};
   return {
-    mark_type: markTypeById(stringValue(raw.mark_type))?.id ?? null,
-    design_style: designStyleById(stringValue(raw.design_style))?.id ?? null,
-    standalone_style: stringValue(raw.standalone_style).slice(0, 80) || null,
-    instructions: stringValue(raw.instructions).slice(0, 1000) || null,
+    markTypes: normalizeMarkTypes(config.mark_types),
+    styles: normalizeStandaloneStyles(config.standalone_styles),
+    instructions: typeof config.instructions === "string" ? config.instructions.trim().slice(0, 1_000) : "",
+    reset: raw.reset === true,
   };
 }
 
@@ -65,168 +62,116 @@ async function loadBrand(job: GenerationJob): Promise<BrandRecord> {
   return data as BrandRecord;
 }
 
-async function saveBrandData(brandId: string, data: Record<string, unknown>) {
+async function loadLikedReferences(data: Record<string, unknown>): Promise<LikedReference[]> {
+  const likedPaths = Array.isArray(data.logo_reference_likes)
+    ? data.logo_reference_likes.filter((item): item is string => typeof item === "string")
+    : [];
+  if (!likedPaths.length) return [];
+
   const admin = createAdminClient();
-  const { error } = await admin.from("brands").update({ data }).eq("id", brandId);
+  const { data: rows, error } = await admin
+    .from("logo_references")
+    .select("image_path, caption")
+    .in("image_path", likedPaths);
   if (error) throw new Error(error.message);
+  const captions = new Map(
+    ((rows ?? []) as { image_path: string; caption: unknown }[]).map((row) => [row.image_path, row.caption]),
+  );
+  const references: LikedReference[] = [];
+  for (const imagePath of likedPaths) {
+    const caption = readCaption(captions.get(imagePath));
+    if (caption) references.push({ imagePath, caption });
+  }
+  return references;
 }
 
-async function runResearch(job: GenerationJob, brand: BrandRecord) {
+async function runBoard(job: GenerationJob, brand: BrandRecord) {
   const data = brand.data ?? {};
-  const cachedResearch = getResearch(data);
-  const cachedPlatform = getPlatform(data);
-  if (cachedResearch && cachedPlatform) {
-    return { research: cachedResearch, platform: cachedPlatform, cached: true };
+  const input = boardInput(job.input);
+  if (!input.markTypes.length) {
+    throw new NonRetryableGenerationError("Choose a logo type before sketching concepts.");
   }
 
-  const clock = startClock("job/logo_research", 240_000);
-  let research = cachedResearch;
-  const brandName = chosenBrandName(brand);
-  if (!research) {
-    await markProviderStarted(job.id, "provider: category research", 15);
-    try {
-      research = await researchCategory(
-        {
-          brief: String(brand.brief),
-          name: brandName,
-          audience: brand.audience ?? null,
-          competitors: brand.competitors ?? null,
-          delegated: delegatedChoices(brand),
-        },
-        120_000,
-      );
-    } catch (error) {
-      // Research improves the result but should not discard the whole job.
-      console.error("Category research failed; continuing without it:", error);
-      research = null;
-    }
-    clock.lap("research");
-    if (research) await saveBrandData(brand.id, { ...data, research });
+  const references = await loadLikedReferences(data);
+  const savedOffset = Number(data.logo_reference_batch_offset);
+  const batchOffset = input.reset || !Number.isInteger(savedOffset) || savedOffset < 0 ? 0 : savedOffset;
+  const batch = references.slice(batchOffset, batchOffset + BOARD_SIZE);
+  if (!batch.length) {
+    throw new NonRetryableGenerationError("You've explored every liked reference.");
   }
 
-  const context = styleContext(research ? { ...brand, data: { ...data, research } } : brand);
-  let platform = cachedPlatform;
+  const clock = startClock("job/logo_board", 280_000);
+  const context = styleContext(brand, { omitPlatform: true });
+  let platform = getPlatform(data);
+  await markProviderStarted(job.id, "provider: board generation", 10);
   if (!platform) {
-    await markProviderStarted(job.id, "provider: creative platform", 70);
-    clock.guard("write the creative platform", 60_000);
     platform = await generateCreativePlatform({
       brief: String(brand.brief),
-      name: brandName,
+      name: chosenBrandName(brand),
       audience: brand.audience ?? null,
       competitors: brand.competitors ?? null,
       styleContext: context,
     });
   }
-  await saveBrandData(brand.id, { ...data, ...(research ? { research } : {}), creative_platform: platform });
-  return { research, platform };
-}
 
-async function runSketches(job: GenerationJob, brand: BrandRecord) {
-  const data = brand.data ?? {};
-  const config = parseSketchConfig(job.input.config);
-  if (!config.mark_type) {
-    throw new NonRetryableGenerationError("Choose a logo type before sketching concepts.");
-  }
-  const platform = getPlatform(data);
-  if (!platform) {
-    throw new NonRetryableGenerationError("Research must finish before sketching concepts.");
-  }
-  const priorConfig = data.logo_config as LogoConfig | null | undefined;
-  const configChanged = priorConfig !== null && priorConfig !== undefined && (
-    priorConfig.mark_type !== config.mark_type ||
-    priorConfig.design_style !== config.design_style ||
-    priorConfig.standalone_style !== config.standalone_style
-  );
-  const reset = job.input.reset === true || configChanged;
-  const priorAll = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
-  const prior = reset ? [] : priorAll;
-  const likedIds = inputStrings(job.input.likedIds);
-  const liked = prior.filter((sketch) => likedIds.includes(sketch.id));
-
-  await markProviderStarted(job.id, "provider: drawing concept", 20);
-  const drawn = await generateLogoSketches({
+  const admin = createAdminClient();
+  const referenceTaste = await loadReferenceTaste(admin, data);
+  const prior = input.reset ? [] : ((data.logo_board as BoardSketch[] | undefined) ?? []);
+  const slots = planBoard(input.styles, input.markTypes, batch, BOARD_SIZE);
+  await setGenerationProgress(job.id, "designing six concepts", 35);
+  const drawn = await generateSketchBoard({
     brandId: brand.id,
     brief: String(brand.brief),
     name: chosenBrandName(brand),
     platform,
-    styleContext: styleContext(brand),
-    config,
-    likedSketches: liked.length ? liked : null,
+    slots,
+    styleContext: context,
+    instructions: input.instructions || null,
+    nameMeaning: typeof data.logo_name_meaning === "string" ? data.logo_name_meaning : null,
+    referenceTaste,
     avoidNames: prior.map((sketch) => sketch.name),
-    clock: startClock("job/logo_sketches", 240_000),
+    clock,
   });
-  const sketches = [...prior, ...drawn];
-  await setGenerationProgress(job.id, "saving concepts", 90);
-  await saveBrandData(brand.id, {
-    ...data,
-    logo_config: config,
-    logo_sketches: sketches,
-    logo_sketch_likes: reset ? [] : likedIds,
-  });
-  return { platform, sketches, research: getResearch(data) };
-}
 
-async function runRefine(job: GenerationJob, brand: BrandRecord) {
-  const data = brand.data ?? {};
-  const platform = getPlatform(data);
-  const sketches = (data.logo_sketches as LogoSketch[] | undefined) ?? [];
-  const likedIds = inputStrings(job.input.likedIds);
-  const liked = sketches.filter((sketch) => likedIds.includes(sketch.id));
-  if (!platform || sketches.length === 0) {
-    throw new NonRetryableGenerationError("Sketch concepts first, then refine the ones you like.");
-  }
-  if (liked.length === 0) {
-    throw new NonRetryableGenerationError("Like at least one sketch to guide the refinement.");
-  }
-  const palette = data.palette as { colors?: { hex?: string }[] } | undefined;
-  const paletteColors = palette?.colors?.map((color) => color.hex).filter((hex): hex is string => !!hex)
-    ?? paletteBasis(getStep2(data))
-    ?? undefined;
-  await markProviderStarted(job.id, "provider: developing finalists", 15);
-  const finalists = await generateLogoFinalists({
-    brandId: brand.id,
-    brief: String(brand.brief),
-    name: chosenBrandName(brand),
+  await setGenerationProgress(job.id, "saving concepts", 90);
+  const nextPatch = {
+    creative_platform: platform,
+    logo_board: drawn,
+    logo_board_likes: [],
+    logo_reference_batch_offset: batchOffset + batch.length,
+    logo_reference_batch_paths: batch.map((reference) => reference.imagePath),
+    logo_board_config: {
+      mark_types: input.markTypes,
+      standalone_styles: input.styles,
+      instructions: input.instructions || null,
+    },
+  };
+  const { error } = await admin.rpc("brands_merge_data", { p_id: brand.id, p_patch: nextPatch });
+  if (error) throw new Error(error.message);
+
+  return {
     platform,
-    liked,
-    styleContext: styleContext(brand),
-    config: getLogoConfig(data),
-    paletteColors,
-    clock: startClock("job/logo_refine", 270_000),
-  });
-  await setGenerationProgress(job.id, "saving finalists", 90);
-  await saveBrandData(brand.id, {
-    ...data,
-    logo_finalists: finalists,
-    logo_sketch_likes: likedIds,
-    logos: finalists.map((finalist) => ({
-      name: finalist.name,
-      descriptor: finalist.idea,
-      svg: finalist.svg ?? "",
-      image_url: finalist.image_url,
-    })),
-  });
-  return { finalists };
+    board: drawn,
+    drawn: drawn.length,
+    requested: slots.length,
+    briefed: batch.length,
+    batchOffset,
+    remaining: Math.max(0, references.length - batchOffset - batch.length),
+  };
 }
 
 function retryable(error: unknown, job: GenerationJob) {
   if (error instanceof NonRetryableGenerationError) return false;
   if (job.provider_started_at) return false;
   const message = error instanceof Error ? error.message : "";
-  return !/missing|choose|add a brief|must finish|first, then|at least one/i.test(message);
+  return !/missing|choose|add a brief|explored/i.test(message);
 }
 
 async function runJob(job: GenerationJob) {
   const brand = await loadBrand(job);
-  switch (job.action) {
-    case "logo_research": return runResearch(job, brand);
-    case "logo_sketches": return runSketches(job, brand);
-    case "logo_refine": return runRefine(job, brand);
-  }
+  return runBoard(job, brand);
 }
 
-// Claims and runs at most one job. A Vercel Cron invokes this entry point; the
-// DB lease makes another invocation recover an interrupted worker safely.
 export async function runOneGenerationJob() {
   const job = await claimGenerationJob();
   if (!job) return null;

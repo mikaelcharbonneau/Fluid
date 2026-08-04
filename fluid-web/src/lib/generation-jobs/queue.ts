@@ -42,7 +42,7 @@ export async function enqueueGenerationJob({
     p_user: userId,
     p_brand: brandId,
     p_action: action,
-    p_vendor: "anthropic",
+    p_vendor: "openai",
     p_input: input,
     p_idempotency_key: idempotency,
     p_credit_amount: JOB_CREDIT_COST[action],
