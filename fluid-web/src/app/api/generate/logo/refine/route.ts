@@ -141,7 +141,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const clock = startClock("logo/refine", 270_000);
+  // Leave enough room below Vercel's 300s function limit to stream the final
+  // result after a long image render has completed.
+  const clock = startClock("logo/refine", 280_000);
 
   // A plan cached by an attempt that ran out of time rendering. Reusable only
   // when it answers the same brief — same concept, same versions, same colours,
