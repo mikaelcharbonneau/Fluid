@@ -107,15 +107,15 @@ export interface RefineBrief {
   onPlan?: (plan: FinalistPlan) => Promise<void> | void;
 }
 
-// api/generate/logo/refine runs on a 270s clock. Both text calls below share
-// that budget with the per-version renders that follow (each already capped
-// at 120s in images.ts). Bounded so a stuck call fails clearly with time
-// still left over, instead of running out the SDK's 10-minute default.
-const DESIGN_CALL_TIMEOUT_MS = 120_000;
+// Refinement must leave the majority of the route's budget for image rendering.
+// These two calls only plan and assess a few marks, so low reasoning and tight
+// output budgets keep them from starving the operation that the user sees.
+const DESIGN_CALL_TIMEOUT_MS = 70_000;
 // The critique call already degrades gracefully on any failure (caught below,
 // marks ship unranked) — a shorter budget is fine here and leaves more of the
 // clock for rendering.
-const CRITIQUE_CALL_TIMEOUT_MS = 60_000;
+const CRITIQUE_CALL_TIMEOUT_MS = 25_000;
+const FINAL_RENDER_TIMEOUT_MS = 160_000;
 
 const DESIGNER_SYSTEM = `You are a senior identity designer at Fluid, a brand
 studio operating at the level of Pentagram or Wolff Olins. You are in the
@@ -349,7 +349,7 @@ export async function generateLogoFinalists(
       instructions: system,
       input: prompt,
       maxOutputTokens: maxTokens,
-      reasoningEffort: "high",
+      reasoningEffort: "low",
       timeoutMs,
     });
   };
@@ -367,7 +367,7 @@ export async function generateLogoFinalists(
     const text = await call(
       DESIGNER_SYSTEM,
       buildRefinePrompt(input),
-      12000,
+      5_000,
       DESIGN_CALL_TIMEOUT_MS,
     );
     designing();
@@ -421,7 +421,7 @@ export async function generateLogoFinalists(
       ].join("\n");
       const judging = activity.phase("Creative-director critique");
       verdicts = extractVerdicts(
-        await call(CRITIC_SYSTEM, critiquePrompt, 3000, CRITIQUE_CALL_TIMEOUT_MS),
+        await call(CRITIC_SYSTEM, critiquePrompt, 1_500, CRITIQUE_CALL_TIMEOUT_MS),
       );
       judging();
       for (const v of verdicts) {
@@ -470,7 +470,7 @@ export async function generateLogoFinalists(
   // A resumed run starts the clock fresh with the design work already cached,
   // so it reaches this guard with the whole budget intact — which is the point
   // of caching the plan.
-  input.clock?.guard("render the finished marks", 150_000);
+  input.clock?.guard("render the finished marks", FINAL_RENDER_TIMEOUT_MS + 15_000);
   const drawing = activity.phase(`Rendering ${Math.min(ordered.length, input.versions.length)} finished marks`);
   const rendered = await Promise.allSettled(
     ordered.slice(0, input.versions.length).map(async (c, i) => {
@@ -480,7 +480,11 @@ export async function generateLogoFinalists(
         phase: "final",
         slot: id,
         direction: c.art,
-        quality: "high",
+        // These are the candidate refinements the client compares before
+        // vectorization, so medium avoids high-quality image latency without
+        // compromising the mark's construction or the selected colourway.
+        quality: "medium",
+        timeoutMs: FINAL_RENDER_TIMEOUT_MS,
         onPrompt: (prompt, model) =>
           activity.emit(
             "prompt",

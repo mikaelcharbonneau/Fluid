@@ -87,7 +87,7 @@ export function pencilSketchPrompt(direction: string): string {
 // A render that hangs would otherwise stall until the whole function is killed
 // at maxDuration — taking the healthy concepts down with it. Capping each
 // request means a stuck one is dropped and the board still ships.
-const RENDER_TIMEOUT_MS = 120_000;
+const DEFAULT_RENDER_TIMEOUT_MS = 120_000;
 
 // A six-up board fires six renders at once, which can still trip a per-minute
 // image quota — and a 429 on some of them would otherwise
@@ -113,10 +113,11 @@ async function requestPng(
   prompt: string,
   quality: "low" | "medium" | "high",
   background: ImageBackground,
+  timeoutMs: number,
 ): Promise<Response> {
   return fetch(OPENAI_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(RENDER_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey()}`,
@@ -138,11 +139,22 @@ async function generatePng(
   prompt: string,
   quality: "low" | "medium" | "high",
   background: ImageBackground,
+  timeoutMs: number,
 ): Promise<Buffer> {
-  let res = await requestPng(prompt, quality, background);
+  const deadline = Date.now() + timeoutMs;
+  const request = () => requestPng(
+    prompt,
+    quality,
+    background,
+    Math.max(1, deadline - Date.now()),
+  );
+  let res = await request();
   if (!res.ok && RETRY_STATUSES.has(res.status)) {
-    await new Promise((resolve) => setTimeout(resolve, retryDelay()));
-    res = await requestPng(prompt, quality, background);
+    const waitMs = Math.min(retryDelay(), Math.max(0, deadline - Date.now()));
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      if (Date.now() < deadline) res = await request();
+    }
   }
 
   if (!res.ok) {
@@ -194,6 +206,8 @@ export async function renderLogoImage(opts: {
   /** A complete prompt for a phase with its own rendering instructions. */
   prompt?: string;
   quality?: "low" | "medium" | "high";
+  /** Total time allowed for one render, including a transient-status retry. */
+  timeoutMs?: number;
   render?: "vector" | "pencil";
   background?: ImageBackground;
   // Reports the exact text this function is about to send. The wrapper below
@@ -212,6 +226,7 @@ export async function renderLogoImage(opts: {
     prompt,
     opts.quality ?? "medium",
     opts.background ?? "opaque",
+    opts.timeoutMs ?? DEFAULT_RENDER_TIMEOUT_MS,
   );
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
