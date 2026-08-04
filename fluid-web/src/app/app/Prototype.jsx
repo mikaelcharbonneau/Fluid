@@ -730,8 +730,8 @@ const AStepProgress = ({ step }) => {
   const steps = [
     { n: 1, label: 'Brief' },
     { n: 2, label: 'Name' },
-    { n: 3, label: 'Style' },
-    { n: 4, label: 'Logo' },
+    { n: 3, label: 'Logo' },
+    { n: 4, label: 'Style' },
     { n: 5, label: 'Kit' },
   ];
   return (
@@ -934,7 +934,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
   const activity = useActivityLog();
   const [logOpen, setLogOpen] = React.useState(false);
   // Back steps to the previous wizard step (available from step 2 on), unless
-  // the step runs sub-steps of its own — step 4 walks back through those first
+  // the step runs sub-steps of its own — step 3 walks back through those first
   // and only leaves the step once it reaches the beginning of them.
   const canBack = step > 1 || !!onBack;
   const goBack = onBack || (() => navigate('step' + (step - 1)));
@@ -3061,6 +3061,7 @@ const DirA_LogoRefine = () => {
 const DirA_LogoExport = () => {
   const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
+  const embedded = !!React.useContext(LogoFlowContext);
   const data = (draft && draft.data) || {};
 
   const svg = pickLogoSvg(draft || {});
@@ -3215,9 +3216,9 @@ const DirA_LogoExport = () => {
         : selected.length
           ? `${selected.length} format${selected.length === 1 ? '' : 's'} selected.`
           : 'Pick what the logo is for, or tick formats yourself.'}
-      nextLabel="Assemble Brand Kit"
+      nextLabel={embedded ? 'Continue to Style' : 'Assemble Brand Kit'}
       onBack={() => navigate('logo-refine')}
-      onNext={() => navigate('step5')}
+      onNext={() => navigate(embedded ? 'step4' : 'step5')}
     >
       <section aria-labelledby="logo-export-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
         <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
@@ -3338,7 +3339,7 @@ const DirA_LogoExport = () => {
 };
 
 // =====================================================================
-// A3 · Step 3 · Style Selection Screen
+// A3 · Step 4 · Style Selection Screen
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
 //      whole identity (hero, palette, type, descriptor). 4 by default,
@@ -4356,17 +4357,17 @@ const DirA_Step3_Style = () => {
 
   return (
   <AWizardLayout
-    step={3}
+    step={4}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
     status="Draft"
-    progress="Step 3 of 5"
-    nextLabel="Continue to Logo"
+    progress="Step 4 of 5"
+    nextLabel="Assemble Brand Kit"
     dockCopy={styleReady
-      ? 'Style set. The logo studio opens next.'
+      ? 'Style set. Your brand kit is ready to assemble.'
       : 'Pick a visual direction — or let the studio choose one — to continue.'}
     nextDisabled={!styleReady}
-    onNext={() => { if (styleReady) navigate('step4'); }}
+    onNext={() => { if (styleReady) navigate('step5'); }}
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -4595,10 +4596,10 @@ const DirA_Step2_Name = () => {
     subtitle="Choose the naming directions that fit, then let Fluid draft options from your brief."
     status="Draft"
     progress="Step 2 of 5"
-    nextLabel="Continue to Style"
+    nextLabel="Continue to Logo"
     dockCopy={chosen
-      ? `“${chosen}” it is. Set the visual direction next.`
-      : 'Choose a name before setting the visual direction.'}
+      ? `“${chosen}” it is. Set the logo direction next.`
+      : 'Choose a name before setting the logo direction.'}
     nextDisabled={!chosen}
     onNext={() => { if (chosen) navigate('step3'); }}
     isThinking={loading}
@@ -5057,7 +5058,7 @@ const AChoiceCard = ({ option, preview, refs, sel, onClick }) => {
   );
 };
 
-// Brand wizard · Step 4 · Logo.
+// Brand wizard · Step 3 · Logo.
 //
 // The same studio the standalone flow runs, as sub-steps of one wizard step.
 // Not a reimplementation: these are the very screens from that flow, rendered
@@ -5141,20 +5142,20 @@ const DirA_Step4_Logo = () => {
 
   const Screen = EMBEDDED_LOGO_SCREENS[phase] || DirA_LogoDirection;
 
-  // Back out of the first sub-step lands on step 3, not on the studio's own
+  // Back out of the first sub-step lands on step 2, not on the studio's own
   // brief screen — which this flow skipped, and which would strand the client
   // in the standalone flow if they reached it.
   const onBack = index === 0
-    ? () => navigate('step3')
+    ? () => navigate('step2')
     : () => handlers.current.onBack && handlers.current.onBack();
 
   return (
     <AWizardLayout
-      step={4}
+      step={3}
       title={chrome.title || 'Design the logo.'}
       subtitle={chrome.subtitle}
       status="Draft"
-      progress="Step 4 of 5"
+      progress="Step 3 of 5"
       dockCopy={chrome.dockCopy}
       nextLabel={chrome.nextLabel || 'Continue'}
       nextDisabled={!!chrome.nextDisabled}
@@ -7601,8 +7602,8 @@ function matchCtaText(text, currentRoute, out) {
   // Wizard dock — Back / Continue.
   if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
   if (/^Continue to Name$/.test(text))           return 'step2';
-  if (/^Continue to Style$/.test(text))          return 'step3';
-  if (/^Continue to Logo$/.test(text))           return 'step4';
+  if (/^Continue to Logo$/.test(text))           return 'step3';
+  if (/^Continue to Style$/.test(text))          return 'step4';
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
 
@@ -8318,8 +8319,8 @@ const SCREEN_FOR_ROUTE = {
   'logo-export':  () => <DirA_LogoExport />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Name />,
-  'step3':        () => <DirA_Step3_Style />,
-  'step4':        () => <DirA_Step4_Logo />,
+  'step3':        () => <DirA_Step4_Logo />,
+  'step4':        () => <DirA_Step3_Style />,
   'step5':        () => <DirA_KitSummary />,
 };
 
@@ -8357,8 +8358,8 @@ function QuickJump() {
     { id: 'logo-export',  label: 'Logo · 7 Export' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Name' },
-    { id: 'step3',        label: 'Wizard · 3 Style' },
-    { id: 'step4',        label: 'Wizard · 4 Logo' },
+    { id: 'step3',        label: 'Wizard · 3 Logo' },
+    { id: 'step4',        label: 'Wizard · 4 Style' },
     { id: 'step5',        label: 'Brand kit' },
   ];
   return (
