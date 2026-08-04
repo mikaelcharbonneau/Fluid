@@ -729,8 +729,8 @@ const AStepProgress = ({ step }) => {
   const { navigate } = useRouter();
   const steps = [
     { n: 1, label: 'Brief' },
-    { n: 2, label: 'Style' },
-    { n: 3, label: 'Name' },
+    { n: 2, label: 'Name' },
+    { n: 3, label: 'Style' },
     { n: 4, label: 'Logo' },
     { n: 5, label: 'Kit' },
   ];
@@ -1157,9 +1157,9 @@ const DirA_Step1_Brief = () => {
     subtitle="A short description is enough to get started — Fluid handles the rest."
     status="Draft"
     progress="Step 1 of 5"
-    nextLabel="Continue to Style"
+    nextLabel="Continue to Name"
     dockCopy={briefReady
-      ? 'Ready. The style step builds on this description.'
+      ? 'Ready. Naming builds on this description.'
       : 'Describe the brand in a sentence or two to continue.'}
     nextDisabled={!briefReady}
     onNext={() => { if (briefReady) navigate('step2'); }}
@@ -3338,7 +3338,7 @@ const DirA_LogoExport = () => {
 };
 
 // =====================================================================
-// A3 · Step 2 · Style Selection Screen
+// A3 · Step 3 · Style Selection Screen
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
 //      whole identity (hero, palette, type, descriptor). 4 by default,
@@ -4333,7 +4333,7 @@ const ATypographySection = () => {
   );
 };
 
-const DirA_Step2_Style = () => {
+const DirA_Step3_Style = () => {
   const { step2, setStep2 } = useStep2();
   const { draft } = useBrandDraft();
   const { navigate } = useRouter();
@@ -4356,17 +4356,17 @@ const DirA_Step2_Style = () => {
 
   return (
   <AWizardLayout
-    step={2}
+    step={3}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
     status="Draft"
-    progress="Step 2 of 5"
-    nextLabel="Continue to Name"
+    progress="Step 3 of 5"
+    nextLabel="Continue to Logo"
     dockCopy={styleReady
-      ? 'Style set. Naming comes next.'
+      ? 'Style set. The logo studio opens next.'
       : 'Pick a visual direction — or let the studio choose one — to continue.'}
     nextDisabled={!styleReady}
-    onNext={() => { if (styleReady) navigate('step3'); }}
+    onNext={() => { if (styleReady) navigate('step4'); }}
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -4440,7 +4440,7 @@ const DirA_Step2_Style = () => {
 };
 
 // =====================================================================
-// A4 · Step 3 · Name Generation Screen
+// A4 · Step 2 · Name Generation Screen
 // 9 name cards in a 3×3 grid. Each card carries the name as the
 // hero, a one-line rationale, domain status, and a fit-score bar so
 // the agent's reasoning is legible at a glance. Selected card gets a
@@ -4472,7 +4472,7 @@ const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
 
 const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
-const DirA_Step3_Name = () => {
+const DirA_Step2_Name = () => {
   const { draft, setField, setData } = useBrandDraft();
   const { navigate } = useRouter();
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
@@ -4542,17 +4542,17 @@ const DirA_Step3_Name = () => {
 
   return (
   <AWizardLayout
-    step={3}
+    step={2}
     title="Find the right name."
     subtitle="Fluid drafts 50 names from your brief — pick one, like your favorites, or type your own."
     status="Draft"
-    progress="Step 3 of 5"
-    nextLabel="Continue to Logo"
+    progress="Step 2 of 5"
+    nextLabel="Continue to Style"
     dockCopy={chosen
-      ? `“${chosen}” it is. The logo studio opens next.`
-      : 'Choose a name — the mark is drawn around it.'}
+      ? `“${chosen}” it is. Set the visual direction next.`
+      : 'Choose a name before setting the visual direction.'}
     nextDisabled={!chosen}
-    onNext={() => { if (chosen) navigate('step4'); }}
+    onNext={() => { if (chosen) navigate('step3'); }}
     isThinking={loading}
   >
     {/* Top toolbar — own name, liked names, regenerate */}
@@ -5757,8 +5757,8 @@ Object.assign(window, {
   AShell,
   DirA_Brands,
   DirA_Step1_Brief,
-  DirA_Step2_Style,
-  DirA_Step3_Name,
+  DirA_Step2_Name,
+  DirA_Step3_Style,
   DirA_Step4_Logo
 });
 
@@ -7513,8 +7513,8 @@ function matchCtaText(text, currentRoute, out) {
 
   // Wizard dock — Back / Continue.
   if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
-  if (/^Continue to Style$/.test(text))          return 'step2';
-  if (/^Continue to Name$/.test(text))           return 'step3';
+  if (/^Continue to Name$/.test(text))           return 'step2';
+  if (/^Continue to Style$/.test(text))          return 'step3';
   if (/^Continue to Logo$/.test(text))           return 'step4';
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
@@ -8230,8 +8230,8 @@ const SCREEN_FOR_ROUTE = {
   'logo-refine':  () => <DirA_LogoRefine />,
   'logo-export':  () => <DirA_LogoExport />,
   'step1':        () => <DirA_Step1_Brief />,
-  'step2':        () => <DirA_Step2_Style />,
-  'step3':        () => <DirA_Step3_Name />,
+  'step2':        () => <DirA_Step2_Name />,
+  'step3':        () => <DirA_Step3_Style />,
   'step4':        () => <DirA_Step4_Logo />,
   'step5':        () => <DirA_KitSummary />,
 };
@@ -8269,8 +8269,8 @@ function QuickJump() {
     { id: 'logo-refine',  label: 'Logo · 6 Refine' },
     { id: 'logo-export',  label: 'Logo · 7 Export' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
-    { id: 'step2',        label: 'Wizard · 2 Style' },
-    { id: 'step3',        label: 'Wizard · 3 Name' },
+    { id: 'step2',        label: 'Wizard · 2 Name' },
+    { id: 'step3',        label: 'Wizard · 3 Style' },
     { id: 'step4',        label: 'Wizard · 4 Logo' },
     { id: 'step5',        label: 'Brand kit' },
   ];
