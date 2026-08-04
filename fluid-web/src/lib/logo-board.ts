@@ -29,6 +29,8 @@ export const BOARD_SIZE = 6;
 /** A liked reference, reduced to what the board needs from it. */
 export interface LikedReference {
   imagePath: string;
+  /** Public catalogue URL supplied to the lettermark analysis prompt. */
+  imageUrl: string;
   caption: ReferenceCaption;
   /** Detailed visual principles inserted directly into the croquis prompt. */
   visualPrinciples: string;
