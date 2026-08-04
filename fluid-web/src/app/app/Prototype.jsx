@@ -2505,6 +2505,14 @@ const DirA_LogoSketches = () => {
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {board.length > 0 && (
+              <button type="button" onClick={repairImages} disabled={loading}
+                style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line-strong)',
+                  cursor:loading ? 'default' : 'pointer',opacity:loading ? .5 : 1}}>
+                Remove backgrounds
+              </button>
+            )}
+            {board.length > 0 && (
               <button type="button" onClick={() => draw({ fresh: true })} disabled={loading || !briefReady}
                 style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
                   boxShadow:'inset 0 0 0 1px var(--line-strong)',

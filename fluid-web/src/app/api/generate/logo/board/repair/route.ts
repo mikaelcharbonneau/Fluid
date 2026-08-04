@@ -21,9 +21,10 @@ function boardFrom(data: Record<string, unknown>): BoardSketch[] {
     : [];
 }
 
-// Re-renders a board that was produced by the short-lived alpha conversion
-// path. This repair never spends another app token and is limited to a single
-// pass for each saved board.
+// Re-renders a board as true transparent PNGs. This repair never spends another
+// app token and is limited to a single transparent-only pass for each saved board.
+const TRANSPARENT_OUTPUT_VERSION = "transparent-only-v2";
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -46,11 +47,11 @@ export async function POST(request: Request) {
   const data = (brand.data as Record<string, unknown>) ?? {};
   const board = boardFrom(data);
   if (!board.length) return NextResponse.json({ error: "There are no concept images to repair." }, { status: 400 });
-  if (data.logo_board_output_version === "native-transparent-v1") {
+  if (data.logo_board_output_version === TRANSPARENT_OUTPUT_VERSION) {
     return NextResponse.json({ error: "This board does not need image repair." }, { status: 409 });
   }
 
-  const repairKey = board.map((sketch) => sketch.id).join(",");
+  const repairKey = `${TRANSPARENT_OUTPUT_VERSION}:${board.map((sketch) => sketch.id).join(",")}`;
   if (data.logo_board_asset_repair_key === repairKey) {
     return NextResponse.json({ error: "This board's images have already been repaired." }, { status: 409 });
   }
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
       p_patch: {
         logo_board: repaired,
         logo_board_asset_repair_key: repairKey,
-        logo_board_output_version: "native-transparent-v1",
+        logo_board_output_version: TRANSPARENT_OUTPUT_VERSION,
       },
     });
     if (saveError) throw new Error(`Could not save repaired images: ${saveError.message}`);
