@@ -472,3 +472,124 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
 }
 
 export { BOARD_SIZE };
+
+export interface ReferenceCroquisBrief {
+  brandId: string;
+  brief: string;
+  name?: string | null;
+  slots: BoardSlot[];
+  clock?: Clock | null;
+  activity?: Activity | null;
+}
+
+function labelForPrompt(slot: BoardSlot): string {
+  if (!slot.markType) return "logo mark";
+  return slot.markType.name.replace(/s$/, "").toLowerCase();
+}
+
+function initialFor(name: string): string {
+  return name.match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() ?? "the brand initial";
+}
+
+// This is the prompt contract for the reference-led logo flow. The visual
+// analysis belongs to the liked reference and is passed straight through to
+// the image model; no intermediate concept writer compresses or replaces it.
+export function referenceCroquisPrompt(
+  input: Pick<ReferenceCroquisBrief, "brief" | "name">,
+  slot: BoardSlot,
+): string {
+  const reference = slot.reference;
+  if (!reference) throw new Error("A liked reference needs a visual analysis before it can guide a croquis.");
+
+  const name = input.name?.trim() || "this brand";
+  const type = labelForPrompt(slot);
+  const lines = [
+    `Create an original, low-fidelity pencil logo croquis on white paper for ${name}.`,
+    `Brand brief: ${input.brief.trim()}`,
+    `Logo type: ${type}.`,
+    `Selected style: ${slotStyleName(slot)}.`,
+    "",
+    "Use these high-level visual principles from the liked reference:",
+    "",
+    `"${reference.visualPrinciples}"`,
+    "",
+  ];
+
+  if (slot.markType?.id === "combination") {
+    lines.push(
+      `Compose an original lettermark based on "${initialFor(name)}" to the left of the wordmark "${name}".`,
+    );
+  } else {
+    lines.push(`Compose an original ${type} for "${name}".`);
+  }
+
+  lines.push(
+    "Do not copy the reference's distinctive symbol, letterform, layout, or trademarked visual elements.",
+    "Show imperfect hand-drawn construction lines, graphite texture, and exploratory designer annotations.",
+  );
+  return lines.join("\n");
+}
+
+function directSketchName(slot: BoardSlot): string {
+  return `${slotStyleName(slot)} ${labelForPrompt(slot)}`;
+}
+
+export async function generateReferenceCroquisBoard(
+  input: ReferenceCroquisBrief,
+): Promise<BoardSketch[]> {
+  const activity = input.activity ?? silentActivity;
+  const stamp = Date.now().toString(36);
+  const drawing = activity.phase(`Rendering ${input.slots.length} reference-led sketches`);
+  const rendered = await Promise.allSettled(
+    input.slots.map(async (slot) => {
+      const prompt = referenceCroquisPrompt(input, slot);
+      const name = directSketchName(slot);
+      const image = await renderLogoImage({
+        brandId: input.brandId,
+        phase: "board",
+        slot: `${stamp}-${slot.index}`,
+        prompt,
+        quality: RENDER_QUALITY,
+        render: "pencil",
+        onPrompt: (sentPrompt, model) =>
+          activity.emit("prompt", `Rendering "${name}" (${model})`, sentPrompt),
+      });
+      activity.emit("note", `Drew "${name}"`);
+      return {
+        id: `sk_${stamp}_${slot.index}`,
+        slot: slot.index,
+        name,
+        style_id: slot.style?.id ?? null,
+        style_name: slotStyleName(slot),
+        mark_type: slot.markType?.id ?? "reference-led",
+        mark_type_name: slotTypeName(slot),
+        territory: "reference-led",
+        territory_name: "Reference-led",
+        attributes: [slot.style?.id, slot.markType?.id].filter((value): value is string => Boolean(value)),
+        idea: `An original ${slotStyleName(slot)} ${labelForPrompt(slot)} informed by a liked reference.`,
+        art: prompt,
+        image_url: image.url,
+        reference_path: slot.reference?.imagePath ?? null,
+      } satisfies BoardSketch;
+    }),
+  );
+  drawing();
+  input.clock?.lap("render");
+
+  const sketches: BoardSketch[] = [];
+  for (const result of rendered) {
+    if (result.status === "fulfilled") sketches.push(result.value);
+    else {
+      console.error("A reference-led board sketch failed to render:", result.reason);
+      activity.emit(
+        "warn",
+        "A sketch failed to render and was dropped",
+        result.reason instanceof Error ? result.reason.message : String(result.reason),
+      );
+    }
+  }
+  if (sketches.length === 0) {
+    throw new Error("Every sketch failed to render. Please try again.");
+  }
+  return sketches;
+}

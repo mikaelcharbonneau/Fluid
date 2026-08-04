@@ -30,6 +30,8 @@ export const BOARD_SIZE = 6;
 export interface LikedReference {
   imagePath: string;
   caption: ReferenceCaption;
+  /** Detailed visual principles inserted directly into the croquis prompt. */
+  visualPrinciples: string;
 }
 
 export interface BoardSlot {
