@@ -4,8 +4,8 @@
 // This is the one genuinely agentic step in the pipeline. Unlike the fixed
 // strategy → design → critique sequence, research is open-ended: the model
 // decides what to search for, follows what it finds, and stops when it has
-// enough. So it runs as a real tool loop over Claude's server-side web search
-// rather than as a single scripted call.
+// enough. So it runs through OpenAI's hosted web-search tool rather than a
+// static, scripted category lookup.
 //
 // Two things it is FOR:
 //  1. Finding what's actually current in logo design right now — real trends
@@ -21,8 +21,6 @@
 // visual language, that is usually evidence the language fits the category —
 // not proof the category is "saturated". The research separates genuine
 // suitability from stale execution instead of defaulting to differentiation.
-
-import Anthropic from "@anthropic-ai/sdk";
 
 export interface CompetitorNote {
   name: string;
@@ -61,19 +59,26 @@ export interface ResearchBrief {
   delegated: { style: boolean; palette: boolean; font: boolean };
 }
 
-const MODEL = "claude-sonnet-5";
+const MODEL = "gpt-5";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
-// Cost and latency controls. These are the tuning knobs for this step — raise
-// EFFORT first if the findings ever come back thin.
-//
-// `effort` matters more here than anything else: it defaults to `high` on
-// Sonnet 5, and this model reaches for tools readily, so at the default it
-// deliberated between every single search and ran for minutes. Research reads
-// search results and fills in a fixed schema; it is not reasoning-heavy work.
+// Research reads search results and fills in a fixed schema; it is not
+// reasoning-heavy work, so keep the model's reasoning effort low.
 const EFFORT = "low";
-const SEARCH_USES = 5; // per round
-const MAX_SEARCH_ROUNDS = 2; // initial call + at most one pause_turn resume
-const MIN_CALL_MS = 20_000; // don't start a call we can't plausibly finish
+
+type OpenAIOutputText = {
+  type: "output_text";
+  text: string;
+  annotations?: Array<{ type?: string; url?: string }>;
+};
+
+type OpenAIResearchResponse = {
+  status?: string;
+  output_text?: string;
+  error?: { message?: string } | null;
+  incomplete_details?: { reason?: string } | null;
+  output?: Array<{ content?: OpenAIOutputText[] }>;
+};
 
 const SYSTEM = `You are the research director at Fluid, a brand studio operating
 at the level of Pentagram or Wolff Olins. Before any strategy or design work
@@ -251,104 +256,75 @@ function extractResearch(text: string, d: ResearchBrief["delegated"]): CategoryR
   };
 }
 
-function textOf(response: Anthropic.Message): string {
-  return response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
+function outputText(response: OpenAIResearchResponse): string {
+  if (response.output_text?.trim()) return response.output_text;
+  return (response.output ?? [])
+    .flatMap((item) => item.content ?? [])
+    .filter((item) => item.type === "output_text")
+    .map((item) => item.text)
     .join("\n");
 }
 
-function looksLikeJson(text: string): boolean {
-  const raw = text.replace(/```(?:json)?/gi, "");
-  const start = raw.indexOf("{");
-  return start !== -1 && raw.lastIndexOf("}") > start;
+function citedUrls(response: OpenAIResearchResponse): string[] {
+  const urls = new Set<string>();
+  for (const item of response.output ?? []) {
+    for (const content of item.content ?? []) {
+      for (const annotation of content.annotations ?? []) {
+        if (annotation.type === "url_citation" && annotation.url) {
+          urls.add(annotation.url);
+        }
+      }
+    }
+  }
+  return [...urls].slice(0, 10);
 }
 
-// Run the research agent. Loops on pause_turn so a long search session
-// completes rather than returning half-finished.
-//
-// `budgetMs` is a HARD deadline, enforced by passing the remaining time as the
-// per-request timeout. Checking the clock between rounds is not enough on its
-// own: the SDK defaults to a 10-minute timeout with 2 retries, so a single
-// slow call can block for ~30 minutes — far longer than the whole serverless
-// function — and no between-rounds check can interrupt it. That is exactly how
-// this step used to overrun its budget into negative time.
+// OpenAI executes hosted web search within the Responses request, so no
+// application-managed tool replay loop is necessary. Keep a hard deadline on
+// that one network call; the durable job worker owns any retry policy.
 export async function researchCategory(
   input: ResearchBrief,
   budgetMs = 120_000,
 ): Promise<CategoryResearch> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
+  const apiKey = (process.env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured.");
   }
-  // No retries. The SDK retries timed-out requests, so wall clock can reach
-  // timeout × (retries + 1) — leaving retries on would let a call overrun the
-  // deadline by a multiple no matter what timeout we set. Research already
-  // degrades gracefully to "none" if it fails, and the caller keeps going, so
-  // a predictable deadline is worth more here than one more attempt.
-  const client = new Anthropic({ maxRetries: 0 });
 
-  const startedAt = Date.now();
-  const remainingMs = () => budgetMs - (Date.now() - startedAt);
+  const response = await fetch(OPENAI_RESPONSES_URL, {
+    method: "POST",
+    signal: AbortSignal.timeout(Math.max(1_000, budgetMs)),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      instructions: SYSTEM,
+      input: buildUserPrompt(input),
+      tools: [{ type: "web_search" }],
+      reasoning: { effort: EFFORT },
+      max_output_tokens: 4_000,
+      text: { format: { type: "json_object" } },
+    }),
+  });
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: buildUserPrompt(input) },
-  ];
-  // The search tool stays declared on every call, including the finalize call
-  // below: once web_search_tool_result blocks are in the history, the request
-  // that replays them has to declare the tool that produced them.
-  const request = {
-    model: MODEL,
-    max_tokens: 8000,
-    thinking: { type: "adaptive" as const },
-    output_config: { effort: EFFORT },
-    system: SYSTEM,
-    tools: [
-      { type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES },
-    ],
-  } satisfies Omit<Anthropic.MessageCreateParamsNonStreaming, "messages">;
-
-  const call = (msgs: Anthropic.MessageParam[]) =>
-    client.messages.create(
-      { ...request, messages: msgs },
-      { timeout: Math.max(MIN_CALL_MS, remainingMs()) },
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `OpenAI research failed (${response.status}): ${detail.slice(0, 300)}`,
     );
-
-  let response = await call(messages);
-
-  // Server-side tools run their own loop; when it hits the per-request cap the
-  // turn pauses and we resume by echoing the assistant turn back.
-  let rounds = 1;
-  while (
-    response.stop_reason === "pause_turn" &&
-    rounds < MAX_SEARCH_ROUNDS &&
-    remainingMs() > MIN_CALL_MS
-  ) {
-    rounds += 1;
-    messages.push({ role: "assistant", content: response.content });
-    response = await call(messages);
   }
 
-  let text = textOf(response);
-
-  // The searching is the expensive part, and it all lives in `messages` by
-  // now. If the loop stopped before Claude wrote up its findings we used to
-  // throw the entire run away with "No JSON object found" — so ask once more,
-  // cheaply, for the write-up alone.
-  if (!looksLikeJson(text)) {
-    console.warn(
-      `[research] no findings after ${rounds} round(s), ${Date.now() - startedAt}ms — asking for the write-up`,
-    );
-    messages.push({ role: "assistant", content: response.content });
-    messages.push({
-      role: "user",
-      content:
-        "Stop searching. Using only what you have already found, respond now " +
-        "with ONLY the JSON object described in your instructions.",
-    });
-    text = textOf(await call(messages));
+  const payload = (await response.json()) as OpenAIResearchResponse;
+  if (payload.status && payload.status !== "completed") {
+    const detail = payload.error?.message ?? payload.incomplete_details?.reason;
+    throw new Error(detail ?? `OpenAI research ended as ${payload.status}.`);
   }
 
-  return extractResearch(text, input.delegated);
+  const research = extractResearch(outputText(payload), input.delegated);
+  const sources = citedUrls(payload);
+  return sources.length ? { ...research, sources } : research;
 }
 
 // Read cached research off a brand's data column, or null.

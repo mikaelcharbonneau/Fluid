@@ -704,8 +704,8 @@ const AStepProgress = ({ step }) => {
   const { navigate } = useRouter();
   const steps = [
     { n: 1, label: 'Brief' },
-    { n: 2, label: 'Style' },
-    { n: 3, label: 'Name' },
+    { n: 2, label: 'Name' },
+    { n: 3, label: 'Style' },
     { n: 4, label: 'Logo' },
     { n: 5, label: 'Kit' },
   ];
@@ -842,19 +842,19 @@ const AContextPanel = ({ brief, styleName, brandName }) => (
       </div>
     )}
 
-    {styleName && (
+    {brandName && (
       <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>02 Style</div>
-        <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
-          <Chip tone="live">{styleName}</Chip>
-        </div>
+        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>02 Name</div>
+        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'var(--fg-1)'}}>{brandName}</div>
       </div>
     )}
 
-    {brandName && (
+    {styleName && (
       <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>03 Name</div>
-        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'var(--fg-1)'}}>{brandName}</div>
+        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>03 Style</div>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+          <Chip tone="live">{styleName}</Chip>
+        </div>
       </div>
     )}
   </div>
@@ -978,7 +978,7 @@ const DirA_Step1_Brief = () => {
     subtitle="A short description is enough to get started — Fluid handles the rest."
     status="Draft"
     progress="Step 1 of 5"
-    nextLabel="Continue to Style"
+    nextLabel="Continue to Name"
     onNext={() => {}}
     isThinking={false}
   >
@@ -1743,7 +1743,7 @@ const DirA_LogoReferences = () => {
 };
 
 // =====================================================================
-// A3 · Step 2 · Style Selection Screen
+// A3 · Step 3 · Style Selection Screen
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
 //      whole identity (hero, palette, type, descriptor). 4 by default,
@@ -2738,7 +2738,7 @@ const ATypographySection = () => {
   );
 };
 
-const DirA_Step2_Style = () => {
+const DirA_Step3_Style = () => {
   const { step2, setStep2 } = useStep2();
 
   // Load all preview fonts once when the step opens.
@@ -2752,12 +2752,12 @@ const DirA_Step2_Style = () => {
 
   return (
   <AWizardLayout
-    step={2}
+    step={3}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
     status="Draft"
-    progress="Step 2 of 5"
-    nextLabel="Continue to Name"
+    progress="Step 3 of 5"
+    nextLabel="Continue to Logo"
     onNext={() => {}}
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
@@ -2832,7 +2832,7 @@ const DirA_Step2_Style = () => {
 };
 
 // =====================================================================
-// A4 · Step 3 · Name Generation Screen
+// A4 · Step 2 · Name Generation Screen
 // 9 name cards in a 3×3 grid. Each card carries the name as the
 // hero, a one-line rationale, domain status, and a fit-score bar so
 // the agent's reasoning is legible at a glance. Selected card gets a
@@ -2864,7 +2864,7 @@ const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
 
 const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
 
-const DirA_Step3_Name = () => {
+const DirA_Step2_Name = () => {
   const { draft, setField } = useBrandDraft();
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
   // `name` should still show that name selected here rather than looking as
@@ -2933,12 +2933,12 @@ const DirA_Step3_Name = () => {
 
   return (
   <AWizardLayout
-    step={3}
+    step={2}
     title="Find the right name."
     subtitle="Fluid drafts 50 names from your brief — pick one, like your favorites, or type your own."
     status="Draft"
-    progress="Step 3 of 5"
-    nextLabel="Continue to Logo"
+    progress="Step 2 of 5"
+    nextLabel="Continue to Style"
     onNext={() => {}}
     isThinking={loading}
   >
@@ -3521,9 +3521,10 @@ const DirA_Step4_Logo = () => {
     setStage('research');
     const pre = await apiResearchCategory(brandId);
     if (pre.error) {
-      // Not fatal: the studio can still design without category grounding.
-      // Say so rather than failing silently on a degraded result.
-      console.warn('Research unavailable:', pre.error);
+      setError(pre.error);
+      setStage('');
+      setLoadingSketches(false);
+      return;
     } else {
       if (pre.research) setResearch(pre.research);
       if (pre.platform) setPlatform(pre.platform);
@@ -4524,8 +4525,8 @@ Object.assign(window, {
   AShell,
   DirA_Brands,
   DirA_Step1_Brief,
-  DirA_Step2_Style,
-  DirA_Step3_Name,
+  DirA_Step2_Name,
+  DirA_Step3_Style,
   DirA_Step4_Logo
 });
 
@@ -6278,8 +6279,8 @@ function matchCtaText(text, currentRoute, out) {
 
   // Wizard dock — Back / Continue.
   if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
-  if (/^Continue to Style$/.test(text))          return 'step2';
-  if (/^Continue to Name$/.test(text))           return 'step3';
+  if (/^Continue to Name$/.test(text))           return 'step2';
+  if (/^Continue to Style$/.test(text))          return 'step3';
   if (/^Continue to Logo$/.test(text))           return 'step4';
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
@@ -6992,8 +6993,8 @@ const SCREEN_FOR_ROUTE = {
   'logo-type':    () => <DirA_LogoType />,
   'logo-references': () => <DirA_LogoReferences />,
   'step1':        () => <DirA_Step1_Brief />,
-  'step2':        () => <DirA_Step2_Style />,
-  'step3':        () => <DirA_Step3_Name />,
+  'step2':        () => <DirA_Step2_Name />,
+  'step3':        () => <DirA_Step3_Style />,
   'step4':        () => <DirA_Step4_Logo />,
   'step5':        () => <DirA_KitSummary />,
 };
@@ -7028,8 +7029,8 @@ function QuickJump() {
     { id: 'logo-type',    label: 'Logo · 3 Type' },
     { id: 'logo-references', label: 'Logo · 4 References' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
-    { id: 'step2',        label: 'Wizard · 2 Style' },
-    { id: 'step3',        label: 'Wizard · 3 Name' },
+    { id: 'step2',        label: 'Wizard · 2 Name' },
+    { id: 'step3',        label: 'Wizard · 3 Style' },
     { id: 'step4',        label: 'Wizard · 4 Logo' },
     { id: 'step5',        label: 'Brand kit' },
   ];
@@ -7207,48 +7208,62 @@ function describeFailure(r, j, fallback) {
   return fallback;
 }
 
-// Logo studio · Phase -1/0 — category research and the creative platform.
-// Split from the sketch call because all four phases in one request exceeded
-// the serverless time limit. Cached server-side, so this is fast on reruns.
-async function apiResearchCategory(brandId) {
+function generationIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'job-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+}
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The browser only enqueues work. Polling drives the current UI, but work is
+// owned by the durable worker and continues after navigation or disconnects.
+async function apiLogoJob(action, payload, fallback) {
   try {
-    const r = await fetch('/api/generate/logo/research', {
+    const resumeStorageKey = payload.brandId ? 'fluid:generation-job:' + payload.brandId + ':' + action : '';
+    const savedKey = resumeStorageKey && typeof window !== 'undefined'
+      ? window.localStorage.getItem(resumeStorageKey)
+      : '';
+    const requestKey = savedKey || generationIdempotencyKey();
+    if (resumeStorageKey && typeof window !== 'undefined') window.localStorage.setItem(resumeStorageKey, requestKey);
+    const r = await fetch('/api/generate/jobs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId }),
+      body: JSON.stringify({ action, ...payload, idempotencyKey: requestKey }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: describeFailure(r, j, 'Category research failed.'), code: j.code };
-    return { research: j.research || null, platform: j.platform || null };
+    signalBalanceChanged(j.code);
+    if (!r.ok || !j.job) return { error: describeFailure(r, j, fallback), code: j.code };
+    let job = j.job;
+    while (job.status === 'queued' || job.status === 'running') {
+      await pause(Math.max(1000, Number(j.retryAfter || 2) * 1000));
+      const status = await fetch('/api/generate/jobs/' + job.id, { cache: 'no-store' });
+      const next = await status.json().catch(() => ({}));
+      if (!status.ok || !next.job) return { error: describeFailure(status, next, fallback), code: next.code };
+      job = next.job;
+    }
+    signalBalanceChanged(job.error && job.error.code);
+    if (resumeStorageKey && typeof window !== 'undefined') window.localStorage.removeItem(resumeStorageKey);
+    if (job.status !== 'succeeded') return { error: (job.error && job.error.message) || fallback };
+    return { result: job.result || {} };
   } catch { return { error: 'Network error.' }; }
 }
 
-// Logo studio · Phase 1 — one low-fi concept sketch at a time, rendered as an
-// image. likedIds bias the concept toward the client's demonstrated taste;
-// reset starts a fresh board instead of adding to the existing one.
-async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
-  try {
-    const r = await fetch('/api/generate/logo/sketches', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok) return { error: describeFailure(r, j, 'Sketch generation failed.'), code: j.code };
-    return { platform: j.platform || null, sketches: j.sketches || [], research: j.research || null };
-  } catch { return { error: 'Network error.' }; }
+async function apiResearchCategory(brandId) {
+  const response = await apiLogoJob('logo_research', { brandId }, 'Category research failed.');
+  if (response.error) return response;
+  return { research: response.result.research || null, platform: response.result.platform || null };
 }
-// Logo studio · Phase 2 — refine liked sketches into 9 critiqued finalists.
+async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
+  const response = await apiLogoJob(
+    'logo_sketches',
+    { brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset },
+    'Sketch generation failed.',
+  );
+  if (response.error) return response;
+  return { platform: response.result.platform || null, sketches: response.result.sketches || [], research: response.result.research || null };
+}
 async function apiRefineLogoSketches(brandId, likedIds) {
-  try {
-    const r = await fetch('/api/generate/logo/refine', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, likedIds: likedIds || [] }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok) return { error: describeFailure(r, j, 'Refinement failed.'), code: j.code };
-    return { finalists: j.finalists || [] };
-  } catch { return { error: 'Network error.' }; }
+  const response = await apiLogoJob('logo_refine', { brandId, likedIds: likedIds || [] }, 'Refinement failed.');
+  if (response.error) return response;
+  return { finalists: response.result.finalists || [] };
 }
 // Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
 async function apiVectorizeLogo(brandId, conceptId) {
