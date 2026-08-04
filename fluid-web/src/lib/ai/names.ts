@@ -16,6 +16,8 @@ export interface NameBrief {
   brief: string;
   audience?: string | null;
   competitors?: string | null;
+  styles?: string[];
+  additionalDetails?: string | null;
 }
 
 const MODEL = "claude-opus-4-8";
@@ -50,8 +52,24 @@ function buildUserPrompt(input: NameBrief): string {
   const lines = [`Brand brief: ${input.brief.trim()}`];
   const audience = (input.audience ?? "").trim();
   const competitors = (input.competitors ?? "").trim();
+  const styles = (input.styles ?? []).map((style) => style.trim()).filter(Boolean);
+  const additionalDetails = (input.additionalDetails ?? "").trim();
   if (audience) lines.push(`Target audience: ${audience}`);
   if (competitors) lines.push(`Competitors / adjacent brands: ${competitors}`);
+  if (styles.length) {
+    lines.push(
+      `Prioritize these naming directions across the set: ${styles.join(", ")}.`,
+      `Treat them as creative guides, not literal words to include in every name.`,
+      `Make the candidates meaningfully cover the selected directions.`,
+      `Do not introduce unrequested naming styles as the main direction.`,
+      ``,
+      `Additional naming details: ${additionalDetails || "None."}`,
+      ``,
+    );
+  }
+  if (!styles.length && additionalDetails) {
+    lines.push(`Additional naming details: ${additionalDetails}`, ``);
+  }
   lines.push(`\nGenerate ${COUNT} name candidates as a JSON array.`);
   return lines.join("\n");
 }
