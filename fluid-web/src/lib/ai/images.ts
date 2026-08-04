@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_EDIT_URL = "https://api.openai.com/v1/images/edits";
 const MODEL = "gpt-image-2";
 export const TRANSPARENT_IMAGE_MODEL = "gpt-image-1.5";
 const BUCKET = "brand-assets";
@@ -114,7 +115,30 @@ async function requestPng(
   quality: "low" | "medium" | "high",
   background: ImageBackground,
   timeoutMs: number,
+  referenceImage?: Buffer,
 ): Promise<Response> {
+  if (referenceImage) {
+    const form = new FormData();
+    form.set("model", imageModel(background));
+    form.set("prompt", prompt);
+    form.set("size", "1024x1024");
+    form.set("quality", quality);
+    form.set("n", "1");
+    form.set("background", background);
+    form.set("output_format", "png");
+    form.append(
+      "image[]",
+      new Blob([new Uint8Array(referenceImage)], { type: "image/png" }),
+      "selected-sketch.png",
+    );
+    return fetch(OPENAI_EDIT_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { Authorization: `Bearer ${apiKey()}` },
+      body: form,
+    });
+  }
+
   return fetch(OPENAI_URL, {
     method: "POST",
     signal: AbortSignal.timeout(timeoutMs),
@@ -140,6 +164,7 @@ async function generatePng(
   quality: "low" | "medium" | "high",
   background: ImageBackground,
   timeoutMs: number,
+  referenceImage?: Buffer,
 ): Promise<Buffer> {
   const deadline = Date.now() + timeoutMs;
   const request = () => requestPng(
@@ -147,6 +172,7 @@ async function generatePng(
     quality,
     background,
     Math.max(1, deadline - Date.now()),
+    referenceImage,
   );
   let res = await request();
   if (!res.ok && RETRY_STATUSES.has(res.status)) {
@@ -208,6 +234,8 @@ export async function renderLogoImage(opts: {
   quality?: "low" | "medium" | "high";
   /** Total time allowed for one render, including a transient-status retry. */
   timeoutMs?: number;
+  /** Source asset for a source-locked edit rather than a new image generation. */
+  referenceImage?: Buffer;
   render?: "vector" | "pencil";
   background?: ImageBackground;
   // Reports the exact text this function is about to send. The wrapper below
@@ -227,6 +255,7 @@ export async function renderLogoImage(opts: {
     opts.quality ?? "medium",
     opts.background ?? "opaque",
     opts.timeoutMs ?? DEFAULT_RENDER_TIMEOUT_MS,
+    opts.referenceImage,
   );
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
