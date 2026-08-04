@@ -504,7 +504,7 @@ export function referenceCroquisPrompt(
   const name = input.name?.trim() || "this brand";
   const type = labelForPrompt(slot);
   const lines = [
-    `Create an original, low-fidelity pencil logo croquis on white paper for ${name}.`,
+    `Create an original, low-fidelity pencil logo croquis for ${name}.`,
     `Brand brief: ${input.brief.trim()}`,
     `Logo type: ${type}.`,
     `Selected style: ${slotStyleName(slot)}.`,
@@ -525,7 +525,13 @@ export function referenceCroquisPrompt(
 
   lines.push(
     "Do not copy the reference's distinctive symbol, letterform, layout, or trademarked visual elements.",
-    "Show imperfect hand-drawn construction lines, graphite texture, and exploratory designer annotations.",
+    "",
+    "Output requirements - absolute:",
+    "- Show exactly one centered logo lockup and nothing else: the mark with its wordmark where applicable.",
+    "- Isolate the logo on a transparent background. Do not show paper, a canvas, a page, or any background color or texture.",
+    "- Render the logo in dark, high-contrast near-black graphite with restrained hand-drawn texture.",
+    "- Do not include annotations, labels, captions, arrows, keywords, diagrams, alternate explorations, detail studies, grids, guides, borders, objects, figures, or mockups.",
+    "- Do not add construction lines outside the logo itself. Do not add written text except the requested wordmark.",
   );
   return lines.join("\n");
 }
@@ -551,6 +557,7 @@ export async function generateReferenceCroquisBoard(
         prompt,
         quality: RENDER_QUALITY,
         render: "pencil",
+        transparentBackground: true,
         onPrompt: (sentPrompt, model) =>
           activity.emit("prompt", `Rendering "${name}" (${model})`, sentPrompt),
       });

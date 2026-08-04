@@ -4,10 +4,10 @@
 // every generated image is uploaded to the public `brand-assets` bucket and
 // only its URL is persisted on the brand record.
 //
-// Note on backgrounds: gpt-image-2 does NOT support `background: "transparent"`.
-// We therefore prompt for a flat white field and keep it — which is also what
-// Recraft's vectorizer traces most cleanly.
+// gpt-image-2 is requested with an opaque field. Reference-led croquis can
+// opt into an alpha pass before storage so they are presented as isolated marks.
 
+import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
@@ -155,6 +155,38 @@ async function generatePng(prompt: string, quality: "low" | "medium" | "high"): 
   throw new Error("Image generation returned no image data.");
 }
 
+// The image endpoint returns croquis over a white raster field. Convert that
+// field to alpha and remap graphite to dark charcoal so an isolated sketch
+// remains legible on any surface. This path is intentionally limited to the
+// reference-led board; finished logo and refinement renders keep their pixels.
+async function isolateGraphiteInk(bytes: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(bytes)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  for (let offset = 0; offset < data.length; offset += 4) {
+    const sourceAlpha = data[offset + 3];
+    const luminance =
+      0.2126 * data[offset] +
+      0.7152 * data[offset + 1] +
+      0.0722 * data[offset + 2];
+    const graphiteAlpha = Math.max(0, Math.min(255, Math.round((223 - luminance) * 2)));
+    const alpha = Math.round((sourceAlpha * graphiteAlpha) / 255);
+
+    data[offset] = 20;
+    data[offset + 1] = 20;
+    data[offset + 2] = 20;
+    data[offset + 3] = alpha;
+  }
+
+  return sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
 // Upload bytes to the public bucket and return its URL.
 export async function storeImage(
   bytes: Buffer,
@@ -184,6 +216,8 @@ export async function renderLogoImage(opts: {
   prompt?: string;
   quality?: "low" | "medium" | "high";
   render?: "vector" | "pencil";
+  /** Remove the opaque render field and store the resulting PNG with alpha. */
+  transparentBackground?: boolean;
   // Reports the exact text this function is about to send. The wrapper below
   // is as much a part of what gets drawn as the art direction is, so a caller
   // reconstructing the prompt to show it would eventually show a lie — the
@@ -197,7 +231,8 @@ export async function renderLogoImage(opts: {
       : logoImagePrompt(opts.direction ?? ""));
   opts.onPrompt?.(prompt, MODEL);
   const bytes = await generatePng(prompt, opts.quality ?? "medium");
-  return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
+  const storedBytes = opts.transparentBackground ? await isolateGraphiteInk(bytes) : bytes;
+  return storeImage(storedBytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
 
 // Every image we ever hand back to a client is one we ourselves stored in
