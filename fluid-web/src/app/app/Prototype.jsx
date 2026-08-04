@@ -3,13 +3,13 @@
 // @ts-nocheck
 // =====================================================================
 // Fluid — Interactive product prototype (ported verbatim from the
-// Claude Design export). All screens share one module scope, exactly as
+// original design export). All screens share one module scope, exactly as
 // the original concatenated <script type="text/babel"> bundle did.
 // Imported with { ssr: false } so top-level window writes run client-only.
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
-import { BOARD_SIZE, MAX_REFERENCE_LIKES, summariseBoardPlan } from "@/lib/logo-board";
+import { BOARD_SIZE, summariseBoardPlan } from "@/lib/logo-board";
 import {
   MAX_REFINE_VERSIONS,
   MAX_VERSION_COLORS,
@@ -2274,15 +2274,8 @@ const DirA_LogoReferences = () => {
     return () => { cancelled = true; };
   }, [typesKey, stylesKey]);
 
-  // Likes are capped because every one of them is promised a sketch: the
-  // concept round deals the liked references across its nine slots, so a tenth
-  // like would be a promise the board has no room to keep.
   const toggleLike = (id) => {
     const removing = likes.includes(id);
-    if (!removing && likes.length >= MAX_REFERENCE_LIKES) {
-      makeToast(`${MAX_REFERENCE_LIKES} is the limit — each one you like gets its own concept sketched. Unlike one to make room.`);
-      return;
-    }
     const next = removing ? likes.filter((item) => item !== id) : [...likes, id];
     const nextDislikes = dislikes.filter((item) => item !== id);
     setLikes(next);
@@ -2317,10 +2310,10 @@ const DirA_LogoReferences = () => {
     <LogoStepShell
       step={4}
       title="Browse logo references."
-      subtitle="Like the existing logos that feel closest to the direction you want. Each one you like gets its own concept."
+      subtitle="Like as many existing logos as you need. Fluid will use them in the order you choose them."
       dockCopy={likes.length
-        ? `${likes.length} of ${MAX_REFERENCE_LIKES} liked — each gets at least one concept sketched.`
-        : `Like the references that feel most right. Up to ${MAX_REFERENCE_LIKES}.`}
+        ? `${likes.length} liked — concepts are generated in ordered batches of six.`
+        : 'Like the references that feel most right.'}
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-type')}
       onNext={() => { if (likes.length) navigate('logo-sketches'); }}
@@ -2378,9 +2371,9 @@ const DirA_LogoReferences = () => {
 };
 
 // Standalone logo studio · Step 5 · Concepts. The first screen in this flow
-// that spends tokens: each press draws ONE concept and adds it to the board,
-// so the client controls how much they pay for and can stop as soon as
-// something lands.
+// that spends tokens: each press draws up to six concepts from the next ordered
+// batch of liked references. The client can regenerate until every saved
+// reference has been explored.
 const DirA_LogoSketches = () => {
   const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
@@ -2401,14 +2394,18 @@ const DirA_LogoSketches = () => {
   // taxonomy uses the AI_CHOICE sentinel. Translate at the boundary so the
   // server sees one vocabulary.
   const requestTypes = aiChoosesType ? [AI_CHOICE] : chosenTypes;
-  const briefReady = hasBrief && requestTypes.length > 0;
+  const referenceLikes = Array.isArray(data.logo_reference_likes) ? data.logo_reference_likes : [];
+  const briefReady = hasBrief && requestTypes.length > 0 && referenceLikes.length > 0;
 
   const [board, setBoard] = React.useState(data.logo_board || []);
   const [likes, setLikes] = React.useState(data.logo_board_likes || []);
   const [loading, setLoading] = React.useState(false);
-  const [stage, setStage] = React.useState('');
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
+  const initialBatchOffset = Number(data.logo_reference_batch_offset);
+  const [remainingReferences, setRemainingReferences] = React.useState(
+    Math.max(0, referenceLikes.length - (Number.isInteger(initialBatchOffset) && initialBatchOffset > 0 ? initialBatchOffset : 0)),
+  );
 
   const persist = (nextBoard, nextLikes) => {
     setData({
@@ -2420,23 +2417,11 @@ const DirA_LogoSketches = () => {
   // Exactly the plan the server will run — same function, same selections —
   // so what the client is shown before spending can't drift from what arrives.
   const plan = summariseBoardPlan(chosenStyles, requestTypes);
-  const likedReferenceCount = Array.isArray(data.logo_reference_likes)
-    ? data.logo_reference_likes.length
-    : 0;
-
-  // `fresh` clears the board first; otherwise the nine new concepts are added
-  // to what's already pinned up.
+  // Each press consumes the next six liked references. Starting over resets
+  // that queue to the first six references.
   const draw = async ({ fresh = false } = {}) => {
     if (!brandId || loading || !briefReady) return;
     setLoading(true); setError(''); setNotice('');
-
-    // Research and the creative platform are their own request — both are
-    // cached on the brand, so this is a no-op after the first board.
-    setStage('research');
-    const pre = await apiResearchCategory(brandId);
-    if (pre.error) console.warn('Research unavailable, drawing without it:', pre.error);
-
-    setStage('draw');
     const res = await apiGenerateLogoBoard(brandId, {
       mark_types: requestTypes,
       standalone_styles: chosenStyles,
@@ -2447,7 +2432,7 @@ const DirA_LogoSketches = () => {
     if (res.error) {
       setError(res.error);
     } else {
-      const nextLikes = fresh ? [] : likes;
+      const nextLikes = [];
       setBoard(res.board);
       setLikes(nextLikes);
       persist(res.board, nextLikes);
@@ -2456,15 +2441,14 @@ const DirA_LogoSketches = () => {
       // the library that drawing again won't close.
       const notices = [];
       if (res.requested && res.drawn && res.drawn < res.requested) {
-        notices.push(`${res.drawn} of ${res.requested} sketches came back — a few renders didn’t finish. Draw ${BOARD_SIZE} more to fill the board out.`);
+        notices.push(`${res.drawn} of ${res.requested} sketches came back — retry to generate the remaining directions.`);
       }
-      if (likedReferenceCount > 0 && res.briefed < likedReferenceCount) {
-        const missing = likedReferenceCount - res.briefed;
-        notices.push(`${missing} of your ${likedReferenceCount} liked reference${likedReferenceCount === 1 ? '' : 's'} ${missing === 1 ? "isn't" : "aren't"} catalogued in enough detail to brief a concept yet, so ${missing === 1 ? 'it was' : 'they were'} left out of this round.`);
+      if (typeof res.remaining === 'number') {
+        setRemainingReferences(res.remaining);
+        notices.push(`${res.remaining} liked reference${res.remaining === 1 ? '' : 's'} remain in the queue.`);
       }
       setNotice(notices.join(' '));
     }
-    setStage('');
     setLoading(false);
   };
 
@@ -2478,13 +2462,13 @@ const DirA_LogoSketches = () => {
     padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
     display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
   };
-  const busyLabel = stage === 'research' ? 'Studying the category…' : 'Sketching nine concepts…';
+  const busyLabel = 'Sketching six concepts…';
 
   return (
     <LogoStepShell
       step={5}
       title="Explore concepts."
-      subtitle="Nine rough sketches at a time. Like the ones worth developing."
+      subtitle="Six rough croquis at a time, each guided by a liked reference."
       dockCopy={likes.length
         ? `${likes.length} concept${likes.length === 1 ? '' : 's'} saved. You'll choose ${likes.length === 1 ? 'it' : 'one of them'} to refine next.`
         : 'Sketch a board, then like the ones worth keeping.'}
@@ -2513,16 +2497,18 @@ const DirA_LogoSketches = () => {
                 Start over
               </button>
             )}
-            <button type="button" onClick={() => draw()} disabled={loading || !briefReady}
+            <button type="button" onClick={() => draw()} disabled={loading || !briefReady || (board.length > 0 && remainingReferences === 0)}
               style={{...toolBtn,background:'#0E0F12',color:'#fff',
-                cursor:loading || !briefReady ? 'default' : 'pointer',opacity:loading || !briefReady ? .5 : 1}}>
+                cursor:loading || !briefReady || (board.length > 0 && remainingReferences === 0) ? 'default' : 'pointer',opacity:loading || !briefReady || (board.length > 0 && remainingReferences === 0) ? .5 : 1}}>
               <Sparkle size={12} color="#FDBA50"/>
-              {loading ? busyLabel : (board.length ? `Sketch ${BOARD_SIZE} more` : `Sketch ${BOARD_SIZE} concepts`)}
+              {loading ? busyLabel : (board.length
+                ? (remainingReferences ? `Generate next ${Math.min(BOARD_SIZE, remainingReferences)}` : 'All references explored')
+                : `Generate ${Math.min(BOARD_SIZE, referenceLikes.length)} concepts`)}
             </button>
           </div>
         </div>
 
-        {/* What the nine will be drawn from — visible so a surprising result is
+        {/* What the six will be drawn from — visible so a surprising result is
             traceable to the brief rather than mysterious. Each pairing is a
             distinct direction: nothing on the board is a blend of two. */}
         <div style={{
@@ -2531,10 +2517,9 @@ const DirA_LogoSketches = () => {
           flexDirection:'column',gap:9,
         }}>
           <div style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.5}}>
-            Each press draws {BOARD_SIZE} sketches, split across your choices. Every
-            sketch sits in one style and one type — they’re separate directions to
-            compare, never blended together.
-            {likedReferenceCount > 0 && ` Each of the ${likedReferenceCount} reference${likedReferenceCount === 1 ? '' : 's'} you liked briefs at least one of them.`}
+            Each batch uses the next {BOARD_SIZE} liked references in order. Every
+            sketch applies one reference's visual principles to an original mark;
+            nothing copies the existing logo.
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {plan.map((p, i) => (
@@ -2555,7 +2540,9 @@ const DirA_LogoSketches = () => {
             boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
           }}>
             {hasBrief
-              ? 'Choose at least one logo type before drawing concepts.'
+              ? (!requestTypes.length
+                ? 'Choose at least one logo type before drawing concepts.'
+                : 'Like at least one reference before drawing concepts.')
               : 'Add a brand description in the brief before drawing concepts.'}
           </div>
         )}
@@ -2592,7 +2579,7 @@ const DirA_LogoSketches = () => {
             <div style={{fontSize:12.5,color:'var(--fg-3)',marginTop:6,lineHeight:1.5,maxWidth:440,margin:'6px auto 0'}}>
               These are rough pencil sketches, not finished logos — you’re choosing
               an idea to develop, so don’t judge the drawing. Sketch a board, like
-              what interests you, and press again for nine more if nothing lands.
+              what interests you, and generate the next six if nothing lands.
             </div>
           </div>
         )}
@@ -2608,8 +2595,8 @@ const DirA_LogoSketches = () => {
                 boxShadow:'inset 0 0 0 1px var(--line)',
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                {/* One spinner for the set, not nine — nine spinners read as
-                    nine separate waits when it is really one. */}
+                {/* One spinner for the set, not six — six spinners read as
+                    six separate waits when it is really one. */}
                 {i === 0 ? (
                   <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
                     <Thinking/>
@@ -3366,8 +3353,8 @@ const ALetAI = ({ onClick, active }) => (
   </button>
 );
 
-// Shown under a section the client delegated. States plainly that the choice
-// is deferred to the research step — not silently left blank.
+// Shown under a section the client delegated. States plainly that the studio
+// will decide from the brief rather than leaving the choice blank.
 const ADelegatedNote = ({ what, onClear }) => (
   <div style={{
     display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
@@ -3376,7 +3363,7 @@ const ADelegatedNote = ({ what, onClear }) => (
     fontSize:12.5, color:'#8A5A12', lineHeight:1.45,
   }}>
     <span style={{flex:1, minWidth:200}}>
-      Fluid will choose the {what} while researching your category — it won’t be
+      Fluid will choose the {what} from your brief — it won’t be
       limited to the options below.
     </span>
     <button onClick={onClear} style={{
@@ -3906,7 +3893,7 @@ const visualStyleImage = (id) => {
 };
 
 // "Let AI choose" writes this sentinel instead of resolving to one of the
-// curated options below. It means "the studio decides this during research,
+// curated options below. It means "the studio decides this from the brief,
 // unconstrained by these lists" — deliberately distinct from an unset field,
 // which just means the user hasn't decided. Mirrors DELEGATED in lib/ai/step2.
 const AI_CHOICE = '__ai__';
@@ -4044,8 +4031,8 @@ const AVisualStyleSection = () => {
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
   const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
-  // Delegating is instant and free — no model call. The decision is made later,
-  // by the research agent, with the category evidence in hand.
+  // Delegating is instant and free — no model call. The decision is made later
+  // by the studio from the completed brief.
   const letAIChoose = () => {
     const next = delegated ? null : AI_CHOICE;
     setSelectedId(next);
@@ -5079,7 +5066,7 @@ const EMBEDDED_LOGO_SCREENS = {
 };
 
 // Where to drop someone back into the studio, read off what the brand already
-// has. Resuming at the start when nine concepts are already drawn would look
+// has. Resuming at the start when a board is already drawn would look
 // like the work had been lost.
 function resumeLogoPhase(data) {
   const d = data || {};
@@ -8473,7 +8460,7 @@ async function apiAssist(brandId, task, options) {
     return { result: j.result || {} };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for name candidates for this brand. Resolves to
+// Phase 3 — ask OpenAI for name candidates for this brand. Resolves to
 // { names } on success or { error } so the caller can show a message.
 async function apiGenerateNames(brandId, guidance) {
   try {
@@ -8487,7 +8474,7 @@ async function apiGenerateNames(brandId, guidance) {
     return { names: j.names || [] };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for a color palette for this brand.
+// Phase 3 — ask OpenAI for a color palette for this brand.
 async function apiGeneratePalette(brandId) {
   try {
     const r = await fetch('/api/generate/palette', {
@@ -8500,7 +8487,7 @@ async function apiGeneratePalette(brandId) {
     return { palette: j.palette || null };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for a typography pairing for this brand.
+// Phase 3 — ask OpenAI for a typography pairing for this brand.
 async function apiGenerateTypography(brandId) {
   try {
     const r = await fetch('/api/generate/typography', {
@@ -8513,7 +8500,7 @@ async function apiGenerateTypography(brandId) {
     return { typography: j.typography || null };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for SVG logo concepts for this brand.
+// Phase 3 — ask OpenAI for SVG logo concepts for this brand.
 async function apiGenerateLogos(brandId) {
   try {
     const r = await fetch('/api/generate/logo', {
@@ -8607,26 +8594,8 @@ async function runStreamed(name, request, fallback) {
   }
 }
 
-// Logo studio · Phase -1/0 — category research and the creative platform.
-// Split from the sketch call because all four phases in one request exceeded
-// the serverless time limit. Cached server-side, so this is fast on reruns.
-async function apiResearchCategory(brandId) {
-  const out = await runStreamed(
-    'Studying the category',
-    () => fetch('/api/generate/logo/research', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId }),
-    }),
-    'Category research failed.',
-  );
-  if (out.error) return { error: out.error, code: out.code };
-  const j = out.data || {};
-  return { research: j.research || null, platform: j.platform || null };
-}
-
-// Standalone logo flow · divergence — nine pencil croquis in one press,
-// distributed across the style × type pairings the client chose. Presses
-// append, so a board grows; `fresh` starts a new one.
+// Logo studio · divergence — six pencil croquis based on the next ordered
+// batch of references the client liked.
 async function apiGenerateLogoBoard(brandId, config, fresh) {
   const out = await runStreamed(
     'Sketching the board',
@@ -8639,7 +8608,7 @@ async function apiGenerateLogoBoard(brandId, config, fresh) {
   signalBalanceChanged(out.code);
   if (out.error) return { error: out.error, code: out.code };
   const j = out.data || {};
-  return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0 };
+  return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0, remaining: j.remaining };
 }
 
 // Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,
@@ -8670,7 +8639,7 @@ async function apiVectorizeLogo(brandId, conceptId) {
     return { svg: j.svg || '', url: j.url || '' };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude to synthesize written brand guidelines.
+// Phase 3 — ask OpenAI to synthesize written brand guidelines.
 async function apiGenerateGuidelines(brandId) {
   try {
     const r = await fetch('/api/generate/guidelines', {
@@ -8873,7 +8842,7 @@ function BrandDraftProvider({ children }) {
    * rendered, spreading it into setField('data', ...). That is only
    * correct while nothing else has written since that render, and the logo flow
    * breaks the assumption constantly: a screen reads `data`, a generation route
-   * writes research to the same brand, the screen then saves its stale copy.
+   * writes a creative platform to the same brand, the screen then saves its stale copy.
    * Reading from the ref means the base is always the live draft.
    */
   const setData = React.useCallback((patch) => {

@@ -1,10 +1,10 @@
 // Phase 3 · Brand-name generation.
-// A single, focused Claude call per wizard step (the "workflow" approach) —
-// not a multi-agent system. Given the brief the user captured, ask Claude for
+// A single, focused OpenAI call per wizard step (the "workflow" approach) —
+// not a multi-agent system. Given the brief the user captured, ask OpenAI for
 // a large set of distinct name candidates and return them as structured data
 // the wizard's name grid can render directly.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 // One generated name candidate. Kept lean — the grid shows just the name.
 export interface GeneratedName {
@@ -20,7 +20,6 @@ export interface NameBrief {
   additionalDetails?: string | null;
 }
 
-const MODEL = "claude-opus-4-8";
 const COUNT = 50;
 
 // api/generate/names has a 60s maxDuration and makes one call; bounded under
@@ -113,26 +112,13 @@ function extractNames(text: string): GeneratedName[] {
 export async function generateBrandNames(
   input: NameBrief,
 ): Promise<GeneratedName[]> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const client = new Anthropic();
-  const response = await client.messages.create(
-    {
-      model: MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(input) }],
-    },
-    { timeout: CALL_TIMEOUT_MS },
-  );
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: 8_000,
+    reasoningEffort: "medium",
+    timeoutMs: CALL_TIMEOUT_MS,
+  });
 
   return extractNames(text);
 }

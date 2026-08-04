@@ -42,7 +42,7 @@ function nameGuidanceFrom(
   return { styleIds: aiChooses ? [] : styleIds, aiChooses, details };
 }
 
-// Claude runs server-side and extended thinking can take a while, so give the
+// OpenAI runs server-side and extended thinking can take a while, so give the
 // function room beyond the short default and pin it to the Node runtime.
 export const runtime = "nodejs";
 export const maxDuration = 60;

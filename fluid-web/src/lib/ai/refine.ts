@@ -11,7 +11,7 @@
 //
 // Two stages have been removed on the way here, and both removals were the
 // same lesson. There was an EXPAND stage that invented marks alongside the
-// client's picks so a critique could cull down to nine — so liking one concept
+// client's picks so a critique could cull down to a final set — so liking one concept
 // bought eight marks nobody chose. Then refinement still developed every liked
 // concept at once, which is divergence in convergence's clothing. It now takes
 // a single concept and a brief, and draws exactly what was asked for.
@@ -19,14 +19,14 @@
 // One call produces all the versions (there are at most MAX_REFINE_VERSIONS of
 // them), which keeps them aware of each other and genuinely distinct.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { renderLogoImage } from "./images";
+import { generateOpenAIText } from "./openai";
 import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
 import type { BoardSketch } from "./sketch-board";
 import { type LogoConfig, logoConfigContext } from "../logo-styles";
 import type { RefineVersion } from "../logo-refine";
-import { silentActivity, summariseThinking, type Activity } from "./activity";
+import { silentActivity, type Activity } from "./activity";
 import {
   MARK_TYPES,
   DESIGN_PRINCIPLES,
@@ -106,8 +106,6 @@ export interface RefineBrief {
   // before the risky part starts.
   onPlan?: (plan: FinalistPlan) => Promise<void> | void;
 }
-
-const MODEL = "claude-opus-4-8";
 
 // api/generate/logo/refine runs on a 270s clock. Both text calls below share
 // that budget with the per-version renders that follow (each already capped
@@ -332,16 +330,12 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
 export async function generateLogoFinalists(
   input: RefineBrief,
 ): Promise<LogoFinalist[]> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
   if (!input.concept) {
     throw new Error("A concept is required.");
   }
   if (input.versions.length === 0) {
     throw new Error("At least one version is required.");
   }
-  const client = new Anthropic();
   const defaultTerritory = input.concept.territory;
   const activity = input.activity ?? silentActivity;
 
@@ -351,29 +345,13 @@ export async function generateLogoFinalists(
     maxTokens: number,
     timeoutMs: number,
   ) => {
-    const response = await client.messages.create(
-      {
-        model: MODEL,
-        max_tokens: maxTokens,
-        thinking: { type: "adaptive" },
-        system,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { timeout: timeoutMs },
-    );
-    // Thinking is on for these calls and used to be discarded entirely.
-    const reasoning = response.content
-      .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
-      .map((b) => b.thinking)
-      .join("\n");
-    if (reasoning.trim()) {
-      const { label, detail } = summariseThinking(reasoning);
-      activity.emit("thinking", label, detail);
-    }
-    return response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
+    return generateOpenAIText({
+      instructions: system,
+      input: prompt,
+      maxOutputTokens: maxTokens,
+      reasoningEffort: "high",
+      timeoutMs,
+    });
   };
 
   // Both stages are text, and together they were overrunning the budget before

@@ -3,7 +3,7 @@
 // name, palette, type, logo — into a concise written brand guide (positioning,
 // voice, messaging, dos & don'ts, usage notes), returned as structured data.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 export interface MessagingPillar {
   title: string;
@@ -29,8 +29,6 @@ export interface GuidelinesBrief {
   logoChoice?: string | null;
   styleContext?: string | null; // resolved Step 2 choices
 }
-
-const MODEL = "claude-opus-4-8";
 
 // api/generate/guidelines has a 60s maxDuration and makes one call; bounded
 // under that so a stuck call fails clearly instead of the platform killing
@@ -135,26 +133,13 @@ function extractGuidelines(text: string): GuidelinesResult {
 export async function generateBrandGuidelines(
   input: GuidelinesBrief,
 ): Promise<GuidelinesResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const client = new Anthropic();
-  const response = await client.messages.create(
-    {
-      model: MODEL,
-      max_tokens: 6000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(input) }],
-    },
-    { timeout: CALL_TIMEOUT_MS },
-  );
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: 6_000,
+    reasoningEffort: "medium",
+    timeoutMs: CALL_TIMEOUT_MS,
+  });
 
   return extractGuidelines(text);
 }

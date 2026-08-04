@@ -7,7 +7,6 @@
 // Keep them in sync if those lists change.
 
 import { platformContext } from "./platform";
-import { researchContext } from "./research";
 
 export interface CustomFont {
   id: string;
@@ -56,7 +55,7 @@ export function getStep2(data: unknown): Step2 {
 // decision to the studio, not leaving it blank. The distinction matters:
 //   • undefined/null → the user simply hasn't decided; generators get no
 //     guidance and fall back to their own judgement.
-//   • DELEGATED      → an explicit instruction to decide this during research,
+//   • DELEGATED      → an explicit instruction to decide this from the brief,
 //     free of the app's curated option lists.
 // Anything that reads a Step 2 field must handle all three states.
 export const DELEGATED = "__ai__";
@@ -151,7 +150,7 @@ export function styleContext(
 
   if (isDelegated(s2.palette)) {
     open.push(
-      "the colour palette — derive real hex values from the research and the " +
+        "the colour palette — derive real hex values from the brief and the " +
         "brand idea; you are NOT limited to any preset palette",
     );
   } else {
@@ -177,17 +176,10 @@ export function styleContext(
     lines.push(
       "",
       `The client has delegated these decisions to the studio — make them ` +
-        `deliberately, grounded in the brief and the research:`,
+        `deliberately, grounded in the brief:`,
       ...open.map((o) => `- ${o}.`),
     );
   }
-
-  // Category research and the creative platform are appended here rather than
-  // threaded through every generator's signature, so palette, typography,
-  // guidelines and both logo phases all design from the same evidence and the
-  // same strategy. This is what keeps the kit expressing one idea.
-  const research = researchContext(brand.data);
-  if (research) lines.push("", research);
 
   if (!opts.omitPlatform) {
     const platform = platformContext(brand.data);
