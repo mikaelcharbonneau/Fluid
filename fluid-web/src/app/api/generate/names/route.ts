@@ -45,7 +45,7 @@ function nameGuidanceFrom(
 // OpenAI runs server-side and extended thinking can take a while, so give the
 // function room beyond the short default and pin it to the Node runtime.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // POST /api/generate/names — generate name candidates for one of the caller's
 // brands and cache them on the brand record. Body: { brandId: string }.
