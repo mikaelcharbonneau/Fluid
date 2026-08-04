@@ -1833,9 +1833,25 @@ const LOGO_STYLE_PLACEHOLDERS = [
   },
 ];
 
-// Holistic worlds contradict when blended — "Luxury + Playful" briefs two
-// incompatible identities. Two is a round to explore, not a mix.
-const MAX_LOGO_STYLES = 2;
+// A reference vote only has meaning for the exact style and mark type that
+// produced its gallery. Changing either choice therefore starts a new visual
+// direction and invalidates every downstream result derived from those votes.
+const resetLogoDirectionWork = () => ({
+  logo_reference_likes: [],
+  logo_reference_dislikes: [],
+  logo_reference_context: null,
+  logo_reference_batch_offset: 0,
+  logo_reference_batch_paths: [],
+  logo_board: [],
+  logo_board_likes: [],
+  logo_board_output_version: null,
+  logo_board_config: null,
+  logo_refine_concept: null,
+  logo_refine_versions: [],
+  logo_finalists: [],
+  logo_finalist_plan: null,
+  logos: [],
+});
 
 const LOGO_TYPE_OPTIONS = [
   { id: 'wordmark', label: 'Wordmark', description: 'The full brand name, set in distinctive type.' },
@@ -1897,22 +1913,23 @@ const DirA_LogoDirection = () => {
   const data = (draft && draft.data) || {};
   const direction = data.logo_direction || {};
   const selectedStyles = direction.mode === 'manual'
-    ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : []))
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : []))
     : [];
   const fluidChooses = direction.mode === 'ai';
   const ready = selectedStyles.length > 0 || fluidChooses;
 
   const chooseStyle = (styleId) => {
     const next = selectedStyles.includes(styleId)
-      ? selectedStyles.filter((id) => id !== styleId)
-      : (selectedStyles.length < MAX_LOGO_STYLES ? [...selectedStyles, styleId] : null);
-    if (!next) { makeToast(`Choose up to ${MAX_LOGO_STYLES} styles — they're explored separately, not blended.`); return; }
+      ? []
+      : [styleId];
     setData({
+      ...resetLogoDirectionWork(),
       logo_direction: { mode: next.length ? 'manual' : null, style_ids: next, style_id: next[0] || null },
     });
   };
   const chooseFluid = () => {
     setData({
+      ...resetLogoDirectionWork(),
       logo_direction: fluidChooses ? { mode: null, style_ids: [], style_id: null } : { mode: 'ai', style_ids: [], style_id: null },
     });
   };
@@ -1925,7 +1942,7 @@ const DirA_LogoDirection = () => {
       step={2}
       title="Pick a visual style."
       subtitle="Choose the visual world for the first round of logo concepts."
-      dockCopy="Pick a visual world — or two to explore — or let Fluid make the call."
+      dockCopy="Pick one visual world, or let Fluid make the call."
       nextLabel="Continue to logo type"
       onBack={() => navigate('logo-brief')}
       onNext={continueToConcepts}
@@ -1938,7 +1955,7 @@ const DirA_LogoDirection = () => {
             <h3 id="logo-style-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
               color:'#000',letterSpacing:'-0.015em',
-            }}>Pick a world, or two to compare.</h3>
+          }}>Pick one visual world.</h3>
           </div>
           <button
             type="button"
@@ -2015,12 +2032,13 @@ const DirA_LogoType = () => {
   const data = (draft && draft.data) || {};
   const aiChoosesType = data.logo_type_mode === 'ai';
   const selectedTypes = Array.isArray(data.logo_types)
-    ? data.logo_types
+    ? data.logo_types.slice(0, 1)
     : (data.logo_type ? [data.logo_type] : []);
 
   const chooseType = (typeId) => {
     if (typeId === 'ai') {
       setData({
+        ...resetLogoDirectionWork(),
         logo_type_mode: aiChoosesType ? null : 'ai',
         logo_types: [],
         logo_type: '',
@@ -2028,10 +2046,14 @@ const DirA_LogoType = () => {
       return;
     }
     const next = selectedTypes.includes(typeId)
-      ? selectedTypes.filter((id) => id !== typeId)
-      : (selectedTypes.length < 3 ? [...selectedTypes, typeId] : null);
-    if (!next) { makeToast('Choose up to three logo types.'); return; }
-    setData({ logo_type_mode: next.length ? 'manual' : null, logo_types: next, logo_type: next[0] || '' });
+      ? []
+      : [typeId];
+    setData({
+      ...resetLogoDirectionWork(),
+      logo_type_mode: next.length ? 'manual' : null,
+      logo_types: next,
+      logo_type: next[0] || '',
+    });
   };
   const continueToConcepts = () => {
     if (selectedTypes.length || aiChoosesType) navigate('logo-references');
@@ -2041,8 +2063,8 @@ const DirA_LogoType = () => {
     <LogoStepShell
       step={3}
       title="Choose a logo type."
-      subtitle="Pick up to three structures for the first round of concepts to explore."
-      dockCopy="Choose up to three logo types to shape the concept round."
+      subtitle="Pick the logo structure for the first round of concepts."
+      dockCopy="Choose one logo type to shape the concept round."
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-direction')}
       onNext={continueToConcepts}
@@ -2054,7 +2076,7 @@ const DirA_LogoType = () => {
           <h3 id="logo-type-heading" style={{
             margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
             color:'#000',letterSpacing:'-0.015em',
-          }}>Select up to three starting structures.</h3>
+          }}>Select one starting structure.</h3>
         </div>
 
         <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
@@ -2226,10 +2248,10 @@ const DirA_LogoReferences = () => {
   const { draft, setData } = useBrandDraft();
   const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
-  const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
+  const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types.slice(0, 1) : (data.logo_type ? [data.logo_type] : []);
   const aiChoosesType = data.logo_type_mode === 'ai';
   const direction = data.logo_direction || {};
-  const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : [])) : [];
+  const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : [])) : [];
   const typeLabel = aiChoosesType ? 'Fluid chooses' : selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
   const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
@@ -2383,11 +2405,11 @@ const DirA_LogoSketches = () => {
 
   const aiChoosesType = data.logo_type_mode === 'ai';
   const chosenTypes = Array.isArray(data.logo_types)
-    ? data.logo_types
+    ? data.logo_types.slice(0, 1)
     : (data.logo_type ? [data.logo_type] : []);
   const direction = data.logo_direction || {};
   const chosenStyles = direction.mode === 'manual'
-    ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : []))
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : []))
     : (direction.mode === 'ai' ? ['fluid-choice'] : []);
 
   // The standalone type cards use 'ai' for the delegated option; the shared
