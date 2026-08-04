@@ -19,7 +19,7 @@
 // One call produces all the versions (there are at most MAX_REFINE_VERSIONS of
 // them), which keeps them aware of each other and genuinely distinct.
 
-import { renderLogoImage } from "./images";
+import { fetchImageBytes, renderLogoImage } from "./images";
 import { generateOpenAIText } from "./openai";
 import type { Clock } from "./budget";
 import type { CreativePlatform } from "./platform";
@@ -82,11 +82,12 @@ export interface FinalistPlan {
  *
  * v1 plans were a pool of 11 that was mostly marks the client never picked.
  * v2 plans developed every liked concept, before the brief narrowed to one
- * concept with colours chosen per version. Resuming either would render
- * something the client did not ask for, so an older plan is discarded and the
- * marks are designed again.
+ * concept with colours chosen per version. v3 plans described the chosen
+ * sketch in text but did not use it as the image-edit source. Resuming any of
+ * them would render something the client did not ask for, so an older plan is
+ * discarded and the marks are designed again.
  */
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
 
 export interface RefineBrief {
   brandId: string;
@@ -139,11 +140,10 @@ VERSION: <the version number this mark answers>
 TYPE: <one mark-type key>
 REFINES: <name of the concept this develops, or NEW>
 IDEA: <one sentence: the concept and the idea it expresses>
-ART: <a precise art-direction brief for the finished mark: exact forms, their
-arrangement, proportion, stroke weight, and colour. Name every colour by the
-exact hex given for that version and say which element takes which. Write it so
-an illustrator could execute it exactly. Describe ONLY the mark — never the
-background, framing, or rendering style.>`;
+ART: <a precise finish specification for the selected sketch: its existing
+silhouette and construction must remain intact; state only the optical cleanup,
+stroke treatment, and the exact hex colours for each existing element. Do not
+invent, replace, add, remove, rotate, or rearrange forms.>`;
 
 function platformLines(p: CreativePlatform): string[] {
   return [
@@ -195,9 +195,11 @@ function buildRefinePrompt(input: RefineBrief): string {
     ...conceptProfile(s),
     ``,
     `YOUR TASK: develop that one concept into ${total} finished`,
-    `mark${total === 1 ? "" : "s"}. Stay faithful to its core geometry and idea —`,
-    `this is a refinement, not a re-invention. Apply proper construction and`,
-    `optical correction.`,
+    `mark${total === 1 ? "" : "s"}. This is a refinement, not a re-invention.`,
+    `The supplied sketch is the mandatory design master: preserve its outer`,
+    `silhouette, all internal negative spaces, stroke paths, proportions,`,
+    `orientation, and element relationships. Apply only construction cleanup`,
+    `and optical correction to those existing forms.`,
     ``,
     // A concept was chosen from a board where every sketch sat in one named
     // style world, so the world is part of what the client picked. Polishing a
@@ -216,12 +218,10 @@ function buildRefinePrompt(input: RefineBrief): string {
     // which is not a choice. Colour is the client's decision; the differences
     // the studio is being paid for are structural.
     lines.push(
-      `The ${total} versions are different RESOLUTIONS of this one idea. Vary`,
-      `the construction, weight, proportion, counter-shapes, and how the`,
-      `elements are joined. Never a new idea. Colour alone is NOT a version —`,
-      `the palettes below are given, so two marks that differ only in colour`,
-      `count as one and waste a slot. Someone comparing them should see one`,
-      `concept resolved ${total} convincing ways.`,
+      `Every version must remain recognizably the SAME selected logo. Versions`,
+      `may vary only in optical cleanup, controlled stroke finishing, and the`,
+      `client-provided palette. Never change the silhouette, counter-shapes,`,
+      `connections, or arrangement of the source sketch.`,
       ``,
     );
   }
@@ -325,6 +325,20 @@ function extractCandidates(text: string, fallbackTerritory: string): Candidate[]
     });
   }
   return out;
+}
+
+function sourceLockedRenderDirection(input: RefineBrief, candidate: Candidate): string {
+  return [
+    `The supplied image is the client-selected source sketch and is mandatory.`,
+    `Refine that exact logo into a finished vector-style mark. Preserve its outer`,
+    `silhouette, internal negative spaces, stroke paths, proportions, orientation,`,
+    `and every relationship between elements. Do not invent a new letterform or`,
+    `symbol, and do not add, remove, rotate, split, merge, or rearrange any forms.`,
+    `Clean only the existing geometry: smooth intentional curves, regularize`,
+    `stroke endings, balance the existing spacing, and remove sketch texture.`,
+    `Use exactly these colours on the existing forms: ${candidate.colors.join(", ")}.`,
+    `The selected sketch's intended direction: ${input.concept.idea}`,
+  ].join("\n");
 }
 
 export async function generateLogoFinalists(
@@ -471,6 +485,8 @@ export async function generateLogoFinalists(
   // so it reaches this guard with the whole budget intact — which is the point
   // of caching the plan.
   input.clock?.guard("render the finished marks", FINAL_RENDER_TIMEOUT_MS + 15_000);
+  activity.emit("note", "Using the selected sketch as the source for every refined version");
+  const sourceSketch = await fetchImageBytes(input.concept.image_url);
   const drawing = activity.phase(`Rendering ${Math.min(ordered.length, input.versions.length)} finished marks`);
   const rendered = await Promise.allSettled(
     ordered.slice(0, input.versions.length).map(async (c, i) => {
@@ -479,12 +495,13 @@ export async function generateLogoFinalists(
         brandId: input.brandId,
         phase: "final",
         slot: id,
-        direction: c.art,
+        direction: sourceLockedRenderDirection(input, c),
         // These are the candidate refinements the client compares before
         // vectorization, so medium avoids high-quality image latency without
         // compromising the mark's construction or the selected colourway.
         quality: "medium",
         timeoutMs: FINAL_RENDER_TIMEOUT_MS,
+        referenceImage: sourceSketch,
         onPrompt: (prompt, model) =>
           activity.emit(
             "prompt",
