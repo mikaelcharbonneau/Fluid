@@ -557,7 +557,7 @@ export async function generateReferenceCroquisBoard(
         prompt,
         quality: RENDER_QUALITY,
         render: "pencil",
-        transparentBackground: true,
+        background: "transparent",
         onPrompt: (sentPrompt, model) =>
           activity.emit("prompt", `Rendering "${name}" (${model})`, sentPrompt),
       });
