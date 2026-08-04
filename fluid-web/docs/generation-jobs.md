@@ -2,24 +2,23 @@
 
 ## Decision
 
-Fluid uses Postgres as the durable queue and Vercel Cron as the worker trigger.
-The API writes a job and returns `202` immediately; `GET /api/generate/jobs/:id`
-is the reconnect/resume contract. The worker claims one job using a database
-lease, so a killed invocation is released to a later cron tick without relying
-on a client connection.
+Fluid uses Postgres as the durable queue. The API writes a job and returns
+`202` immediately; `GET /api/generate/jobs/:id` is the reconnect/resume
+contract. An authenticated scheduler invokes the worker, which claims one job
+using a database lease so an interrupted invocation can be recovered without
+relying on a client connection.
 
 Vercel Workflow was not selected for this first production implementation: it
 would add a Vercel-specific execution dependency while the application already
-uses Supabase for its authoritative brand and credit data. Vercel Cron plus the
-leased Postgres queue keeps recovery, audit data, and vendor concurrency in the
-same transaction boundary. If queue latency becomes material, the fallback is a
-managed queue that invokes the existing worker endpoint; the job schema and
-claim/complete API stay unchanged.
+uses Supabase for its authoritative brand and credit data. The leased Postgres
+queue keeps recovery, audit data, and vendor concurrency in the same transaction
+boundary. A compatible external scheduler can invoke the existing worker endpoint
+without changing the job schema or claim/complete API.
 
 ## Operations
 
-- Set `CRON_SECRET` in Vercel. Vercel Cron calls
-  `/api/internal/generation-jobs/run` every minute with this bearer token.
+- Set `CRON_SECRET` in the scheduler and deployment environment. The scheduler
+  calls `/api/internal/generation-jobs/run` with this bearer token.
 - One `running` job is allowed per `(account, vendor)`. Jobs expose phase,
   progress, attempt count, error, timestamps, and terminal result in
   `generation_jobs` for dashboards and alerts.
