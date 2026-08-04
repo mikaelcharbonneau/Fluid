@@ -76,7 +76,12 @@ async function loadLikedReferences(
         }
       }
       return caption
-        ? { imagePath, caption, visualPrinciples: visualPrinciples(caption) }
+        ? {
+            imagePath,
+            imageUrl: referenceImageUrl(imagePath),
+            caption,
+            visualPrinciples: visualPrinciples(caption),
+          }
         : null;
     }))).filter((reference): reference is LikedReference => reference !== null);
   } catch {

@@ -22,6 +22,7 @@ import type { CreativePlatform } from "./platform";
 import { BOARD_SIZE, type BoardSlot, slotStyleName, slotTypeName } from "../logo-board";
 import { captionBrief } from "./caption-reference";
 import { MARK_TYPES, DESIGN_PRINCIPLES, ANTI_CLICHE, CRITIQUE_RUBRIC } from "./design";
+import { analyzeLettermarkReference } from "./lettermark-reference-prompt";
 
 export interface BoardSketch {
   id: string;
@@ -491,12 +492,13 @@ function initialFor(name: string): string {
   return name.match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() ?? "the brand initial";
 }
 
-// This is the prompt contract for the reference-led logo flow. The visual
-// analysis belongs to the liked reference and is passed straight through to
-// the image model; no intermediate concept writer compresses or replaces it.
+// This is the prompt contract for the reference-led logo flow. Non-lettermark
+// references pass their stored visual analysis straight through. Lettermarks
+// first receive an editable, platform-managed OpenAI analysis prompt.
 export function referenceCroquisPrompt(
   input: Pick<ReferenceCroquisBrief, "brief" | "name">,
   slot: BoardSlot,
+  lettermarkDirection?: string,
 ): string {
   const reference = slot.reference;
   if (!reference) throw new Error("A liked reference needs a visual analysis before it can guide a croquis.");
@@ -509,13 +511,34 @@ export function referenceCroquisPrompt(
     `Logo type: ${type}.`,
     `Selected style: ${slotStyleName(slot)}.`,
     "",
-    "Use these high-level visual principles from the liked reference:",
-    "",
-    `"${reference.visualPrinciples}"`,
-    "",
   ];
 
-  if (slot.markType?.id === "combination") {
+  if (lettermarkDirection) {
+    const initial = initialFor(name);
+    const direction = lettermarkDirection.replaceAll("{{letter}}", initial);
+    lines.push(
+      "Use this reusable lettermark direction created by analyzing the liked reference in OpenAI:",
+      "",
+      `"${direction}"`,
+      "",
+      "The direction's color and background instructions describe the reference aesthetic only. The croquis output requirements below override them for this concept stage.",
+      "",
+    );
+  } else {
+    lines.push(
+      "Use these high-level visual principles from the liked reference:",
+      "",
+      `"${reference.visualPrinciples}"`,
+      "",
+    );
+  }
+
+  if (slot.markType?.id === "lettermark") {
+    lines.push(
+      `Compose an original lettermark from "${initialFor(name)}".`,
+      "Do not reproduce the liked reference's distinctive geometry, silhouette, or trademarked visual elements.",
+    );
+  } else if (slot.markType?.id === "combination") {
     lines.push(
       `Compose an original lettermark based on "${initialFor(name)}" to the left of the wordmark "${name}".`,
     );
@@ -540,15 +563,39 @@ function directSketchName(slot: BoardSlot): string {
   return `${slotStyleName(slot)} ${labelForPrompt(slot)}`;
 }
 
+async function lettermarkDirections(
+  slots: readonly BoardSlot[],
+  activity: Activity,
+): Promise<Map<string, string>> {
+  const references = new Map<string, string>();
+  for (const slot of slots) {
+    if (slot.markType?.id === "lettermark" && slot.reference) {
+      references.set(slot.reference.imagePath, slot.reference.imageUrl);
+    }
+  }
+  if (!references.size) return new Map();
+
+  activity.emit("note", `Analyzing ${references.size} liked lettermark reference${references.size === 1 ? "" : "s"}`);
+  const analyses = await Promise.all(
+    Array.from(references, async ([imagePath, imageUrl]) => [
+      imagePath,
+      await analyzeLettermarkReference(imageUrl),
+    ] as const),
+  );
+  activity.emit("note", `Prepared ${analyses.length} lettermark direction${analyses.length === 1 ? "" : "s"}`);
+  return new Map(analyses);
+}
+
 export async function generateReferenceCroquisBoard(
   input: ReferenceCroquisBrief,
 ): Promise<BoardSketch[]> {
   const activity = input.activity ?? silentActivity;
   const stamp = Date.now().toString(36);
+  const directions = await lettermarkDirections(input.slots, activity);
   const drawing = activity.phase(`Rendering ${input.slots.length} reference-led sketches`);
   const rendered = await Promise.allSettled(
     input.slots.map(async (slot) => {
-      const prompt = referenceCroquisPrompt(input, slot);
+      const prompt = referenceCroquisPrompt(input, slot, directions.get(slot.reference?.imagePath ?? ""));
       const name = directSketchName(slot);
       const image = await renderLogoImage({
         brandId: input.brandId,

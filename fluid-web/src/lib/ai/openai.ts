@@ -29,18 +29,27 @@ export async function generateOpenAIText({
   input,
   model,
   maxOutputTokens,
-  reasoningEffort = "medium",
+  reasoningEffort,
   timeoutMs = 120_000,
   json = false,
+  prompt,
 }: {
-  instructions: string;
+  instructions?: string;
   input: string | unknown[];
   model?: string;
   maxOutputTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
   timeoutMs?: number;
   json?: boolean;
+  /** A reusable prompt saved in the OpenAI platform. */
+  prompt?: { id: string; version?: string };
 }): Promise<string> {
+  // Dashboard prompts own their configured model and reasoning settings. The
+  // standard code-managed calls retain the app's established defaults.
+  const selectedModel = prompt
+    ? model?.trim() || ""
+    : model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5";
+  const selectedReasoning = reasoningEffort ?? (prompt ? undefined : "medium");
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     signal: AbortSignal.timeout(timeoutMs),
@@ -49,10 +58,11 @@ export async function generateOpenAIText({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5",
-      instructions,
       input,
-      reasoning: { effort: reasoningEffort },
+      ...(selectedModel ? { model: selectedModel } : {}),
+      ...(instructions?.trim() ? { instructions: instructions.trim() } : {}),
+      ...(prompt ? { prompt } : {}),
+      ...(selectedReasoning ? { reasoning: { effort: selectedReasoning } } : {}),
       ...(maxOutputTokens ? { max_output_tokens: maxOutputTokens } : {}),
       ...(json ? { text: { format: { type: "json_object" } } } : {}),
     }),
