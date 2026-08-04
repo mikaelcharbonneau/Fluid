@@ -4,7 +4,7 @@ import {
   generateReferenceCroquisBoard,
   referenceCroquisPrompt,
 } from "@/lib/ai/sketch-board";
-import { IMAGE_MODEL } from "@/lib/ai/images";
+import { TRANSPARENT_IMAGE_MODEL } from "@/lib/ai/images";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
       // carries the visual principles for its own liked reference.
       renders: slots.map((s) => ({
         slot: s.index,
-        model: IMAGE_MODEL,
+        model: TRANSPARENT_IMAGE_MODEL,
         reference: s.reference?.imagePath ?? null,
         prompt: referenceCroquisPrompt({ brief: String(brand.brief), name: brandName }, s),
       })),
@@ -258,7 +258,7 @@ export async function POST(request: Request) {
     const nextPatch = {
       logo_board: board,
       logo_board_likes: [],
-      logo_board_output_version: "native-transparent-v1",
+      logo_board_output_version: "transparent-only-v2",
       logo_reference_batch_offset: batchOffset + batch.length,
       logo_reference_batch_paths: batch.map((reference) => reference.imagePath),
       logo_board_config: {

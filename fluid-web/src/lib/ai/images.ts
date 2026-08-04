@@ -4,15 +4,16 @@
 // every generated image is uploaded to the public `brand-assets` bucket and
 // only its URL is persisted on the brand record.
 //
-// Reference-led croquis request a native transparent PNG. Some image-model
-// deployments reject that setting, so those calls fall back to opaque output
-// rather than dropping the entire board.
+// Reference-led croquis must be true transparent PNGs. GPT Image 2 does not
+// support that output mode, so transparent requests use GPT Image 1.5 while
+// the rest of the product keeps GPT Image 2's rendering quality.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const MODEL = "gpt-image-2";
+export const TRANSPARENT_IMAGE_MODEL = "gpt-image-1.5";
 const BUCKET = "brand-assets";
 
 /** Exported so a prompt preview can report which model would receive it. */
@@ -100,6 +101,10 @@ const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
 const RETRY_DELAY_MS = 4_000;
 type ImageBackground = "opaque" | "transparent";
 
+function imageModel(background: ImageBackground): string {
+  return background === "transparent" ? TRANSPARENT_IMAGE_MODEL : MODEL;
+}
+
 function retryDelay(): number {
   return RETRY_DELAY_MS + Math.floor(Math.random() * RETRY_DELAY_MS);
 }
@@ -117,7 +122,7 @@ async function requestPng(
       Authorization: `Bearer ${apiKey()}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: imageModel(background),
       prompt,
       size: "1024x1024",
       quality,
@@ -138,20 +143,6 @@ async function generatePng(
   if (!res.ok && RETRY_STATUSES.has(res.status)) {
     await new Promise((resolve) => setTimeout(resolve, retryDelay()));
     res = await requestPng(prompt, quality, background);
-  }
-
-  // gpt-image-2 historically rejected transparent output. Keep the board
-  // reliable for accounts on that deployment while preferring native alpha
-  // wherever it is now available.
-  if (!res.ok && background === "transparent") {
-    const detail = await res.text().catch(() => "");
-    if (res.status === 400 && /background|transparent/i.test(detail)) {
-      res = await requestPng(prompt, quality, "opaque");
-    } else {
-      throw new Error(
-        `Image generation failed (${res.status}): ${detail.slice(0, 300)}`,
-      );
-    }
   }
 
   if (!res.ok) {
@@ -216,7 +207,7 @@ export async function renderLogoImage(opts: {
     (opts.render === "pencil"
       ? pencilSketchPrompt(opts.direction ?? "")
       : logoImagePrompt(opts.direction ?? ""));
-  opts.onPrompt?.(prompt, MODEL);
+  opts.onPrompt?.(prompt, imageModel(opts.background ?? "opaque"));
   const bytes = await generatePng(
     prompt,
     opts.quality ?? "medium",
