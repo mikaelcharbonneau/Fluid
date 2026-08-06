@@ -358,6 +358,7 @@ export async function generateLogoFinalists(
     prompt: string,
     maxTokens: number,
     timeoutMs: number,
+    acceptPartial = false,
   ) => {
     return generateOpenAIText({
       instructions: system,
@@ -365,6 +366,7 @@ export async function generateLogoFinalists(
       maxOutputTokens: maxTokens,
       reasoningEffort: "low",
       timeoutMs,
+      acceptPartial,
     });
   };
 
@@ -375,14 +377,18 @@ export async function generateLogoFinalists(
     // 1. Develop the chosen concept into the requested versions. One call: at
     // most MAX_REFINE_VERSIONS marks, and they have to differ from each other,
     // which only works if one response writes them all.
+    //
+    // Reasoning models charge thinking against max_output_tokens; 5k was too
+    // tight for multi-version art direction and hit the output-token ceiling.
     const designing = activity.phase(
       `Drawing ${input.versions.length} version${input.versions.length === 1 ? "" : "s"} of "${input.concept.name}"`,
     );
     const text = await call(
       DESIGNER_SYSTEM,
       buildRefinePrompt(input),
-      5_000,
+      32_000,
       DESIGN_CALL_TIMEOUT_MS,
+      true,
     );
     designing();
     input.clock?.lap("refine");

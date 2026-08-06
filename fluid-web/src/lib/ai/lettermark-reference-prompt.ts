@@ -22,6 +22,9 @@ function cleanPrompt(raw: string): string {
  * app's own reference catalogue, never user-controlled arbitrary input.
  */
 export async function analyzeLettermarkReference(imageUrl: string): Promise<string> {
+  // Platform prompts still need an explicit ceiling: without one (or with a
+  // low dashboard default), reasoning models stop mid-direction with
+  // max_output_tokens. This call feeds the croquis board directly.
   const result = await generateOpenAIText({
     prompt: {
       id: PROMPT_ID,
@@ -39,7 +42,9 @@ export async function analyzeLettermarkReference(imageUrl: string): Promise<stri
         ],
       },
     ],
+    maxOutputTokens: 16_000,
     timeoutMs: 120_000,
+    acceptPartial: true,
   });
 
   const prompt = cleanPrompt(result);

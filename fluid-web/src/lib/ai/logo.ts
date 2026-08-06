@@ -127,12 +127,17 @@ function extractLogos(text: string): LogoConcept[] {
 export async function generateBrandLogos(
   input: LogoBrief,
 ): Promise<LogoConcept[]> {
+  // Reasoning models charge thinking tokens against max_output_tokens. Three
+  // SVG marks are verbose; 8k left too little room for thinking + markup and
+  // surfaced as "reached its output-token limit". Leave headroom and accept a
+  // partial response so any complete SVGs still ship.
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
-    maxOutputTokens: 8_000,
-    reasoningEffort: "medium",
+    maxOutputTokens: 32_000,
+    reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
+    acceptPartial: true,
   });
 
   return extractLogos(text);
