@@ -10,7 +10,6 @@
 
 import { runSkill } from "./run";
 import type { BrandContext } from "./context";
-import { FLOW_SKILL } from "./flow";
 import type { Activity } from "@/lib/ai/activity";
 import {
   AUDIENCE_CONTRACT,
@@ -55,10 +54,19 @@ interface StepInput {
   activity?: Activity;
 }
 
-/** The skill the whole thread is running, injected as background on every call. */
-function supporting(ctx: BrandContext): string | undefined {
-  return FLOW_SKILL[ctx.path ?? "new"];
-}
+// Reasoning effort is the biggest lever on how long a step takes, and most
+// steps do not need much of it: once the context document is written, six
+// directions with a six-word note each is closer to formatting than to
+// thinking. "medium" is reserved for the two steps where the judgement IS the
+// product — the names and the taglines — because that is what the user is
+// paying for there.
+//
+// The thread previously injected the flow's own skill as background on every
+// call. For the full build that meant attaching brand-strategy — 2,300 tokens
+// instructing the model to run a questionnaire and produce a complete strategy
+// report — to a request for six short phrases. It invited exactly the
+// over-thinking that was timing steps out, and the context document already
+// carries every decision it would have contributed.
 
 export async function generateNames(
   { context, activity }: StepInput,
@@ -67,7 +75,8 @@ export async function generateNames(
   const seen = exclude.map((n) => n.trim()).filter(Boolean);
   return runSkill({
     skill: "brand-naming",
-    supportingSkill: supporting(context),
+    effort: "medium",
+    maxTokens: 6_000,
     context,
     activity,
     // "10 more" has to mean ten the user has not already rejected.
@@ -86,7 +95,6 @@ export async function generateDirections({ context, activity }: StepInput): Prom
 }> {
   return runSkill({
     skill: "brand-identity",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: DIRECTIONS_CONTRACT,
@@ -107,7 +115,6 @@ export async function generatePositionRead({
 }: StepInput): Promise<PositionRead> {
   return runSkill({
     skill: "brand-positioning",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: positionContract((context.competitors ?? []).filter(Boolean)),
@@ -118,7 +125,6 @@ export async function generatePositionRead({
 export async function generateVoices({ context, activity }: StepInput): Promise<VoiceOption[]> {
   return runSkill({
     skill: "brand-voice",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: VOICES_CONTRACT,
@@ -132,7 +138,7 @@ export async function generateTaglines({
 }: StepInput): Promise<TaglineOption[]> {
   return runSkill({
     skill: "brand-messaging",
-    supportingSkill: supporting(context),
+    effort: "medium",
     context,
     activity,
     contract: TAGLINES_CONTRACT,
@@ -143,7 +149,6 @@ export async function generateTaglines({
 export async function generateLaunchPlan({ context, activity }: StepInput): Promise<LaunchPlan> {
   return runSkill({
     skill: "brand-launch",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: LAUNCH_CONTRACT,
@@ -154,7 +159,6 @@ export async function generateLaunchPlan({ context, activity }: StepInput): Prom
 export async function generateKit({ context, activity }: StepInput): Promise<BrandKit> {
   return runSkill({
     skill: "brand-guidelines",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: KIT_CONTRACT,
@@ -168,7 +172,6 @@ export async function generateKit({ context, activity }: StepInput): Promise<Bra
 export async function suggestAudience({ context, activity }: StepInput): Promise<string[]> {
   return runSkill({
     skill: "target-audience",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: AUDIENCE_CONTRACT,
@@ -179,7 +182,6 @@ export async function suggestAudience({ context, activity }: StepInput): Promise
 export async function suggestCompetitors({ context, activity }: StepInput): Promise<string[]> {
   return runSkill({
     skill: "competitor-branding",
-    supportingSkill: supporting(context),
     context,
     activity,
     contract: COMPETITORS_CONTRACT,

@@ -734,13 +734,8 @@ const AStepProgress = ({ step }) => {
   const steps = [
     { n: 1, label: 'Brief' },
     { n: 2, label: 'Name' },
-<<<<<<< HEAD
-    { n: 3, label: 'Style' },
-    { n: 4, label: 'Logo' },
-=======
     { n: 3, label: 'Logo' },
     { n: 4, label: 'Style' },
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     { n: 5, label: 'Kit' },
   ];
   return (
@@ -1042,43 +1037,6 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
   );
 };
 
-<<<<<<< HEAD
-// Summary side panel used in steps 2, 3, 4
-const AContextPanel = ({ brief, styleName, brandName }) => (
-  <div style={{
-    background: 'var(--bg-elev)', borderRadius: 16, padding: 18,
-    boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-    display: 'flex', flexDirection: 'column', gap: 14,
-    height: 'max-content'
-  }}>
-    <div className="eyebrow" style={{fontSize: 10, color: 'var(--fg-3)'}}>Brand Context</div>
-    
-    {brief && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>01 Brief</div>
-        <div style={{fontSize:12.5, color:'var(--fg-2)', lineHeight:1.4}}>{brief}</div>
-      </div>
-    )}
-
-    {brandName && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>02 Name</div>
-        <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'var(--fg-1)'}}>{brandName}</div>
-      </div>
-    )}
-
-    {styleName && (
-      <div>
-        <div style={{fontSize:11.5, fontWeight:600, color:'var(--fg-3)', marginBottom:4}}>03 Style</div>
-        <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
-          <Chip tone="live">{styleName}</Chip>
-        </div>
-      </div>
-    )}
-  </div>
-);
-=======
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 
 // =====================================================================
 // A2 · Step 1 · Brief Input Screen
@@ -1204,15 +1162,11 @@ const DirA_Step1_Brief = () => {
     status="Draft"
     progress="Step 1 of 5"
     nextLabel="Continue to Name"
-<<<<<<< HEAD
-    onNext={() => {}}
-=======
     dockCopy={briefReady
       ? 'Ready. Naming builds on this description.'
       : 'Describe the brand in a sentence or two to continue.'}
     nextDisabled={!briefReady}
     onNext={() => { if (briefReady) navigate('step2'); }}
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     isThinking={false}
   >
     <div style={{display:'flex', flexDirection:'column', gap:14}}>
@@ -3435,11 +3389,7 @@ const DirA_LogoExport = () => {
 };
 
 // =====================================================================
-<<<<<<< HEAD
-// A3 · Step 3 · Style Selection Screen
-=======
 // A3 · Step 4 · Style Selection Screen
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
 //      whole identity (hero, palette, type, descriptor). 4 by default,
@@ -4457,15 +4407,6 @@ const DirA_Step3_Style = () => {
 
   return (
   <AWizardLayout
-<<<<<<< HEAD
-    step={3}
-    title="Choose your visual direction."
-    subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
-    status="Draft"
-    progress="Step 3 of 5"
-    nextLabel="Continue to Logo"
-    onNext={() => {}}
-=======
     step={4}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
@@ -4477,7 +4418,6 @@ const DirA_Step3_Style = () => {
       : 'Pick a visual direction — or let the studio choose one — to continue.'}
     nextDisabled={!styleReady}
     onNext={() => { if (styleReady) navigate('step5'); }}
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -4594,10 +4534,6 @@ const NAME_STYLE_OPTIONS = [
   { id: 'real_words', label: 'Real words', description: 'Apple, Amazon' },
 ];
 
-<<<<<<< HEAD
-const DirA_Step2_Name = () => {
-  const { draft, setField } = useBrandDraft();
-=======
 const ANameStyleOption = ({ option, selected, disabled, onClick }) => (
   <button
     type="button"
@@ -4624,7 +4560,6 @@ const DirA_Step2_Name = () => {
   const { draft, setField, setData } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
   // `name` should still show that name selected here rather than looking as
   // though nothing was ever picked.
@@ -4707,14 +4642,6 @@ const DirA_Step2_Name = () => {
   return (
   <AWizardLayout
     step={2}
-<<<<<<< HEAD
-    title="Find the right name."
-    subtitle="Fluid drafts 50 names from your brief — pick one, like your favorites, or type your own."
-    status="Draft"
-    progress="Step 2 of 5"
-    nextLabel="Continue to Style"
-    onNext={() => {}}
-=======
     title="Guide the name generation."
     subtitle="Choose the naming directions that fit, then let Fluid draft options from your brief."
     status="Draft"
@@ -4725,7 +4652,6 @@ const DirA_Step2_Name = () => {
       : 'Choose a name before setting the logo direction.'}
     nextDisabled={!chosen}
     onNext={() => { if (chosen) navigate('step3'); }}
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     isThinking={loading}
   >
     <section aria-labelledby="name-guidance-heading" style={{display:'flex',flexDirection:'column',gap:16,marginBottom:24}}>
@@ -5267,131 +5193,12 @@ const DirA_Step4_Logo = () => {
 
   const Screen = EMBEDDED_LOGO_SCREENS[phase] || DirA_LogoDirection;
 
-<<<<<<< HEAD
-  // Phase 1 — draw one more concept sketch. Likes so far bias the new concept;
-  // `fresh` starts a new board (used when the brief just changed) instead of
-  // adding this concept to the existing one. The server returns the full
-  // board either way, so the client just displays whatever comes back.
-  const generateSketches = React.useCallback(async (likedIds, { fresh = false } = {}) => {
-    if (!brandId || !markType) return;
-    setLoadingSketches(true); setError('');
-    setPhase('sketch');
-
-    // Research and the platform run as their own request. Doing them inline
-    // with the design and render passes exceeded the server's time limit and
-    // the whole board was lost. Both are cached, so this returns immediately
-    // on a regeneration.
-    setStage('research');
-    const pre = await apiResearchCategory(brandId);
-    if (pre.error) {
-      setError(pre.error);
-      setStage('');
-      setLoadingSketches(false);
-      return;
-    } else {
-      if (pre.research) setResearch(pre.research);
-      if (pre.platform) setPlatform(pre.platform);
-    }
-
-    setStage('sketch');
-    const res = await apiGenerateLogoSketches(brandId, likedIds || [], {
-      mark_type: markType, design_style: designStyle, instructions,
-    }, fresh);
-    if (res.error) {
-      setError(res.error);
-      if (!sketches.length) setPhase('brief');
-    } else {
-      setPlatform(res.platform);
-      if (res.research) setResearch(res.research);
-      setSketches(res.sketches);
-      setLikes(fresh ? [] : (likedIds || []));
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        ...(res.research ? { research: res.research } : {}),
-        creative_platform: res.platform,
-        logo_config: { mark_type: markType, design_style: designStyle, instructions },
-        logo_sketches: res.sketches,
-        logo_sketch_likes: fresh ? [] : (likedIds || []),
-      });
-    }
-    setStage('');
-    setLoadingSketches(false);
-  }, [brandId, draft, setField, markType, designStyle, instructions, sketches.length]);
-
-  // Phase 2 — refine the liked directions into 9 critiqued finalists.
-  const refine = React.useCallback(async () => {
-    if (!brandId || likes.length === 0) return;
-    setLoadingRefine(true); setError('');
-    const res = await apiRefineLogoSketches(brandId, likes);
-    if (res.error) {
-      setError(res.error);
-    } else {
-      setFinalists(res.finalists);
-      setPhase('final');
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        logo_finalists: res.finalists,
-        logo_sketch_likes: likes,
-        logos: res.finalists.map((f) => ({ name: f.name, descriptor: f.idea, svg: f.svg })),
-      });
-    }
-    setLoadingRefine(false);
-  }, [brandId, likes, draft, setField]);
-
-  // Choosing a mark is also the trigger to produce the real vector file.
-  // Cached server-side, so re-picking the same mark costs nothing.
-  const [vectorizing, setVectorizing] = React.useState('');
-  const chooseFinalist = async (f) => {
-    setField('logo_choice', f.name);
-    if (f.svg || vectorizing) return;
-    setVectorizing(f.id); setError('');
-    const res = await apiVectorizeLogo(brandId, f.id);
-    if (res.error) {
-      setError(res.error);
-    } else {
-      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
-      setFinalists(next);
-      setField('data', {
-        ...((draft && draft.data) || {}),
-        logo_finalists: next,
-        logos: next.map((x) => ({ name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url })),
-      });
-    }
-    setVectorizing('');
-  };
-
-  const toggleLike = (id) => {
-    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
-    setLikes(next);
-    setField('data', { ...((draft && draft.data) || {}), logo_sketch_likes: next });
-  };
-
-  // No auto-generation: the studio waits for the client's brief. Nothing is
-  // drawn (and no tokens spent) until a mark type is chosen.
-
-  const toolBtn = {
-    padding:'8px 12px', borderRadius:10, fontSize:12, fontWeight:600, border:0,
-    display:'inline-flex', alignItems:'center', gap:6,
-  };
-
-  const TITLES = {
-    brief: 'Brief the studio.',
-    sketch: 'Pick the directions you like.',
-    final: 'Choose the mark.',
-  };
-  const SUBTITLES = {
-    brief: 'Tell the studio what kind of mark you’re after. These choices shape every concept it draws.',
-    sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
-    final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
-  };
-=======
   // Back out of the first sub-step lands on step 2, not on the studio's own
   // brief screen — which this flow skipped, and which would strand the client
   // in the standalone flow if they reached it.
   const onBack = index === 0
     ? () => navigate('step2')
     : () => handlers.current.onBack && handlers.current.onBack();
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 
   return (
     <AWizardLayout
@@ -7861,13 +7668,8 @@ function matchCtaText(text, currentRoute, out) {
   // Wizard dock — Back / Continue.
   if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
   if (/^Continue to Name$/.test(text))           return 'step2';
-<<<<<<< HEAD
-  if (/^Continue to Style$/.test(text))          return 'step3';
-  if (/^Continue to Logo$/.test(text))           return 'step4';
-=======
   if (/^Continue to Logo$/.test(text))           return 'step3';
   if (/^Continue to Style$/.test(text))          return 'step4';
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
 
@@ -8586,13 +8388,8 @@ const SCREEN_FOR_ROUTE = {
   'logo-export':  () => <DirA_LogoExport />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Name />,
-<<<<<<< HEAD
-  'step3':        () => <DirA_Step3_Style />,
-  'step4':        () => <DirA_Step4_Logo />,
-=======
   'step3':        () => <DirA_Step4_Logo />,
   'step4':        () => <DirA_Step3_Style />,
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   'step5':        () => <DirA_KitSummary />,
 };
 
@@ -8630,13 +8427,8 @@ function QuickJump() {
     { id: 'logo-export',  label: 'Logo · 7 Export' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Name' },
-<<<<<<< HEAD
-    { id: 'step3',        label: 'Wizard · 3 Style' },
-    { id: 'step4',        label: 'Wizard · 4 Logo' },
-=======
     { id: 'step3',        label: 'Wizard · 3 Logo' },
     { id: 'step4',        label: 'Wizard · 4 Style' },
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     { id: 'step5',        label: 'Brand kit' },
   ];
   return (
@@ -8813,64 +8605,6 @@ function describeFailure(r, j, fallback) {
   return fallback;
 }
 
-<<<<<<< HEAD
-function generationIdempotencyKey() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'job-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-}
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// The browser only enqueues work. Polling drives the current UI, but work is
-// owned by the durable worker and continues after navigation or disconnects.
-async function apiLogoJob(action, payload, fallback) {
-  try {
-    const resumeStorageKey = payload.brandId ? 'fluid:generation-job:' + payload.brandId + ':' + action : '';
-    const savedKey = resumeStorageKey && typeof window !== 'undefined'
-      ? window.localStorage.getItem(resumeStorageKey)
-      : '';
-    const requestKey = savedKey || generationIdempotencyKey();
-    if (resumeStorageKey && typeof window !== 'undefined') window.localStorage.setItem(resumeStorageKey, requestKey);
-    const r = await fetch('/api/generate/jobs', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ...payload, idempotencyKey: requestKey }),
-    });
-    const j = await r.json().catch(() => ({}));
-    signalBalanceChanged(j.code);
-    if (!r.ok || !j.job) return { error: describeFailure(r, j, fallback), code: j.code };
-    let job = j.job;
-    while (job.status === 'queued' || job.status === 'running') {
-      await pause(Math.max(1000, Number(j.retryAfter || 2) * 1000));
-      const status = await fetch('/api/generate/jobs/' + job.id, { cache: 'no-store' });
-      const next = await status.json().catch(() => ({}));
-      if (!status.ok || !next.job) return { error: describeFailure(status, next, fallback), code: next.code };
-      job = next.job;
-    }
-    signalBalanceChanged(job.error && job.error.code);
-    if (resumeStorageKey && typeof window !== 'undefined') window.localStorage.removeItem(resumeStorageKey);
-    if (job.status !== 'succeeded') return { error: (job.error && job.error.message) || fallback };
-    return { result: job.result || {} };
-  } catch { return { error: 'Network error.' }; }
-}
-
-async function apiResearchCategory(brandId) {
-  const response = await apiLogoJob('logo_research', { brandId }, 'Category research failed.');
-  if (response.error) return response;
-  return { research: response.result.research || null, platform: response.result.platform || null };
-}
-async function apiGenerateLogoSketches(brandId, likedIds, config, reset) {
-  const response = await apiLogoJob(
-    'logo_sketches',
-    { brandId, likedIds: likedIds || [], config: config || {}, reset: !!reset },
-    'Sketch generation failed.',
-  );
-  if (response.error) return response;
-  return { platform: response.result.platform || null, sketches: response.result.sketches || [], research: response.result.research || null };
-}
-async function apiRefineLogoSketches(brandId, likedIds) {
-  const response = await apiLogoJob('logo_refine', { brandId, likedIds: likedIds || [] }, 'Refinement failed.');
-  if (response.error) return response;
-  return { finalists: response.result.finalists || [] };
-=======
 // ── The activity stream ────────────────────────────────────────────────
 // The three slow routes answer with server-sent events rather than one JSON
 // blob: a run of several minutes now narrates itself instead of going quiet.
@@ -8986,7 +8720,6 @@ async function apiRefineLogoSketches(brandId, conceptId, versions) {
   signalBalanceChanged(out.code);
   if (out.error) return { error: out.error, code: out.code };
   return { finalists: (out.data || {}).finalists || [] };
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 }
 // Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
 async function apiVectorizeLogo(brandId, conceptId) {

@@ -192,7 +192,14 @@ export const FLOWS: Flow[] = [
   },
 ];
 
-/** The skill each flow is fundamentally running, injected alongside the step's own. */
+/**
+ * The skill each flow is fundamentally running.
+ *
+ * No longer injected into prompts — see the note in generate.ts about what
+ * attaching brand-strategy to every call was costing. Kept because it is the
+ * honest answer to "what is this flow", and the verifier holds every flow to
+ * having one.
+ */
 export const FLOW_SKILL: Record<string, string> = {
   new: "brand-strategy",
   audit: "brand-audit",

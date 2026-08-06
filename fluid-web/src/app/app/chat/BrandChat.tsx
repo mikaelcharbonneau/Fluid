@@ -27,7 +27,7 @@ import {
   CARD, CORAL, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, label,
 } from "./ui";
 import {
-  Assets, Chevron, Grid, Guides, Home, Search, Send, Settings, Token,
+  Assets, Chevron, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
 } from "./icons";
 import {
   AvoidWidget, BriefWidget, CategoryWidget, DirectionWidget, GoalWidget, KitWidget,
@@ -48,6 +48,8 @@ interface Msg {
   step?: RenderedStep;
   /** A failure, styled as a warning rather than as Fluid speaking. */
   error?: boolean;
+  /** A failure the user can do something about, with the button to do it. */
+  retry?: boolean;
 }
 
 const TYPE_MS = 16;
@@ -98,6 +100,10 @@ export function BrandChat() {
   const brandRef = useRef<string | null>(resumeId);
   // Read by callbacks that must not be re-created on every context change.
   const contextRef = useRef<BrandContext>({});
+  // The turn that failed, kept so "Try again" has something to send. The
+  // answer itself is already stored server-side — the route saves before it
+  // generates — so retrying re-runs the generation, it does not re-ask.
+  const lastTurn = useRef<{ step: string; value: unknown } | null>(null);
 
   // ---- typing --------------------------------------------------------
   useEffect(() => {
@@ -196,6 +202,7 @@ export function BrandChat() {
         setNamePage(0);
       }
 
+      lastTurn.current = { step: stepKey, value };
       const onActivity = (event: ActivityEvent) => setStatus(event.label);
       const out = await postTurn({ brandId: id, step: stepKey, value }, onActivity);
 
@@ -207,7 +214,7 @@ export function BrandChat() {
       }
 
       if (out.error) {
-        setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
+        setMsgs((cur) => [...cur, note(cur.length, out.error!, true, true)]);
         return;
       }
       if (out.done || !out.step) {
@@ -329,6 +336,15 @@ export function BrandChat() {
     }
   }, [busy]);
 
+  const retryTurn = useCallback(() => {
+    const last = lastTurn.current;
+    if (!last || busy) return;
+    // Drop the failure notice: the thread should show one attempt, not a
+    // growing column of them.
+    setMsgs((cur) => cur.filter((m) => !m.retry));
+    submit(last.step, last.value);
+  }, [busy, submit]);
+
   const sendComposer = () => {
     const text = composer.trim();
     if (!text || busy) return;
@@ -380,6 +396,7 @@ export function BrandChat() {
                   moreBusy={moreBusy}
                   redrawMarks={redrawMarks}
                   redrawing={redrawing}
+                  retryTurn={retryTurn}
                 />
               ))}
 
@@ -452,8 +469,8 @@ export function BrandChat() {
   );
 }
 
-function note(seq: number, text: string, error = false): Msg {
-  return { id: `note-${seq}`, role: "ai", text, full: text, error };
+function note(seq: number, text: string, error = false, retry = false): Msg {
+  return { id: `note-${seq}`, role: "ai", text, full: text, error, retry };
 }
 
 // ---- one message -----------------------------------------------------
@@ -474,10 +491,11 @@ interface MessageProps {
   moreBusy: boolean;
   redrawMarks: () => void;
   redrawing: boolean;
+  retryTurn: () => void;
 }
 
 function Message(props: MessageProps) {
-  const { msg, context, busy, hasWorkBelow } = props;
+  const { msg, context, busy, hasWorkBelow, retryTurn } = props;
 
   if (msg.role === "user") {
     return (
@@ -510,6 +528,25 @@ function Message(props: MessageProps) {
           {msg.text}
           {typing ? <span className="bchat-caret" /> : null}
         </div>
+
+        {msg.retry ? (
+          <div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={retryTurn}
+              style={{
+                padding: "9px 16px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+                background: busy ? "#EDEDEF" : INK, color: busy ? FAINT : "#fff",
+                cursor: busy ? "not-allowed" : "pointer",
+                display: "inline-flex", alignItems: "center", gap: 7,
+              }}
+            >
+              <Refresh size={12} />
+              Try again
+            </button>
+          </div>
+        ) : null}
 
         {msg.step && !ready ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "4px 0" }}>

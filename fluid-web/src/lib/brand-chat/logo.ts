@@ -15,7 +15,6 @@ import { silentActivity } from "@/lib/ai/activity";
 import { runSkill } from "./run";
 import { identityContract, parseIdentity, type IdentityBrief } from "./contracts";
 import { markPrompt } from "./logo-prompt";
-import { FLOW_SKILL } from "./flow";
 import type { BrandContext } from "./context";
 
 export interface LogoMark {
@@ -41,6 +40,11 @@ export interface LogoSet {
 
 /** Time for one image. Six run together, so this is the wall clock, not a sum. */
 const RENDER_TIMEOUT_MS = 120_000;
+
+// The brief and the renders share the route's 300s, so this step cannot take
+// the whole budget the way a text-only step can. The two together are capped
+// well under it, leaving room for the save that follows.
+const BRIEF_TIMEOUT_MS = 110_000;
 
 /**
  * The answers a set of marks depends on.
@@ -69,7 +73,11 @@ export async function generateLogoSet(
 
   const brief: IdentityBrief = await runSkill({
     skill: "brand-identity",
-    supportingSkill: FLOW_SKILL[context.path ?? "new"],
+    // The one place the extra thinking earns its cost: this brief decides what
+    // six images will be, and a weak construction cannot be recovered later.
+    effort: "medium",
+    maxTokens: 5_000,
+    timeoutMs: BRIEF_TIMEOUT_MS,
     context,
     activity,
     contract: identityContract(name, markType, context.avoid ?? []),
