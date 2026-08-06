@@ -1,9 +1,9 @@
 // Phase 3 · Brand color-palette generation.
-// One focused Claude call: given the brief (and the name / visual direction the
+// One focused OpenAI call: given the brief (and the name / visual direction the
 // user already chose), propose a small, coherent color system with roles and
 // usage notes, returned as structured data the Brand Kit can render as swatches.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 export interface PaletteColor {
   name: string; // human label, e.g. "Signal coral"
@@ -26,7 +26,11 @@ export interface PaletteBrief {
   basisColors?: string[] | null; // exact colors the user picked in Step 2
 }
 
-const MODEL = "claude-opus-4-8";
+
+// api/generate/palette has a 60s maxDuration and makes one call; bounded
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 50_000;
 
 const SYSTEM = `You are Fluid, an expert brand designer specializing in color.
 Given a brand brief, you design a small, coherent color palette.
@@ -117,23 +121,13 @@ function extractPalette(text: string): PaletteResult {
 export async function generateBrandPalette(
   input: PaletteBrief,
 ): Promise<PaletteResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: 4_000,
+    reasoningEffort: "medium",
+    timeoutMs: CALL_TIMEOUT_MS,
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
 
   return extractPalette(text);
 }

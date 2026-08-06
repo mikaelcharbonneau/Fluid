@@ -48,20 +48,44 @@ export async function PATCH(request: Request, { params }: Ctx) {
     return NextResponse.json({ error: "No valid fields." }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("brands")
-    .update(input)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
+  // `data` is merged, never assigned. The wizard autosaves by sending its whole
+  // copy of the object, so assigning it would drop every key the client does
+  // not know about — the creative platform, the logo
+  // finalists — each time a field changes. Scalar columns still assign.
+  const { data: patchData, ...columns } = input;
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let brand: unknown = null;
+
+  if (Object.keys(columns).length) {
+    const { data: row, error } = await supabase
+      .from("brands")
+      .update(columns)
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!row) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    brand = row;
   }
-  if (!data) {
+
+  if (patchData !== undefined) {
+    // Merged in one statement rather than read-modify-write, so a debounced
+    // field save landing while a generation route writes its result cannot
+    // clobber it.
+    const { data: rows, error } = await supabase.rpc("brands_merge_data", {
+      p_id: id,
+      p_patch: patchData,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    brand = row;
+  }
+
+  if (!brand) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
-  return NextResponse.json({ brand: data });
+  return NextResponse.json({ brand });
 }
 
 // DELETE /api/brands/[id]

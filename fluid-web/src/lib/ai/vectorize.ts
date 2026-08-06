@@ -9,11 +9,30 @@
 // anchor points rather than clean geometry.
 
 import { fetchImageBytes, storeImage } from "./images";
+import { vendorFetch } from "./vendor-fetch";
 
 const RECRAFT_URL = "https://external.api.recraft.ai/v1/images/vectorize";
 
 // Recraft's documented input limits.
 const MAX_BYTES = 5 * 1024 * 1024;
+
+// A single trace is a small, synchronous op on Recraft's side — nothing here
+// should ever legitimately take anywhere near this long. This is a
+// non-idempotent POST, so it gets one 60s attempt and no ambiguous retry.
+// That leaves route time for the follow-up SVG download and Supabase upload.
+const VECTORIZE_TIMEOUT_MS = 60_000;
+// The result download is a plain static-file GET off Recraft's CDN — much
+// tighter budget is reasonable, and it stays well within what's left of the
+// route's deadline after the trace call above.
+const DOWNLOAD_TIMEOUT_MS = 20_000;
+const DOWNLOAD_TOTAL_TIMEOUT_MS = 30_000;
+
+// Guards against buffering an absurdly large body before the real MAX_BYTES
+// check ever runs. Sized generously above MAX_BYTES so it never rejects a
+// legitimate response — it only exists to reject a Content-Length that is
+// obviously wrong (misbehaving upstream, or a redirect to something that
+// isn't the traced result at all) before spending time reading it.
+const MAX_DECLARED_BYTES = MAX_BYTES * 4;
 
 function apiKey(): string {
   const key = (process.env.RECRAFT_API_KEY ?? "").trim();
@@ -44,11 +63,21 @@ export async function vectorizeImage(opts: {
     "concept.png",
   );
 
-  const res = await fetch(RECRAFT_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey()}` },
-    body: form, // fetch sets the multipart boundary itself
-  });
+  const res = await vendorFetch(
+    RECRAFT_URL,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey()}` },
+      body: form, // fetch sets the multipart boundary itself
+    },
+    {
+      timeoutMs: VECTORIZE_TIMEOUT_MS,
+      totalTimeoutMs: VECTORIZE_TIMEOUT_MS,
+      maxRetries: 0,
+      retryable: false,
+      label: "Recraft vectorize",
+    },
+  );
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -64,8 +93,32 @@ export async function vectorizeImage(opts: {
   const svgUrl = json.image?.url ?? json.data?.[0]?.url;
   if (!svgUrl) throw new Error("Vectorization returned no SVG.");
 
-  const svgRes = await fetch(svgUrl);
+  const svgRes = await vendorFetch(
+    svgUrl,
+    {},
+    {
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      totalTimeoutMs: DOWNLOAD_TOTAL_TIMEOUT_MS,
+      maxRetries: 1,
+      retryable: true,
+      label: "Recraft SVG download",
+    },
+  );
   if (!svgRes.ok) throw new Error("Could not download the vectorized SVG.");
+
+  // Cheap rejection before buffering: a wildly oversized (or missing/garbage)
+  // Content-Length means either a misbehaving upstream or a redirect to
+  // something that was never the traced result, and there's no reason to
+  // spend the read on it before the real MAX_BYTES check ever gets a look.
+  const declaredLength = Number(svgRes.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_DECLARED_BYTES) {
+    throw new Error("The vectorized SVG was unexpectedly large.");
+  }
+  const contentType = svgRes.headers.get("content-type") ?? "";
+  if (contentType && !/svg|xml|text|octet-stream/i.test(contentType)) {
+    throw new Error(`Unexpected content type for the vectorized SVG: ${contentType}`);
+  }
+
   const svg = await svgRes.text();
   if (!svg.includes("<svg")) throw new Error("Vectorization returned invalid SVG.");
 

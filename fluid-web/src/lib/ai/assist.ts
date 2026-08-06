@@ -1,8 +1,8 @@
 // Phase 3 · Inline AI assists for the wizard's "suggest" buttons.
-// Small, fast single Claude calls behind one endpoint: rewrite the brief,
+// Small, fast single OpenAI calls behind one endpoint: rewrite the brief,
 // suggest an audience or competitors, or pick the best option from a set.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 export type AssistTask =
   | "brief_shorter"
@@ -36,25 +36,21 @@ export interface AssistResult {
   choice?: string;
 }
 
-const MODEL = "claude-opus-4-8";
-
-function firstText(response: Anthropic.Message): string {
-  return response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-}
+// The route this feeds (api/generate/assist) has a 60s maxDuration and makes
+// exactly one of these calls per request. Bounded well under that so a stuck
+// call surfaces as a clear timeout error instead of the platform silently
+// killing the function with no response body at all — the SDK otherwise
+// defaults to a 10-minute timeout with its own retries on top.
+const CALL_TIMEOUT_MS = 45_000;
 
 async function ask(system: string, user: string, maxTokens = 700): Promise<string> {
-  const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: user }],
+  return generateOpenAIText({
+    instructions: system,
+    input: user,
+    maxOutputTokens: maxTokens,
+    reasoningEffort: "low",
+    timeoutMs: CALL_TIMEOUT_MS,
   });
-  return firstText(response);
 }
 
 const BRIEF_SYSTEM = `You are Fluid, a brand strategist helping refine a one-or-two
@@ -69,9 +65,6 @@ const BRIEF_INSTRUCTION: Record<string, string> = {
 };
 
 export async function runAssist(input: AssistInput): Promise<AssistResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
   const brief = input.brief.trim();
 
   if (input.task === "brief_shorter" || input.task === "brief_punchier" || input.task === "brief_sharper") {

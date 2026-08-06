@@ -48,8 +48,8 @@ export default function PrivacyPage() {
           needs to do its job:
         </p>
         <p>
-          <strong>Anthropic</strong> — your briefs and prompts are sent to Anthropic&apos;s Claude
-          models to generate brand assets. <strong>Supabase</strong> — hosts our database and
+          <strong>OpenAI</strong> — your briefs, prompts, and selected reference logos are sent to
+          OpenAI&apos;s models to generate brand assets. <strong>Supabase</strong> — hosts our database and
           authentication (your account and projects). <strong>Stripe</strong> — processes
           subscription payments. <strong>Vercel</strong> — hosts and serves the application.
         </p>

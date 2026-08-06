@@ -4,15 +4,21 @@
 // every generated image is uploaded to the public `brand-assets` bucket and
 // only its URL is persisted on the brand record.
 //
-// Note on backgrounds: gpt-image-2 does NOT support `background: "transparent"`.
-// We therefore prompt for a flat white field and keep it — which is also what
-// Recraft's vectorizer traces most cleanly.
+// Reference-led croquis must be true transparent PNGs. GPT Image 2 does not
+// support that output mode, so transparent requests use GPT Image 1.5 while
+// the rest of the product keeps GPT Image 2's rendering quality.
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_EDIT_URL = "https://api.openai.com/v1/images/edits";
 const MODEL = "gpt-image-2";
+export const TRANSPARENT_IMAGE_MODEL = "gpt-image-1.5";
 const BUCKET = "brand-assets";
+
+/** Exported so a prompt preview can report which model would receive it. */
+export const IMAGE_MODEL = MODEL;
 
 export interface RenderedImage {
   url: string; // public Supabase URL
@@ -46,30 +52,136 @@ export function logoImagePrompt(direction: string): string {
   ].join("\n");
 }
 
-// A render that hangs would otherwise stall until the whole function is killed
-// at maxDuration — taking the eight healthy concepts down with it. Capping each
-// request means a stuck one is dropped and the board still ships.
-const RENDER_TIMEOUT_MS = 120_000;
+// The divergence phase asks for the opposite of the above: a graphite croquis
+// on paper, not a finished flat mark. The client is choosing a DIRECTION, and a
+// polished render invites them to judge the execution — which does not exist
+// yet — instead of the idea.
+//
+// The tension to hold is "loose in the line, precise in the form". A sketch
+// that is genuinely rough is not a sketch, it is a broken mark: letterforms
+// still have to be spelled correctly and proportions still have to be
+// deliberate. Only the rendering is quick.
+export function pencilSketchPrompt(direction: string): string {
+  return [
+    `A designer's quick concept sketch of a logo, drawn by hand in a sketchbook.`,
+    `${direction.trim()}`,
+    ``,
+    `Rendering requirements — these are absolute:`,
+    `- GRAPHITE PENCIL on off-white paper. Visible pencil texture and paper`,
+    `  grain, slightly uneven line weight, the odd doubled or overshot stroke.`,
+    `- Monochrome graphite only — soft greys through to near-black. NO colour,`,
+    `  NO ink, NO marker, NO digital vector look, NO flat solid fills.`,
+    `- Drawn quickly and confidently, the way a designer thumbnails an idea.`,
+    `  Faint construction lines may stay visible. Solid areas are filled with`,
+    `  pencil shading or hatching, never a perfectly even tone.`,
+    `- The IDEA must still read unmistakably. Letterforms spelled correctly and`,
+    `  legible, proportions deliberate, shapes closed where they should close.`,
+    `  Loose in the line, precise in the form.`,
+    `- Plain off-white paper filling the frame. Nothing else.`,
+    `- The mark centered, occupying roughly 70% of the frame.`,
+    `- Viewed flat on. No desk, no hand, no pencil in shot, no cast shadow, no`,
+    `  torn or curled edges, no page border, no mockup, no scene.`,
+    `- No annotations, dimension lines, labels, captions, or signature.`,
+  ].join("\n");
+}
 
-// Generate one image. Returns raw PNG bytes.
-async function generatePng(prompt: string, quality: "low" | "medium" | "high"): Promise<Buffer> {
-  const res = await fetch(OPENAI_URL, {
+// A render that hangs would otherwise stall until the whole function is killed
+// at maxDuration — taking the healthy concepts down with it. Capping each
+// request means a stuck one is dropped and the board still ships.
+const DEFAULT_RENDER_TIMEOUT_MS = 120_000;
+
+// A six-up board fires six renders at once, which can still trip a per-minute
+// image quota — and a 429 on some of them would otherwise
+// hand the client a board with holes in it for no reason but timing. One
+// retry, backed off with jitter so the retries don't re-collide.
+//
+// Deliberately bounded at one: beyond that the caller is better served by a
+// short board now than a long wait for a full one, and the route has a
+// deadline of its own to respect.
+const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
+const RETRY_DELAY_MS = 4_000;
+type ImageBackground = "opaque" | "transparent";
+
+function imageModel(background: ImageBackground): string {
+  return background === "transparent" ? TRANSPARENT_IMAGE_MODEL : MODEL;
+}
+
+function retryDelay(): number {
+  return RETRY_DELAY_MS + Math.floor(Math.random() * RETRY_DELAY_MS);
+}
+
+async function requestPng(
+  prompt: string,
+  quality: "low" | "medium" | "high",
+  background: ImageBackground,
+  timeoutMs: number,
+  referenceImage?: Buffer,
+): Promise<Response> {
+  if (referenceImage) {
+    const form = new FormData();
+    form.set("model", imageModel(background));
+    form.set("prompt", prompt);
+    form.set("size", "1024x1024");
+    form.set("quality", quality);
+    form.set("n", "1");
+    form.set("background", background);
+    form.set("output_format", "png");
+    form.append(
+      "image[]",
+      new Blob([new Uint8Array(referenceImage)], { type: "image/png" }),
+      "selected-sketch.png",
+    );
+    return fetch(OPENAI_EDIT_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { Authorization: `Bearer ${apiKey()}` },
+      body: form,
+    });
+  }
+
+  return fetch(OPENAI_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(RENDER_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey()}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: imageModel(background),
       prompt,
       size: "1024x1024",
       quality,
       n: 1,
-      background: "opaque", // transparent is unsupported on gpt-image-2
+      background,
       output_format: "png",
     }),
   });
+}
+
+// Generate one image. Returns raw PNG bytes.
+async function generatePng(
+  prompt: string,
+  quality: "low" | "medium" | "high",
+  background: ImageBackground,
+  timeoutMs: number,
+  referenceImage?: Buffer,
+): Promise<Buffer> {
+  const deadline = Date.now() + timeoutMs;
+  const request = () => requestPng(
+    prompt,
+    quality,
+    background,
+    Math.max(1, deadline - Date.now()),
+    referenceImage,
+  );
+  let res = await request();
+  if (!res.ok && RETRY_STATUSES.has(res.status)) {
+    const waitMs = Math.min(retryDelay(), Math.max(0, deadline - Date.now()));
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      if (Date.now() < deadline) res = await request();
+    }
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -109,23 +221,76 @@ export async function storeImage(
 
 // Render one logo concept and persist it. `slot` keeps paths unique and
 // human-readable: <brandId>/<phase>/<slot>.png
+//
+// `render` chooses the treatment: "vector" for a finished flat mark, "pencil"
+// for a divergence-phase croquis.
 export async function renderLogoImage(opts: {
   brandId: string;
   phase: string;
   slot: string;
-  direction: string;
+  direction?: string;
+  /** A complete prompt for a phase with its own rendering instructions. */
+  prompt?: string;
   quality?: "low" | "medium" | "high";
+  /** Total time allowed for one render, including a transient-status retry. */
+  timeoutMs?: number;
+  /** Source asset for a source-locked edit rather than a new image generation. */
+  referenceImage?: Buffer;
+  render?: "vector" | "pencil";
+  background?: ImageBackground;
+  // Reports the exact text this function is about to send. The wrapper below
+  // is as much a part of what gets drawn as the art direction is, so a caller
+  // reconstructing the prompt to show it would eventually show a lie — the
+  // only trustworthy copy is the one handed to the renderer.
+  onPrompt?: (prompt: string, model: string) => void;
 }): Promise<RenderedImage> {
+  const prompt =
+    opts.prompt ??
+    (opts.render === "pencil"
+      ? pencilSketchPrompt(opts.direction ?? "")
+      : logoImagePrompt(opts.direction ?? ""));
+  opts.onPrompt?.(prompt, imageModel(opts.background ?? "opaque"));
   const bytes = await generatePng(
-    logoImagePrompt(opts.direction),
+    prompt,
     opts.quality ?? "medium",
+    opts.background ?? "opaque",
+    opts.timeoutMs ?? DEFAULT_RENDER_TIMEOUT_MS,
+    opts.referenceImage,
   );
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }
 
+// Every image we ever hand back to a client is one we ourselves stored in
+// `storeImage` above, so its URL always lives under our own Supabase project.
+// `logo_finalists[].image_url` reaches here by way of a client-writable brand
+// `data` patch, though — without this check, a user could point it at an
+// internal or arbitrary host and have our server fetch it on their behalf
+// (SSRF), with the response echoed back through the caller's error text.
+const ALLOWED_IMAGE_HOST = (() => {
+  try {
+    return new URL(SUPABASE_URL).host;
+  } catch {
+    return "";
+  }
+})();
+
+function assertFetchableImageUrl(url: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid image URL.");
+  }
+  if (parsed.protocol !== "https:" || parsed.host !== ALLOWED_IMAGE_HOST) {
+    throw new Error("Image URL is not from a trusted source.");
+  }
+  return parsed;
+}
+
 // Fetch a stored image back as bytes — needed to hand a concept to Recraft.
 export async function fetchImageBytes(url: string): Promise<Buffer> {
-  const res = await fetch(url);
+  const parsed = assertFetchableImageUrl(url);
+  const res = await fetch(parsed);
   if (!res.ok) throw new Error(`Could not read image (${res.status}).`);
   return Buffer.from(await res.arrayBuffer());
 }

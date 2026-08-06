@@ -2,6 +2,7 @@
 
 ## Decision
 
+<<<<<<< HEAD
 Fluid uses Postgres as the durable queue and Vercel Cron as the worker trigger.
 The API writes a job and returns `202` immediately; `GET /api/generate/jobs/:id`
 is the reconnect/resume contract. The worker claims one job using a database
@@ -20,6 +21,25 @@ claim/complete API stay unchanged.
 
 - Set `CRON_SECRET` in Vercel. Vercel Cron calls
   `/api/internal/generation-jobs/run` every minute with this bearer token.
+=======
+Fluid uses Postgres as the durable queue. The API writes a job and returns
+`202` immediately; `GET /api/generate/jobs/:id` is the reconnect/resume
+contract. An authenticated scheduler invokes the worker, which claims one job
+using a database lease so an interrupted invocation can be recovered without
+relying on a client connection.
+
+Vercel Workflow was not selected for this first production implementation: it
+would add a Vercel-specific execution dependency while the application already
+uses Supabase for its authoritative brand and credit data. The leased Postgres
+queue keeps recovery, audit data, and vendor concurrency in the same transaction
+boundary. A compatible external scheduler can invoke the existing worker endpoint
+without changing the job schema or claim/complete API.
+
+## Operations
+
+- Set `CRON_SECRET` in the scheduler and deployment environment. The scheduler
+  calls `/api/internal/generation-jobs/run` with this bearer token.
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 - One `running` job is allowed per `(account, vendor)`. Jobs expose phase,
   progress, attempt count, error, timestamps, and terminal result in
   `generation_jobs` for dashboards and alerts.
@@ -35,6 +55,15 @@ claim/complete API stay unchanged.
   The original failed job remains immutable for audit; the new job reserves a
   fresh credit only after the prior reservation was refunded.
 
+<<<<<<< HEAD
+=======
+## Current action
+
+The queue currently supports `logo_board`: one ordered batch of up to six
+reference-led croquis. The production UI may use the streaming board route;
+the queue exposes the same persisted work item for recovery-oriented clients.
+
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 ## Provider policy
 
 The job runner owns retries at the work-item level. Provider call deadlines,

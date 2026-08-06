@@ -7,7 +7,6 @@
 // Keep them in sync if those lists change.
 
 import { platformContext } from "./platform";
-import { researchContext } from "./research";
 
 export interface CustomFont {
   id: string;
@@ -56,7 +55,7 @@ export function getStep2(data: unknown): Step2 {
 // decision to the studio, not leaving it blank. The distinction matters:
 //   • undefined/null → the user simply hasn't decided; generators get no
 //     guidance and fall back to their own judgement.
-//   • DELEGATED      → an explicit instruction to decide this during research,
+//   • DELEGATED      → an explicit instruction to decide this from the brief,
 //     free of the app's curated option lists.
 // Anything that reads a Step 2 field must handle all three states.
 export const DELEGATED = "__ai__";
@@ -114,10 +113,18 @@ function refineWords(r?: Step2["refine"]): string[] {
 
 // A human-readable summary of every Step 2 choice, for injection into prompts.
 // Returns "" when the user made no Step 2 picks.
-export function styleContext(brand: {
-  style_id?: string | null;
-  data?: unknown;
-}): string {
+//
+// `omitPlatform` is for callers that state the creative platform themselves.
+// The board prompt opens with it, and printing it again here read as two
+// separate instructions rather than one — repetition is emphasis to a model,
+// so the strategy was quietly outweighing the sections it is meant to inform.
+export function styleContext(
+  brand: {
+    style_id?: string | null;
+    data?: unknown;
+  },
+  opts: { omitPlatform?: boolean } = {},
+): string {
   const s2 = getStep2(brand.data);
   const lines: string[] = [];
   // Decisions the client delegated. These are collected separately and stated
@@ -143,7 +150,7 @@ export function styleContext(brand: {
 
   if (isDelegated(s2.palette)) {
     open.push(
-      "the colour palette — derive real hex values from the research and the " +
+        "the colour palette — derive real hex values from the brief and the " +
         "brand idea; you are NOT limited to any preset palette",
     );
   } else {
@@ -169,20 +176,15 @@ export function styleContext(brand: {
     lines.push(
       "",
       `The client has delegated these decisions to the studio — make them ` +
-        `deliberately, grounded in the brief and the research:`,
+        `deliberately, grounded in the brief:`,
       ...open.map((o) => `- ${o}.`),
     );
   }
 
-  // Category research and the creative platform are appended here rather than
-  // threaded through every generator's signature, so palette, typography,
-  // guidelines and both logo phases all design from the same evidence and the
-  // same strategy. This is what keeps the kit expressing one idea.
-  const research = researchContext(brand.data);
-  if (research) lines.push("", research);
-
-  const platform = platformContext(brand.data);
-  if (platform) lines.push("", platform);
+  if (!opts.omitPlatform) {
+    const platform = platformContext(brand.data);
+    if (platform) lines.push("", platform);
+  }
 
   return lines.join("\n");
 }

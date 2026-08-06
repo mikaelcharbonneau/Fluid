@@ -216,8 +216,39 @@
     .home-hero { padding: 24px !important; }
   }
 
+  /* Reference gallery: a masonry collage rather than a uniform grid. Every
+     reference is a different shape — a wide wordmark and a square emblem
+     letterboxed into identical tiles both read worse than they do at their
+     own proportions. CSS multi-column gives true masonry (no JS, no fixed row
+     height); cards opt out of column breaks so one never splits in half.
+
+     Trade-off worth knowing: multi-column fills top-to-bottom then across, so
+     reading order is column-wise. That's right for a gallery you scan, and
+     ranking still puts the strongest matches in the first positions. */
+  .logo-references-grid {
+    column-count: 4;
+    column-gap: 10px;
+  }
+  .logo-reference-card {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 10px;
+    display: inline-block;
+    width: 100%;
+  }
+  /* Natural aspect ratio — the whole point of the collage. */
+  .logo-reference-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
   /* Standalone logo brief: preserve the studio hierarchy while letting the
      progress, field grid, and dock reflow on compact screens. */
+  @media (max-width: 1240px) {
+    .logo-references-grid { column-count: 3; }
+  }
   @media (max-width: 1040px) {
     .logo-progress-label { display: none; }
     .logo-progress-line { width: 10px !important; }
@@ -225,7 +256,7 @@
   @media (max-width: 900px) {
     .logo-direction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .logo-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    .logo-references-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .logo-references-grid { column-count: 2; }
   }
   @media (max-width: 760px) {
     .logo-wizard-header {
@@ -245,7 +276,18 @@
     .logo-dock-copy { display: none; }
     .logo-wizard-dock button { margin-left: auto; }
     .logo-direction-grid { grid-template-columns: 1fr !important; }
+    .logo-style-card-with-preview { height: 276px !important; }
+    .logo-style-preview-layout {
+      grid-template-columns: 1fr !important;
+      grid-template-rows: 140px minmax(0, 1fr);
+      gap: 10px !important;
+    }
+    .logo-style-preview-copy {
+      padding: 0 5px 2px !important;
+      justify-content: flex-start !important;
+      gap: 6px !important;
+    }
     .logo-type-grid { grid-template-columns: 1fr !important; }
-    .logo-references-grid { grid-template-columns: 1fr !important; }
+    .logo-references-grid { column-count: 1; }
     .logo-direction-toolbar { align-items: flex-start !important; flex-direction: column !important; }
   }

@@ -1,5 +1,5 @@
 // Phase 3 · Brand logo generation (SVG marks).
-// One focused Claude call: given the brief (and the name / palette already
+// One focused OpenAI call: given the brief (and the name / palette already
 // chosen), produce a few self-contained SVG logo concepts. LLMs are strong at
 // clean geometric/typographic vector marks, so we generate SVG code rather than
 // raster images — crisp at any size, on-brand, and editable.
@@ -8,7 +8,7 @@
 // renders it via an <img> data-URI (which disables scripting in the SVG). Both
 // layers matter — never inject this SVG into the DOM with innerHTML.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 export interface LogoConcept {
   name: string; // e.g. "Ascending monogram"
@@ -24,8 +24,12 @@ export interface LogoBrief {
   styleContext?: string | null; // resolved Step 2 choices
 }
 
-const MODEL = "claude-opus-4-8";
 const COUNT = 3;
+
+// api/generate/logo has a 120s maxDuration and makes one call; bounded well
+// under that so a stuck call fails clearly instead of the platform killing
+// the function mid-response (the SDK's own default is 10 minutes).
+const CALL_TIMEOUT_MS = 100_000;
 
 // We use a plain delimiter format (not JSON) because SVG is full of quotes and
 // slashes that make JSON-in-JSON escaping fragile and error-prone.
@@ -123,24 +127,13 @@ function extractLogos(text: string): LogoConcept[] {
 export async function generateBrandLogos(
   input: LogoBrief,
 ): Promise<LogoConcept[]> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const client = new Anthropic();
-  // No extended thinking here: SVG generation doesn't need it and it materially
-  // reduces latency, which kept logo generation from finishing in time.
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: 8_000,
+    reasoningEffort: "medium",
+    timeoutMs: CALL_TIMEOUT_MS,
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
 
   return extractLogos(text);
 }

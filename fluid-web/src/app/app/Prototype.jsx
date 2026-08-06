@@ -3,12 +3,37 @@
 // @ts-nocheck
 // =====================================================================
 // Fluid — Interactive product prototype (ported verbatim from the
-// Claude Design export). All screens share one module scope, exactly as
+// original design export). All screens share one module scope, exactly as
 // the original concatenated <script type="text/babel"> bundle did.
 // Imported with { ssr: false } so top-level window writes run client-only.
 // =====================================================================
 import React from "react";
 import { MARK_TYPE_OPTIONS, DESIGN_STYLE_OPTIONS } from "@/lib/logo-styles";
+import { BOARD_SIZE, summariseBoardPlan } from "@/lib/logo-board";
+import {
+  MAX_REFINE_VERSIONS,
+  MAX_VERSION_COLORS,
+  defaultVersionPalettes,
+  normaliseHex,
+} from "@/lib/logo-refine";
+import {
+  EXPORT_FORMATS,
+  ICO_SIZES,
+  PNG_SIZES,
+  USE_CASES,
+  recommendedFormats,
+  reasonsFor,
+} from "@/lib/logo-export";
+import {
+  markPaths,
+  monochromeSvg,
+  parseLogoSvg,
+  reversedSvg,
+  transparentSvg,
+} from "@/lib/logo-svg";
+import { svgToPdfBytes } from "@/lib/export-pdf";
+import { buildIco } from "@/lib/export-ico";
+import { buildZip } from "@/lib/export-zip";
 import { logoReferencesFor } from "@/lib/logo-references";
 
 // Two source files declare the bare `const { useState } = React` (and the
@@ -479,24 +504,28 @@ const DirA_Brands = () => (
         </div>
         <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14}}>
           <QuickPath
+            route={CHAT + '?flow=audit'}
             title="Rebranding"
             sub="Refresh an existing brand. Keep what works, update the rest."
             preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=logo-only'}
             title="Logo"
             sub="Skip the strategy. Drop a name, get marks in seconds."
             preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=name-only'}
             title="Name"
             sub="Nine names with reasoning and domain status."
             preview={__assets['assets/min/preview-name.jpg']} previewBg="#F3F3F4"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=guidelines-only'}
             title="Guidelines"
             sub="Already have a logo and palette? We'll write the rules."
             preview={__assets['assets/min/preview-guidelines.jpg']} previewBg="#F4F6F5"
@@ -705,8 +734,13 @@ const AStepProgress = ({ step }) => {
   const steps = [
     { n: 1, label: 'Brief' },
     { n: 2, label: 'Name' },
+<<<<<<< HEAD
     { n: 3, label: 'Style' },
     { n: 4, label: 'Logo' },
+=======
+    { n: 3, label: 'Logo' },
+    { n: 4, label: 'Style' },
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     { n: 5, label: 'Kit' },
   ];
   return (
@@ -743,11 +777,176 @@ const AStepProgress = ({ step }) => {
 };
 
 // Wizard layout wrapper
-const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, nextLabel, backLabel, isThinking }) => {
+/**
+ * The run log the dock renders.
+ *
+ * Events arrive on a window event rather than through context because the API
+ * helpers are plain functions called from deep inside screens — threading a
+ * setter down to every call site would mean touching every screen to show a
+ * log none of them own.
+ *
+ * The log is kept after a run ends. "What did it just do?" is asked most often
+ * once something looks wrong, which is always after the run finished.
+ */
+const useActivityLog = () => {
+  const [events, setEvents] = React.useState([]);
+  const [running, setRunning] = React.useState(false);
+  const [runName, setRunName] = React.useState('');
+  const [failure, setFailure] = React.useState('');
+
+  React.useEffect(() => {
+    const onActivity = (e) => {
+      const d = e.detail || {};
+      if (d.kind === 'start') {
+        setRunning(true);
+        setRunName(d.name || '');
+        setFailure('');
+        // Each run starts a fresh log: two runs' events interleaved read as
+        // one confusing run.
+        setEvents([{ seq: 0, at: 0, kind: 'phase', label: d.name || 'Working…' }]);
+      } else if (d.kind === 'event' && d.event) {
+        setEvents((prev) => [...prev, d.event]);
+      } else if (d.kind === 'end') {
+        setRunning(false);
+        if (d.error) setFailure(d.error);
+      }
+    };
+    window.addEventListener(ACTIVITY_EVENT, onActivity);
+    return () => window.removeEventListener(ACTIVITY_EVENT, onActivity);
+  }, []);
+
+  return { events, running, runName, failure };
+};
+
+const ACTIVITY_TONE = {
+  phase: '#FDBA50',
+  tool: '#7DD3FC',
+  prompt: '#C4B5FD',
+  thinking: '#A7F3D0',
+  note: 'rgba(255,255,255,.45)',
+  warn: '#FD7947',
+};
+
+const fmtAt = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
+
+// One line of the log. Events carrying a detail — an image prompt, the model's
+// reasoning — expand in place rather than opening anything.
+const AActivityRow = ({ event }) => {
+  const [open, setOpen] = React.useState(false);
+  const hasDetail = !!event.detail;
+  return (
+    <div style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+      <div
+        onClick={hasDetail ? () => setOpen((o) => !o) : undefined}
+        style={{
+          display: 'flex', alignItems: 'baseline', gap: 10,
+          cursor: hasDetail ? 'pointer' : 'default',
+        }}
+      >
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'rgba(255,255,255,.35)',
+          flex: '0 0 46px', textAlign: 'right',
+        }}>{fmtAt(event.at)}</span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+          color: ACTIVITY_TONE[event.kind] || 'rgba(255,255,255,.5)',
+          flex: '0 0 58px',
+        }}>{event.kind}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,.85)', lineHeight: 1.45 }}>
+          {event.label}
+          {hasDetail && (
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
+              {open ? '▾ hide' : '▸ show'}
+            </span>
+          )}
+        </span>
+      </div>
+      {open && (
+        <pre style={{
+          margin: '8px 0 4px 114px', padding: '10px 12px', borderRadius: 8,
+          background: 'rgba(0,0,0,.35)', color: 'rgba(255,255,255,.78)',
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, lineHeight: 1.5,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 260, overflowY: 'auto',
+        }}>{event.detail}</pre>
+      )}
+    </div>
+  );
+};
+
+/**
+ * The dock's activity panel.
+ *
+ * Collapsed it is one line — the newest, because during a run the newest line
+ * is the answer to "what is it doing". Expanded it is the whole run.
+ */
+const ADockActivity = ({ events, running, failure, open, onToggle }) => {
+  const bodyRef = React.useRef(null);
+  const latest = events.length ? events[events.length - 1] : null;
+
+  // Follow the tail while it runs, but not once the client has expanded the log
+  // to read something — yanking the scroll away mid-read is worse than stale.
+  const [pinned, setPinned] = React.useState(true);
+  React.useEffect(() => {
+    if (!open || !pinned || !bodyRef.current) return;
+    bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [events, open, pinned]);
+
+  if (!latest && !running) return null;
+
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={onToggle}
+        style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', minWidth: 0 }}
+      >
+        {running
+          ? <Thinking/>
+          : <span style={{
+              width: 6, height: 6, borderRadius: 99, flex: '0 0 6px',
+              background: failure ? '#FD7947' : 'rgba(255,255,255,.35)',
+            }}/>}
+        <span style={{
+          flex: 1, minWidth: 0, fontSize: 12.5, color: 'rgba(255,255,255,.85)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {failure || (latest ? latest.label : 'Working…')}
+        </span>
+        <span style={{
+          fontSize: 10.5, color: 'rgba(255,255,255,.45)', flex: '0 0 auto',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {events.length} {open ? '▾' : '▸'}
+        </span>
+      </div>
+
+      {open && (
+        <div
+          ref={bodyRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+          }}
+          style={{
+            marginTop: 10, maxHeight: 300, overflowY: 'auto',
+            borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 6,
+          }}
+        >
+          {events.map((ev, i) => <AActivityRow key={`${ev.seq}-${i}`} event={ev} />)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, onBack, nextLabel, backLabel, dockCopy, nextDisabled, isThinking }) => {
   const { navigate } = useRouter();
-  // Back steps to the previous wizard step (available from step 2 on).
-  const canBack = step > 1;
-  const goBack = () => navigate('step' + (step - 1));
+  const activity = useActivityLog();
+  const [logOpen, setLogOpen] = React.useState(false);
+  // Back steps to the previous wizard step (available from step 2 on), unless
+  // the step runs sub-steps of its own — step 3 walks back through those first
+  // and only leaves the step once it reaches the beginning of them.
+  const canBack = step > 1 || !!onBack;
+  const goBack = onBack || (() => navigate('step' + (step - 1)));
   return (
   <AShell breadcrumb={['Brands', 'New brand']}>
     <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
@@ -781,7 +980,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
         position:'absolute', bottom: 20, left: 24, right: 24,
         background: '#0E0F12', color: '#fff', borderRadius: 16,
         padding: '14px 18px',
-        display:'flex',alignItems:'center',gap:14,
+        display:'flex',alignItems: logOpen ? 'flex-start' : 'center',gap:14,
         boxShadow:'0 18px 50px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06)',
         overflow:'hidden',
         zIndex: 10
@@ -793,7 +992,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
         {/* Back button first (leftmost), then the Fluid logo, then the status
             text — the logo sits immediately to the left of the text. */}
         {canBack ? (
-          <button onClick={goBack} style={{
+          <button onClick={goBack} data-selfnav style={{
             padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
             fontSize:12,fontWeight:600, border:0, cursor:'pointer', flex:'0 0 auto'
           }}>
@@ -805,18 +1004,36 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
           background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
-        <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
-          {isThinking ? (
-            <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
-              Fluid AI is drafting options... <Thinking/>
-            </span>
-          ) : "Fill in card details to refine the strategy."}
-        </div>
-        <button onClick={onNext} style={{
-          padding:'8px 14px',borderRadius:8,background:'#fff',color:'#000',
-          fontSize:12,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
-          border:0, cursor:'pointer'
-        }}>
+        {activity.events.length || activity.running ? (
+          <ADockActivity
+            events={activity.events}
+            running={activity.running}
+            failure={activity.failure}
+            open={logOpen}
+            onToggle={() => setLogOpen((o) => !o)}
+          />
+        ) : (
+          <div style={{flex:1, minWidth:0, fontSize: 13, color:'rgba(255,255,255,.85)'}}>
+            {isThinking ? (
+              <span style={{display:'inline-flex',alignItems:'center',gap:8}}>
+                Fluid AI is drafting options... <Thinking/>
+              </span>
+            ) : (dockCopy || "Fill in card details to refine the strategy.")}
+          </div>
+        )}
+        <button
+          onClick={onNext}
+          disabled={nextDisabled}
+          aria-disabled={nextDisabled}
+          data-selfnav
+          style={{
+            padding:'8px 14px',borderRadius:8,
+            background: nextDisabled ? 'rgba(255,255,255,.14)' : '#fff',
+            color: nextDisabled ? 'rgba(255,255,255,.48)' : '#000',
+            fontSize:12,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
+            border:0, cursor: nextDisabled ? 'not-allowed' : 'pointer',
+          }}
+        >
           {nextLabel || 'Continue'} <ArrowRight size={12}/>
         </button>
       </div>
@@ -825,6 +1042,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
   );
 };
 
+<<<<<<< HEAD
 // Summary side panel used in steps 2, 3, 4
 const AContextPanel = ({ brief, styleName, brandName }) => (
   <div style={{
@@ -859,6 +1077,8 @@ const AContextPanel = ({ brief, styleName, brandName }) => (
     )}
   </div>
 );
+=======
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 
 // =====================================================================
 // A2 · Step 1 · Brief Input Screen
@@ -930,7 +1150,12 @@ const ACompetitorChip = ({ name, domain, onRemove }) => (
 
 const DirA_Step1_Brief = () => {
   const { draft, setField } = useBrandDraft();
+  const { navigate } = useRouter();
   const brief = (draft && draft.brief) || '';
+  // The description is the one thing every later step reads. Audience and
+  // competitors are marked optional on the cards and are genuinely optional
+  // here too — gating on them would contradict the label.
+  const briefReady = brief.trim().length > 0;
   const audience = (draft && draft.audience) || '';
   // Competitors are stored as a comma-separated string; edit them as chips.
   const competitors = ((draft && draft.competitors) || '')
@@ -979,7 +1204,15 @@ const DirA_Step1_Brief = () => {
     status="Draft"
     progress="Step 1 of 5"
     nextLabel="Continue to Name"
+<<<<<<< HEAD
     onNext={() => {}}
+=======
+    dockCopy={briefReady
+      ? 'Ready. Naming builds on this description.'
+      : 'Describe the brand in a sentence or two to continue.'}
+    nextDisabled={!briefReady}
+    onNext={() => { if (briefReady) navigate('step2'); }}
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     isThinking={false}
   >
     <div style={{display:'flex', flexDirection:'column', gap:14}}>
@@ -1099,8 +1332,133 @@ const DirA_Step1_Brief = () => {
 // decisions belong to later steps in the logo workflow.
 // =====================================================================
 
+// Reference-browsing and concept-drawing are separate steps, so the reference
+// gallery is no longer labelled "Concepts". Total is derived from this list —
+// the header used to hard-code "of 5".
+const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Refine', 'Export'];
+
+// The logo studio runs in two places: on its own, as a seven-step flow with its
+// own chrome, and inside step 4 of the brand wizard, where the same screens are
+// sub-steps of a bigger job. Rather than keep two implementations in step,
+// every screen renders through LogoStepShell and navigates through
+// useLogoFlowNav — and this context is what tells them which world they are in.
+//
+// Null means standalone. Embedded supplies the phase machinery instead.
+const LogoFlowContext = React.createContext(null);
+
+// The route each studio screen owns, in order. The embedded flow drops 'Brief':
+// the wizard already asked for the name, the description, the audience and the
+// competitors, and asking again is how a long form starts feeling like a form.
+const LOGO_ROUTES = [
+  'logo-brief', 'logo-direction', 'logo-type',
+  'logo-references', 'logo-sketches', 'logo-refine', 'logo-export',
+];
+const EMBEDDED_LOGO_ROUTES = LOGO_ROUTES.filter((r) => r !== 'logo-brief');
+
+/**
+ * Move between studio screens without caring which flow is running.
+ *
+ * Standalone screens change route; embedded ones change phase. Passing a route
+ * name the embedded flow doesn't have — 'logo-brief', or the wizard steps
+ * either side of it — falls through to real navigation, which is what makes
+ * "back" from the first sub-step land on step 3.
+ */
+const useLogoFlowNav = () => {
+  const { navigate } = useRouter();
+  const embed = React.useContext(LogoFlowContext);
+  return React.useCallback((target) => {
+    if (embed && EMBEDDED_LOGO_ROUTES.includes(target)) embed.setPhase(target);
+    else navigate(target);
+  }, [embed, navigate]);
+};
+
+/**
+ * The chrome around one studio screen.
+ *
+ * Standalone, it is the full-page logo wizard. Embedded, the page already
+ * belongs to the brand wizard — so this renders the heading and the sub-step
+ * rail inline, and hands its dock (label, copy, disabled, handlers) up to the
+ * parent, which owns the only dock on screen. Two docks would be two answers to
+ * the same question.
+ */
+const LogoStepShell = ({
+  children, step, title, subtitle, dockCopy,
+  nextLabel, onNext, onBack, nextDisabled,
+}) => {
+  const embed = React.useContext(LogoFlowContext);
+
+  // Embedded, the parent owns the page header and the dock, so it needs what
+  // this screen would have put in them. An effect rather than a render-time
+  // call: setting parent state while the child renders is the classic warning.
+  React.useEffect(() => {
+    if (!embed) return;
+    embed.setChrome({ title, subtitle, dockCopy, nextLabel, onNext, onBack, nextDisabled });
+  }, [embed, title, subtitle, dockCopy, nextLabel, onNext, onBack, nextDisabled]);
+
+  if (!embed) {
+    return (
+      <ALogoWizardLayout
+        step={step} title={title} subtitle={subtitle} dockCopy={dockCopy}
+        nextLabel={nextLabel} onNext={onNext} onBack={onBack} nextDisabled={nextDisabled}
+      >
+        {children}
+      </ALogoWizardLayout>
+    );
+  }
+
+  // No heading here: the wizard header above is already showing this screen's
+  // title, and repeating it would read as two different questions.
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <ALogoSubProgress activeStep={step} onPick={embed.goToStep} furthest={embed.furthest} />
+      {children}
+    </div>
+  );
+};
+
+// The sub-step rail shown inside wizard step 4. Steps already visited are
+// clickable so a client can go back and change a choice without walking the
+// whole flow forward again.
+const ALogoSubProgress = ({ activeStep, onPick, furthest = 1 }) => {
+  const labels = LOGO_STEPS.slice(1); // 'Brief' belongs to the standalone flow
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}
+      aria-label="Logo progress">
+      {labels.map((label, i) => {
+        const n = i + 2; // sub-step 1 is LOGO_STEPS[1]
+        const active = n === activeStep;
+        const done = n < activeStep;
+        const reachable = n <= furthest;
+        return (
+          <React.Fragment key={label}>
+            {i > 0 && <div style={{width:12,height:1.5,background:'var(--line)'}}/>}
+            <button
+              type="button"
+              onClick={reachable && !active ? () => onPick(n) : undefined}
+              aria-current={active ? 'step' : undefined}
+              disabled={!reachable || active}
+              style={{
+                display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',
+                borderRadius:99,border:0,fontFamily:'inherit',
+                background: active ? '#0E0F12' : (done ? 'var(--bg-sunken)' : 'transparent'),
+                boxShadow: active || done ? 'none' : 'inset 0 0 0 1px var(--line)',
+                color: active ? '#fff' : (reachable ? 'var(--fg-2)' : 'var(--fg-4)'),
+                fontSize:11.5,fontWeight: active ? 700 : 600,
+                cursor: reachable && !active ? 'pointer' : 'default',
+              }}
+            >
+              <span style={{fontFamily:'var(--font-mono)',fontSize:9.5,opacity:.75}}>{n - 1}</span>
+              {label}
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 const ALogoProgress = ({ activeStep = 1 }) => {
-  const steps = ['Brief', 'Style', 'Type', 'Concepts', 'Export'];
+  const steps = LOGO_STEPS;
   return (
     <div className="logo-progress" style={{display:'flex',alignItems:'center',gap:10}} aria-label="Logo creation progress">
       {steps.map((label, i) => (
@@ -1128,7 +1486,10 @@ const ALogoWizardLayout = ({
   subtitle = 'Start with the name and the idea. Visual direction comes next.',
   dockCopy = 'Add a name and brief to shape the first directions.',
   nextLabel = 'Continue to direction', onNext, nextDisabled, onBack,
-}) => (
+}) => {
+  const activity = useActivityLog();
+  const [logOpen, setLogOpen] = React.useState(false);
+  return (
   <AShell breadcrumb={['Brands', 'Logo studio']}>
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       <div className="logo-wizard-header" style={{
@@ -1137,7 +1498,7 @@ const ALogoWizardLayout = ({
         <div style={{minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
             <Chip tone="neutral">Draft</Chip>
-            <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>Logo · Step {step} of 5</span>
+            <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>Logo · Step {step} of {LOGO_STEPS.length}</span>
           </div>
           <h2 style={{
             fontFamily:'var(--font-display)',fontWeight:800,fontSize:42,
@@ -1155,12 +1516,12 @@ const ALogoWizardLayout = ({
       <div className="logo-wizard-dock" style={{
         position:'absolute',bottom:20,left:24,right:24,
         background:'#0E0F12',color:'#fff',borderRadius:16,padding:'14px 18px',
-        display:'flex',alignItems:'center',gap:14,
+        display:'flex',alignItems: logOpen ? 'flex-start' : 'center',gap:14,
         boxShadow:'0 18px 50px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06)',
         overflow:'hidden',zIndex:10,
       }}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'var(--fl-accent)'}}/>
-        {onBack && <button type="button" onClick={onBack} style={{
+        {onBack && <button type="button" onClick={onBack} data-selfnav style={{
           padding:'8px 14px',borderRadius:8,background:'rgba(255,255,255,.10)',color:'#fff',
           fontSize:12,fontWeight:600,border:0,cursor:'pointer',flex:'0 0 auto',
         }}>Back</button>}
@@ -1168,14 +1529,25 @@ const ALogoWizardLayout = ({
           width:28,height:28,background:'url("' + __assets['assets/min/fluid-app-icon.png'] + '") center / contain no-repeat',
           flex:'0 0 28px',
         }}/>
-        <div className="logo-dock-copy" style={{flex:1,minWidth:0,fontSize:13,color:'rgba(255,255,255,.85)'}}>
-          {dockCopy}
-        </div>
+        {activity.events.length || activity.running ? (
+          <ADockActivity
+            events={activity.events}
+            running={activity.running}
+            failure={activity.failure}
+            open={logOpen}
+            onToggle={() => setLogOpen((o) => !o)}
+          />
+        ) : (
+          <div className="logo-dock-copy" style={{flex:1,minWidth:0,fontSize:13,color:'rgba(255,255,255,.85)'}}>
+            {dockCopy}
+          </div>
+        )}
         <button
           type="button"
           onClick={onNext}
           disabled={nextDisabled}
           aria-disabled={nextDisabled}
+          data-selfnav
           style={{
             padding:'8px 14px',borderRadius:8,
             background:nextDisabled ? 'rgba(255,255,255,.14)' : '#fff',
@@ -1189,15 +1561,18 @@ const ALogoWizardLayout = ({
       </div>
     </div>
   </AShell>
-);
+  );
+};
 
 const DirA_LogoBrief = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setField, setData } = useBrandDraft();
   const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
   const name = (draft && (draft.name_choice || resolveBrandName(draft))) || '';
   const brief = (draft && draft.brief) || '';
   const tagline = String(data.logo_tagline || '');
+  const nameMeaning = String(data.logo_name_meaning || '');
+  const audience = (draft && draft.audience) || '';
   const competitors = ((draft && draft.competitors) || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
   const [compInput, setCompInput] = React.useState('');
@@ -1208,7 +1583,8 @@ const DirA_LogoBrief = () => {
     setField('name_choice', value);
     setField('name', value);
   };
-  const setTagline = (value) => setField('data', { ...data, logo_tagline: value });
+  const setTagline = (value) => setData({ logo_tagline: value });
+  const setNameMeaning = (value) => setData({ logo_name_meaning: value });
   const addCompetitor = (raw) => {
     const value = String(raw || '').trim().replace(/,+$/, '').trim();
     if (!value) return;
@@ -1279,7 +1655,32 @@ const DirA_LogoBrief = () => {
           </div>
         </AFieldCard>
 
-        <AFieldCard n="02" title="Brand description" meta={`${String(brief).length} / 800`}>
+        {/* Where the name comes from. The single biggest lever on pictorial and
+            abstract marks: without it the studio has to guess what to draw, and
+            "Cadence" is musical rhythm, cycling cadence, or speech pattern. */}
+        <AFieldCard n="02" title="What the name means" optional meta={`${String(nameMeaning).length} / 300`}>
+          <div style={{
+            background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+            padding:'16px 18px',
+          }}>
+            <textarea
+              value={nameMeaning}
+              onChange={(e) => setNameMeaning(e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={300}
+              aria-label="What the name means or where it comes from"
+              placeholder="Named for the rhythm a team finds when it stops sprinting — a steady, repeatable beat rather than a race."
+              rows={2}
+              style={{
+                width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:17,fontWeight:500,
+                color:'#000',lineHeight:1.45,minHeight:52,
+              }}
+            />
+          </div>
+        </AFieldCard>
+
+        <AFieldCard n="03" title="Brand description" meta={`${String(brief).length} / 800`}>
           <div style={{
             position:'relative',background:'var(--bg)',borderRadius:14,
             boxShadow:'inset 0 0 0 1px var(--line)',padding:'18px 18px 14px',
@@ -1315,8 +1716,37 @@ const DirA_LogoBrief = () => {
           </div>
         </AFieldCard>
 
+        {/* Who it's for. Sets the register entirely — the same fintech gets a
+            different mark for enterprise CFOs than for 22-year-olds. */}
+        <AFieldCard n="04" title="Target audience" optional meta={`${String(audience).length} / 300`}>
+          <div style={{
+            background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
+            padding:'16px 18px',
+          }}>
+            <textarea
+              value={audience}
+              onChange={(e) => setField('audience', e.target.value)}
+              onKeyDown={shortcut}
+              maxLength={300}
+              aria-label="Target audience"
+              placeholder="Solo founders and two-person teams in their first year — allergic to process, but quietly worried they're drifting."
+              rows={2}
+              style={{
+                width:'100%',resize:'vertical',border:'none',outline:'none',background:'transparent',
+                fontFamily:'var(--font-display)',fontSize:17,fontWeight:500,
+                color:'#000',lineHeight:1.45,minHeight:52,
+              }}
+            />
+            <div className="logo-assist-row" style={{display:'flex',alignItems:'center',gap:8,marginTop:12,paddingTop:12,borderTop:'1px dashed var(--line)'}}>
+              <button type="button" onClick={() => runAssist('audience')} disabled={!!assisting} style={{...pill,opacity:assisting && !busy('audience') ? .5 : 1}}>
+                <Sparkle size={11}/> {busy('audience') ? 'Thinking…' : 'Suggest an audience'}
+              </button>
+            </div>
+          </div>
+        </AFieldCard>
+
         <div className="logo-brief-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-          <AFieldCard n="03" title="Competitors" optional>
+          <AFieldCard n="05" title="Competitors" optional>
             <div style={{
               background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
               padding:14,display:'flex',flexDirection:'column',gap:12,minHeight:124,
@@ -1352,7 +1782,7 @@ const DirA_LogoBrief = () => {
             </div>
           </AFieldCard>
 
-          <AFieldCard n="04" title="Tagline" optional meta={`${String(tagline).length} / 120`}>
+          <AFieldCard n="06" title="Tagline" optional meta={`${String(tagline).length} / 120`}>
             <div style={{
               background:'var(--bg)',borderRadius:14,boxShadow:'inset 0 0 0 1px var(--line)',
               padding:'14px 16px',display:'flex',flexDirection:'column',gap:10,minHeight:124,
@@ -1383,14 +1813,95 @@ const DirA_LogoBrief = () => {
   );
 };
 
+// Overall visual worlds, mirroring STANDALONE_STYLE_OPTIONS in logo-styles.ts.
+// Deliberately orthogonal to logo type: any of these can be drawn as a
+// wordmark, a mascot or an emblem, so the two steps never ask the same thing.
+// "Let Fluid choose" is handled by its own control, so it isn't a card here.
 const LOGO_STYLE_PLACEHOLDERS = [
-  { id: 'placeholder-01', label: 'Style 01' },
-  { id: 'placeholder-02', label: 'Style 02' },
-  { id: 'placeholder-03', label: 'Style 03' },
-  { id: 'placeholder-04', label: 'Style 04' },
-  { id: 'placeholder-05', label: 'Style 05' },
-  { id: 'placeholder-06', label: 'Style 06' },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    description: 'Reduced to essentials. Space, restraint, nothing decorative.',
+    preview: __assets['logo-style-previews/minimal.png'],
+    previewBg: '#FBFAF7',
+  },
+  {
+    id: 'organic',
+    label: 'Organic',
+    description: 'Natural, flowing forms. Softened edges and living curves.',
+    preview: __assets['logo-style-previews/organic.png'],
+    previewBg: '#F4EFE3',
+  },
+  {
+    id: 'futurist',
+    label: 'Futurist',
+    description: 'Forward-looking and engineered. Precision with an edge.',
+    preview: __assets['logo-style-previews/futurist.png'],
+    previewBg: '#070B0F',
+  },
+  {
+    id: 'luxury',
+    label: 'Luxury',
+    description: 'Refined and premium. High contrast, generous space, restraint.',
+    preview: __assets['logo-style-previews/luxury.png'],
+    previewBg: '#0A0A0A',
+  },
+  {
+    id: 'playful',
+    label: 'Playful',
+    description: 'Energetic and informal. Rounded, colourful, full of character.',
+    preview: __assets['logo-style-previews/playful.png'],
+    previewBg: '#FAF7EF',
+  },
+  {
+    id: 'retro',
+    label: 'Retro',
+    description: 'Period reference. Warmth and nostalgia, deliberately dated.',
+    preview: __assets['logo-style-previews/retro.png'],
+    previewBg: '#F3E4BF',
+  },
+  {
+    id: 'editorial',
+    label: 'Editorial',
+    description: 'Typographic and considered. Intelligent rather than opulent.',
+    preview: __assets['logo-style-previews/editorial.png'],
+    previewBg: '#F8F8F6',
+  },
+  {
+    id: 'corporate',
+    label: 'Corporate',
+    description: 'Stable and credible. Built to be trusted for decades.',
+    preview: __assets['logo-style-previews/corporate.png'],
+    previewBg: '#FFFFFF',
+  },
+  {
+    id: 'brutalist',
+    label: 'Brutalist',
+    description: 'Raw and stark. Heavy, industrial, unapologetic.',
+    preview: __assets['logo-style-previews/brutalist.png'],
+    previewBg: '#F5F5F3',
+  },
 ];
+
+// A reference vote only has meaning for the exact style and mark type that
+// produced its gallery. Changing either choice therefore starts a new visual
+// direction and invalidates every downstream result derived from those votes.
+const resetLogoDirectionWork = () => ({
+  logo_reference_likes: [],
+  logo_reference_dislikes: [],
+  logo_reference_context: null,
+  logo_reference_batch_offset: 0,
+  logo_reference_batch_paths: [],
+  logo_board: [],
+  logo_board_likes: [],
+  logo_board_output_version: null,
+  logo_board_config: null,
+  logo_refine_concept: null,
+  logo_refine_versions: [],
+  logo_finalists: [],
+  logo_finalist_plan: null,
+  logos: [],
+});
 
 const LOGO_TYPE_OPTIONS = [
   { id: 'wordmark', label: 'Wordmark', description: 'The full brand name, set in distinctive type.' },
@@ -1444,32 +1955,31 @@ const ALogoTypeCard = ({ type, selected, onClick }) => {
   );
 };
 
-// Standalone logo studio · Step 2 · Visual style. The cards are deliberately
-// neutral placeholders until the product's final visual-style set is defined.
+// Standalone logo studio · Step 2 · Visual style. Each card pairs a custom
+// fictional identity board with concise guidance for the direction.
 const DirA_LogoDirection = () => {
-  const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const { draft, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const direction = data.logo_direction || {};
   const selectedStyles = direction.mode === 'manual'
-    ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : []))
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : []))
     : [];
   const fluidChooses = direction.mode === 'ai';
   const ready = selectedStyles.length > 0 || fluidChooses;
 
   const chooseStyle = (styleId) => {
     const next = selectedStyles.includes(styleId)
-      ? selectedStyles.filter((id) => id !== styleId)
-      : (selectedStyles.length < 3 ? [...selectedStyles, styleId] : null);
-    if (!next) { makeToast('Choose up to three styles.'); return; }
-    setField('data', {
-      ...data,
+      ? []
+      : [styleId];
+    setData({
+      ...resetLogoDirectionWork(),
       logo_direction: { mode: next.length ? 'manual' : null, style_ids: next, style_id: next[0] || null },
     });
   };
   const chooseFluid = () => {
-    setField('data', {
-      ...data,
+    setData({
+      ...resetLogoDirectionWork(),
       logo_direction: fluidChooses ? { mode: null, style_ids: [], style_id: null } : { mode: 'ai', style_ids: [], style_id: null },
     });
   };
@@ -1478,11 +1988,11 @@ const DirA_LogoDirection = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={2}
       title="Pick a visual style."
-      subtitle="Choose up to three directions for the first round of logo concepts."
-      dockCopy="Choose up to three styles, or let Fluid make the call."
+      subtitle="Choose the visual world for the first round of logo concepts."
+      dockCopy="Pick one visual world, or let Fluid make the call."
       nextLabel="Continue to logo type"
       onBack={() => navigate('logo-brief')}
       onNext={continueToConcepts}
@@ -1495,7 +2005,7 @@ const DirA_LogoDirection = () => {
             <h3 id="logo-style-heading" style={{
               margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
               color:'#000',letterSpacing:'-0.015em',
-            }}>Select up to three directions.</h3>
+          }}>Pick one visual world.</h3>
           </div>
           <button
             type="button"
@@ -1515,7 +2025,7 @@ const DirA_LogoDirection = () => {
         </div>
 
         <div className="logo-direction-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:14}}>
-          {LOGO_STYLE_PLACEHOLDERS.map((style, index) => {
+          {LOGO_STYLE_PLACEHOLDERS.map((style) => {
             const selected = selectedStyles.includes(style.id);
             return (
               <button
@@ -1523,46 +2033,62 @@ const DirA_LogoDirection = () => {
                 type="button"
                 onClick={() => chooseStyle(style.id)}
                 aria-pressed={selected}
+                className="logo-style-card-with-preview"
                 style={{
-                  minHeight:178,padding:20,borderRadius:16,textAlign:'left',cursor:'pointer',
+                  height:200,padding:10,borderRadius:16,textAlign:'left',cursor:'pointer',
                   border:selected ? '2px solid #000' : '1px solid var(--line)',
                   background:selected ? '#fff' : 'var(--bg-elev)',
                   boxShadow:selected ? '0 10px 24px rgba(0,0,0,.10)' : 'var(--shadow-xs)',
                   display:'flex',flexDirection:'column',justifyContent:'space-between',
-                  transition:'border-color .15s, box-shadow .15s, transform .15s',
+                  overflow:'hidden',transition:'border-color .15s, box-shadow .15s, transform .15s',
                 }}
               >
-                <span style={{fontFamily:'var(--font-mono)',fontSize:11,color:selected ? '#000' : 'var(--fg-4)'}}>
-                  0{index + 1}
-                </span>
-                <span style={{fontFamily:'var(--font-display)',fontSize:22,fontWeight:700,color:'#000',letterSpacing:'-0.02em'}}>
-                  {style.label}
-                </span>
-                <span style={{fontSize:11.5,color:'var(--fg-4)'}}>Placeholder</span>
+                <div className="logo-style-preview-layout" style={{
+                  width:'100%',height:'100%',display:'grid',
+                  gridTemplateColumns:'minmax(0, 1.85fr) minmax(108px, .95fr)',gap:14,
+                }}>
+                  <div className="logo-style-preview-image" style={{
+                    minWidth:0,minHeight:0,borderRadius:9,
+                    backgroundColor:style.previewBg,backgroundImage:`url("${style.preview}")`,
+                    backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',
+                    boxShadow:'inset 0 0 0 1px rgba(0,0,0,.10)',
+                  }}/>
+                  <div className="logo-style-preview-copy" style={{
+                    minWidth:0,padding:'4px 4px 4px 0',display:'flex',flexDirection:'column',
+                    alignItems:'flex-start',justifyContent:'center',gap:16,
+                  }}>
+                    <span style={{fontFamily:'var(--font-display)',fontSize:18,fontWeight:700,color:'#000',lineHeight:1.1}}>
+                      {style.label}
+                    </span>
+                    <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.45}}>
+                      {style.description}
+                    </span>
+                  </div>
+                </div>
               </button>
             );
           })}
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
 // Standalone logo studio · Step 3 · Logo type. Visual treatments remain for
 // the later concepts step; this choice controls the structural logo direction.
 const DirA_LogoType = () => {
-  const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const { draft, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
   const aiChoosesType = data.logo_type_mode === 'ai';
   const selectedTypes = Array.isArray(data.logo_types)
-    ? data.logo_types
+    ? data.logo_types.slice(0, 1)
     : (data.logo_type ? [data.logo_type] : []);
 
   const chooseType = (typeId) => {
     if (typeId === 'ai') {
-      setField('data', {
-        ...data,
+      setData({
+        ...resetLogoDirectionWork(),
         logo_type_mode: aiChoosesType ? null : 'ai',
         logo_types: [],
         logo_type: '',
@@ -1570,21 +2096,25 @@ const DirA_LogoType = () => {
       return;
     }
     const next = selectedTypes.includes(typeId)
-      ? selectedTypes.filter((id) => id !== typeId)
-      : (selectedTypes.length < 3 ? [...selectedTypes, typeId] : null);
-    if (!next) { makeToast('Choose up to three logo types.'); return; }
-    setField('data', { ...data, logo_type_mode: next.length ? 'manual' : null, logo_types: next, logo_type: next[0] || '' });
+      ? []
+      : [typeId];
+    setData({
+      ...resetLogoDirectionWork(),
+      logo_type_mode: next.length ? 'manual' : null,
+      logo_types: next,
+      logo_type: next[0] || '',
+    });
   };
   const continueToConcepts = () => {
     if (selectedTypes.length || aiChoosesType) navigate('logo-references');
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={3}
       title="Choose a logo type."
-      subtitle="Pick up to three structures for the first round of concepts to explore."
-      dockCopy="Choose up to three logo types to shape the concept round."
+      subtitle="Pick the logo structure for the first round of concepts."
+      dockCopy="Choose one logo type to shape the concept round."
       nextLabel="Continue to concepts"
       onBack={() => navigate('logo-direction')}
       onNext={continueToConcepts}
@@ -1596,7 +2126,7 @@ const DirA_LogoType = () => {
           <h3 id="logo-type-heading" style={{
             margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
             color:'#000',letterSpacing:'-0.015em',
-          }}>Select up to three starting structures.</h3>
+          }}>Select one starting structure.</h3>
         </div>
 
         <div className="logo-type-grid" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:14}}>
@@ -1608,7 +2138,86 @@ const DirA_LogoType = () => {
           })}
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
+  );
+};
+
+// Mirrors readAxes() in logo-reference-query.ts. Step 4 is a slider the client
+// never touches: liking a mark votes for its axis positions. Showing the result
+// keeps that legible — and is how someone notices if it read them wrong.
+const AXIS_POLES = {
+  boldness: ['quiet', 'bold'],
+  energy:   ['calm', 'energetic'],
+  warmth:   ['cool', 'warm'],
+  detail:   ['simple', 'detailed'],
+};
+const AXIS_MIN_SAMPLES = 2;
+const AXIS_MAX_SPREAD = 0.30;
+const AXIS_REJECTION_PUSH = 0.5;
+
+function readRefinementAxes(liked, disliked) {
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = (xs) => xs.length < 2 ? 0 : Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
+  const values = (rows, axis) => rows
+    .map((r) => Number((r.refinement || {})[axis]))
+    .filter((n) => Number.isFinite(n))
+    .map((n) => Math.min(1, Math.max(0, n)));
+
+  const out = [];
+  for (const axis of Object.keys(AXIS_POLES)) {
+    const L = values(liked, axis), D = values(disliked, axis);
+    if (L.length < AXIS_MIN_SAMPLES || sd(L) > AXIS_MAX_SPREAD) continue;
+    const preferred = mean(L);
+    const push = (D.length >= AXIS_MIN_SAMPLES && sd(D) <= AXIS_MAX_SPREAD)
+      ? AXIS_REJECTION_PUSH * (preferred - mean(D)) : 0;
+    const value = Math.min(1, Math.max(0, preferred + push));
+    const [low, high] = AXIS_POLES[axis];
+    const label = value < 0.2 ? `very ${low}` : value < 0.4 ? `leaning ${low}`
+      : value <= 0.6 ? 'balanced' : value <= 0.8 ? high : `very ${high}`;
+    out.push({ axis, value, label, low, high });
+  }
+  return out;
+}
+
+// The readout. Axes the picks disagreed on are absent on purpose — silence
+// means "no view", so we say that rather than showing a misleading midpoint.
+const ARefinementReadout = ({ axes, sampled }) => {
+  if (!sampled) return null;
+  return (
+    <div style={{
+      padding:'14px 16px',borderRadius:14,background:'var(--bg-elev)',
+      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',flexDirection:'column',gap:10,
+    }}>
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
+        <span className="eyebrow" style={{color:'var(--fg-3)'}}>What your picks suggest</span>
+        <span style={{fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>
+          set by choosing, not by sliders
+        </span>
+      </div>
+      {axes.length === 0 ? (
+        <div style={{fontSize:12.5,color:'var(--fg-3)',lineHeight:1.5}}>
+          Not enough of a pattern yet — like a few more, or a few that feel
+          similar to each other, and a direction will show up here.
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:9}}>
+          {axes.map(({ axis, value, label, low, high }) => (
+            <div key={axis} style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{flex:'0 0 92px',fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>{low}</span>
+              <div style={{flex:1,height:4,borderRadius:99,background:'var(--bg-sunken)',position:'relative'}}>
+                <div style={{
+                  position:'absolute',left:`${value * 100}%`,top:'50%',
+                  width:10,height:10,borderRadius:99,background:'#FD7947',
+                  transform:'translate(-50%,-50%)',transition:'left .2s',
+                }}/>
+              </div>
+              <span style={{flex:'0 0 92px',fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)',textAlign:'right'}}>{high}</span>
+              <span style={{flex:'0 0 96px',fontSize:11.5,fontWeight:700,color:'#000'}}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -1623,38 +2232,59 @@ const LogoReferenceContext = ({ label, value }) => (
   </div>
 );
 
-const LOGO_REFERENCE_PLACEHOLDERS = Array.from({ length: 9 }, (_, index) => ({
-  id: `reference-${String(index + 1).padStart(2, '0')}`,
-  label: `Reference ${String(index + 1).padStart(2, '0')}`,
-}));
-
 const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
-  <article style={{
-    background:'var(--bg-elev)',borderRadius:16,padding:12,
+  <article className="logo-reference-card" style={{
+    background:'var(--bg-elev)',borderRadius:13,padding:8,
     boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : (disliked ? '0 0 0 2px var(--line-strong), var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)'),
-    display:'flex',flexDirection:'column',gap:10,
+    opacity: disliked ? 0.55 : 1, transition:'opacity .15s',
   }}>
+    {/* No fixed height: the card takes the image's own proportions, which is
+        what makes the gallery read as a collage rather than a grid. */}
     <div style={{
-      minHeight:148,borderRadius:10,background:'var(--bg-sunken)',
-      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',alignItems:'center',justifyContent:'center',
-      fontFamily:'var(--font-mono)',fontSize:10,color:'var(--fg-4)',textTransform:'uppercase',letterSpacing:'.06em',
-    }}>Logo placeholder</div>
+      borderRadius:8,background:'#fff',overflow:'hidden',
+      boxShadow:'inset 0 0 0 1px var(--line)',marginBottom:7,
+      // Reserve the image's box up front so lazily-loaded artwork doesn't
+      // shove the masonry columns around as it arrives.
+      aspectRatio: reference.aspectRatio || undefined,
+    }}>
+      <img
+        src={reference.imageUrl}
+        alt={`${reference.name} — ${reference.markType} reference`}
+        loading="lazy"
+        style={reference.aspectRatio ? {height:'100%',objectFit:'cover'} : undefined}
+      />
+    </div>
+    {/* Why this reference is here: the attributes it shares with the chosen
+        direction. Keeps the gallery legible rather than arbitrary. */}
+    {reference.matched && reference.matched.length > 0 && (
+      <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+        {reference.matched.slice(0, 2).map((attr) => (
+          <span key={attr} style={{
+            fontFamily:'var(--font-mono)',fontSize:8.5,letterSpacing:'.02em',
+            padding:'2px 5px',borderRadius:5,background:'rgba(253,121,71,.12)',color:'#B4441A',
+          }}>{attr}</span>
+        ))}
+      </div>
+    )}
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:13.5,color:'#000'}}>{reference.label}</span>
+      <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:12,color:'#000',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reference.name}</span>
       <div style={{display:'inline-flex',gap:5}}>
         <button
           type="button" onClick={onLike} aria-pressed={liked} title={liked ? 'Unlike' : 'Like'}
-          aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.label}`}
-          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+          aria-label={`${liked ? 'Unlike' : 'Like'} ${reference.name}`}
+          style={{flex:'0 0 26px',width:26,height:26,borderRadius:99,border:0,cursor:'pointer',background:liked ? 'rgba(253,121,71,.12)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={liked ? '#FD7947' : 'none'} stroke={liked ? '#FD7947' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
         <button
           type="button" onClick={onDislike} aria-pressed={disliked} title={disliked ? 'Remove dislike' : 'Dislike'}
-          aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.label}`}
-          style={{flex:'0 0 30px',width:30,height:30,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
+          aria-label={`${disliked ? 'Remove dislike from' : 'Dislike'} ${reference.name}`}
+          style={{flex:'0 0 26px',width:26,height:26,borderRadius:99,border:0,cursor:'pointer',background:disliked ? 'var(--fg-2)' : 'var(--bg-sunken)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v10"/><path d="M11 20h5.3a2 2 0 0 0 1.9-1.4l1.4-4.5A2 2 0 0 0 17.7 11H14l.6-3.2A2 2 0 0 0 12.6 5L7 10H4v10z"/></svg>
+          {/* A real thumbs-DOWN. The previous path drew the palm at y=10–20
+              with the thumb rising to y=5 — i.e. a thumbs-up on the Dislike
+              button, so both controls read as positive. */}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={disliked ? '#fff' : 'none'} stroke={disliked ? '#fff' : 'var(--fg-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V3"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
         </button>
       </div>
     </div>
@@ -1665,25 +2295,64 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
 // visual preferences only; the next step will generate original sketches from
 // the brief, style, type, and the references liked here.
 const DirA_LogoReferences = () => {
-  const { draft, setField } = useBrandDraft();
-  const { navigate } = useRouter();
+  const { draft, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
   const data = (draft && draft.data) || {};
-  const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types : (data.logo_type ? [data.logo_type] : []);
+  const selectedTypes = Array.isArray(data.logo_types) ? data.logo_types.slice(0, 1) : (data.logo_type ? [data.logo_type] : []);
   const aiChoosesType = data.logo_type_mode === 'ai';
   const direction = data.logo_direction || {};
-  const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids : (direction.style_id ? [direction.style_id] : [])) : [];
+  const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : [])) : [];
   const typeLabel = aiChoosesType ? 'Fluid chooses' : selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
   const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
   const [dislikes, setDislikes] = React.useState(data.logo_reference_dislikes || []);
+  const [references, setReferences] = React.useState(null);
+  const [loadError, setLoadError] = React.useState('');
+
+  // What the picks imply, computed from the references already on screen so it
+  // updates the instant something is liked — no round trip.
+  const byId = React.useMemo(() => {
+    const m = new Map();
+    (references || []).forEach((r) => m.set(r.id, r));
+    return m;
+  }, [references]);
+  const derivedAxes = React.useMemo(
+    () => readRefinementAxes(
+      likes.map((id) => byId.get(id)).filter(Boolean),
+      dislikes.map((id) => byId.get(id)).filter(Boolean),
+    ),
+    [likes, dislikes, byId],
+  );
+
+  // Pull references that actually match the brief: the mark types chosen in
+  // Step 3, ranked against the visual directions chosen in Step 2. Delegating
+  // either ("Let Fluid choose") simply omits that filter.
+  const typesKey = aiChoosesType ? '' : selectedTypes.join(',');
+  const stylesKey = direction.mode === 'ai' ? 'fluid-choice' : selectedStyles.join(',');
+  React.useEffect(() => {
+    let cancelled = false;
+    setReferences(null); setLoadError('');
+    const params = new URLSearchParams({ limit: '16' });
+    if (typesKey) params.set('types', typesKey);
+    if (stylesKey) params.set('styles', stylesKey);
+    fetch('/api/logo-references?' + params.toString(), { cache: 'no-store' })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (cancelled) return;
+        if (!ok) { setLoadError(j.error || "Couldn't load references."); setReferences([]); return; }
+        setReferences(j.references || []);
+      })
+      .catch(() => { if (!cancelled) { setLoadError('Network error. Check your connection.'); setReferences([]); } });
+    return () => { cancelled = true; };
+  }, [typesKey, stylesKey]);
 
   const toggleLike = (id) => {
-    const next = likes.includes(id) ? likes.filter((item) => item !== id) : [...likes, id];
+    const removing = likes.includes(id);
+    const next = removing ? likes.filter((item) => item !== id) : [...likes, id];
     const nextDislikes = dislikes.filter((item) => item !== id);
     setLikes(next);
     setDislikes(nextDislikes);
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_reference_likes: next,
       logo_reference_dislikes: nextDislikes,
       logo_reference_context: {
@@ -1698,8 +2367,7 @@ const DirA_LogoReferences = () => {
     const nextLikes = likes.filter((item) => item !== id);
     setDislikes(next);
     setLikes(nextLikes);
-    setField('data', {
-      ...((draft && draft.data) || {}),
+    setData({
       logo_reference_likes: nextLikes,
       logo_reference_dislikes: next,
       logo_reference_context: {
@@ -1711,14 +2379,16 @@ const DirA_LogoReferences = () => {
   };
 
   return (
-    <ALogoWizardLayout
+    <LogoStepShell
       step={4}
       title="Browse logo references."
-      subtitle="Like the existing logos that feel closest to the direction you want."
-      dockCopy={likes.length ? `${likes.length} liked reference${likes.length === 1 ? '' : 's'} will guide the sketch round.` : 'Like the references that feel most right.'}
-      nextLabel="Continue to sketches"
+      subtitle="Like as many existing logos as you need. Fluid will use them in the order you choose them."
+      dockCopy={likes.length
+        ? `${likes.length} liked — concepts are generated in ordered batches of six.`
+        : 'Like the references that feel most right.'}
+      nextLabel="Continue to concepts"
       onBack={() => navigate('logo-type')}
-      onNext={() => { if (likes.length) makeToast('Sketch generation is the next step.'); }}
+      onNext={() => { if (likes.length) navigate('logo-sketches'); }}
       nextDisabled={likes.length === 0}
     >
       <section aria-labelledby="logo-references-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
@@ -1732,18 +2402,1044 @@ const DirA_LogoReferences = () => {
           <LogoReferenceContext label="Type" value={typeLabel}/>
         </div>
 
-        <div className="logo-references-grid" style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
-          {LOGO_REFERENCE_PLACEHOLDERS.map((reference) => (
-            <ALogoReferenceCard key={reference.id} reference={reference} liked={likes.includes(reference.id)} disliked={dislikes.includes(reference.id)} onLike={() => toggleLike(reference.id)} onDislike={() => toggleDislike(reference.id)} />
-          ))}
+        {loadError && (
+          <div style={{fontSize:12.5,color:'var(--destructive)'}}>{loadError}</div>
+        )}
+
+        <ARefinementReadout axes={derivedAxes} sampled={likes.length + dislikes.length} />
+
+        {references === null ? (
+          <div className="logo-references-grid">
+            {/* Varied skeleton heights so the loading state previews the
+                collage rather than promising a uniform grid. */}
+            {[190, 250, 160, 220, 170, 240, 200, 150].map((h, i) => (
+              <div key={i} className="logo-reference-card" style={{height:h,borderRadius:16,background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)'}} />
+            ))}
+          </div>
+        ) : references.length === 0 ? (
+          <div style={{
+            padding:'28px 20px',borderRadius:14,background:'var(--bg-sunken)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:13,color:'var(--fg-3)',textAlign:'center',
+          }}>
+            No references match that combination yet. Try another style or logo type.
+          </div>
+        ) : (
+          <div className="logo-references-grid">
+            {references.map((reference) => (
+              <ALogoReferenceCard
+                key={reference.id}
+                reference={reference}
+                liked={likes.includes(reference.id)}
+                disliked={dislikes.includes(reference.id)}
+                onLike={() => toggleLike(reference.id)}
+                onDislike={() => toggleDislike(reference.id)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </LogoStepShell>
+  );
+};
+
+// Standalone logo studio · Step 5 · Concepts. The first screen in this flow
+// that spends tokens: each press draws up to six concepts from the next ordered
+// batch of liked references. The client can regenerate until every saved
+// reference has been explored.
+const DirA_LogoSketches = () => {
+  const { draft, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
+  const data = (draft && draft.data) || {};
+  const brandId = draft && draft.id;
+  const hasBrief = !!String((draft && draft.brief) || '').trim();
+
+  const aiChoosesType = data.logo_type_mode === 'ai';
+  const chosenTypes = Array.isArray(data.logo_types)
+    ? data.logo_types.slice(0, 1)
+    : (data.logo_type ? [data.logo_type] : []);
+  const direction = data.logo_direction || {};
+  const chosenStyles = direction.mode === 'manual'
+    ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : []))
+    : (direction.mode === 'ai' ? ['fluid-choice'] : []);
+
+  // The standalone type cards use 'ai' for the delegated option; the shared
+  // taxonomy uses the AI_CHOICE sentinel. Translate at the boundary so the
+  // server sees one vocabulary.
+  const requestTypes = aiChoosesType ? [AI_CHOICE] : chosenTypes;
+  const referenceLikes = Array.isArray(data.logo_reference_likes) ? data.logo_reference_likes : [];
+  const briefReady = hasBrief && requestTypes.length > 0 && referenceLikes.length > 0;
+
+  const [board, setBoard] = React.useState(data.logo_board || []);
+  const [likes, setLikes] = React.useState(data.logo_board_likes || []);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [assetError, setAssetError] = React.useState(false);
+  const [notice, setNotice] = React.useState('');
+  const initialBatchOffset = Number(data.logo_reference_batch_offset);
+  const [remainingReferences, setRemainingReferences] = React.useState(
+    Math.max(0, referenceLikes.length - (Number.isInteger(initialBatchOffset) && initialBatchOffset > 0 ? initialBatchOffset : 0)),
+  );
+
+  const persist = (nextBoard, nextLikes) => {
+    setData({
+      logo_board: nextBoard,
+      logo_board_likes: nextLikes,
+    });
+  };
+
+  // Exactly the plan the server will run — same function, same selections —
+  // so what the client is shown before spending can't drift from what arrives.
+  const plan = summariseBoardPlan(chosenStyles, requestTypes);
+  // Each press consumes the next six liked references. Starting over resets
+  // that queue to the first six references.
+  const draw = async ({ fresh = false } = {}) => {
+    if (!brandId || loading || !briefReady) return;
+    setLoading(true); setError(''); setAssetError(false); setNotice('');
+    const res = await apiGenerateLogoBoard(brandId, {
+      mark_types: requestTypes,
+      standalone_styles: chosenStyles,
+      // The tagline is deliberately NOT sent as direction: Step 1 promises it
+      // is context only and won't be forced into the mark.
+    }, fresh);
+
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const nextLikes = [];
+      setBoard(res.board);
+      setLikes(nextLikes);
+      persist(res.board, nextLikes);
+      // Two different shortfalls, and they're worth telling apart. A render
+      // that failed is a retry; a reference with no caption yet is a gap in
+      // the library that drawing again won't close.
+      const notices = [];
+      if (res.requested && res.drawn && res.drawn < res.requested) {
+        notices.push(`${res.drawn} of ${res.requested} sketches came back — retry to generate the remaining directions.`);
+      }
+      if (typeof res.remaining === 'number') {
+        setRemainingReferences(res.remaining);
+        notices.push(`${res.remaining} liked reference${res.remaining === 1 ? '' : 's'} remain in the queue.`);
+      }
+      setNotice(notices.join(' '));
+    }
+    setLoading(false);
+  };
+
+  const repairImages = async () => {
+    if (!brandId || loading) return;
+    setLoading(true); setError('');
+    const res = await apiRepairLogoBoard(brandId);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setBoard(res.board);
+      persist(res.board, likes);
+      setAssetError(false);
+    }
+    setLoading(false);
+  };
+
+  const toggleLike = (id) => {
+    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
+    setLikes(next);
+    persist(board, next);
+  };
+
+  const toolBtn = {
+    padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
+    display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
+  };
+  const busyLabel = 'Sketching six concepts…';
+
+  return (
+    <LogoStepShell
+      step={5}
+      title="Explore concepts."
+      subtitle="Six rough croquis at a time, each guided by a liked reference."
+      dockCopy={likes.length
+        ? `${likes.length} concept${likes.length === 1 ? '' : 's'} saved. You'll choose ${likes.length === 1 ? 'it' : 'one of them'} to refine next.`
+        : 'Sketch a board, then like the ones worth keeping.'}
+      nextLabel="Continue to refinement"
+      onBack={() => navigate('logo-references')}
+      onNext={() => { if (likes.length) navigate('logo-refine'); }}
+      nextDisabled={likes.length === 0}
+    >
+      <section aria-labelledby="logo-sketches-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+              Concepts{board.length ? ` · ${board.length} drawn` : ''}{likes.length ? ` · ${likes.length} liked` : ''}
+            </div>
+            <h3 id="logo-sketches-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>Build a board you actually like.</h3>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {board.length > 0 && (
+              <button type="button" onClick={repairImages} disabled={loading}
+                style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line-strong)',
+                  cursor:loading ? 'default' : 'pointer',opacity:loading ? .5 : 1}}>
+                Remove backgrounds
+              </button>
+            )}
+            {board.length > 0 && (
+              <button type="button" onClick={() => draw({ fresh: true })} disabled={loading || !briefReady}
+                style={{...toolBtn,background:'transparent',color:'var(--fg-2)',
+                  boxShadow:'inset 0 0 0 1px var(--line-strong)',
+                  cursor:loading || !briefReady ? 'default' : 'pointer',opacity:loading || !briefReady ? .5 : 1}}>
+                Start over
+              </button>
+            )}
+            <button type="button" onClick={() => draw()} disabled={loading || !briefReady || (board.length > 0 && remainingReferences === 0)}
+              style={{...toolBtn,background:'#0E0F12',color:'#fff',
+                cursor:loading || !briefReady || (board.length > 0 && remainingReferences === 0) ? 'default' : 'pointer',opacity:loading || !briefReady || (board.length > 0 && remainingReferences === 0) ? .5 : 1}}>
+              <Sparkle size={12} color="#FDBA50"/>
+              {loading ? busyLabel : (board.length
+                ? (remainingReferences ? `Generate next ${Math.min(BOARD_SIZE, remainingReferences)}` : 'All references explored')
+                : `Generate ${Math.min(BOARD_SIZE, referenceLikes.length)} concepts`)}
+            </button>
+          </div>
+        </div>
+
+        {/* What the six will be drawn from — visible so a surprising result is
+            traceable to the brief rather than mysterious. Each pairing is a
+            distinct direction: nothing on the board is a blend of two. */}
+        <div style={{
+          padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+          boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',
+          flexDirection:'column',gap:9,
+        }}>
+          <div style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.5}}>
+            Each batch uses the next {BOARD_SIZE} liked references in order. Every
+            sketch applies one reference's visual principles to an original mark;
+            nothing copies the existing logo.
+          </div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {plan.map((p, i) => (
+              <span key={i} style={{
+                display:'inline-flex',alignItems:'center',gap:6,padding:'4px 9px',
+                borderRadius:99,background:'var(--bg-sunken)',fontSize:11,color:'var(--fg-2)',
+              }}>
+                <span style={{fontFamily:'var(--font-mono)',fontSize:10,color:'var(--fg-4)'}}>×{p.count}</span>
+                {p.styleName} · {p.typeName}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {!briefReady && (
+          <div role="status" style={{
+            padding:'14px 16px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+          }}>
+            {hasBrief
+              ? (!requestTypes.length
+                ? 'Choose at least one logo type before drawing concepts.'
+                : 'Like at least one reference before drawing concepts.')
+              : 'Add a brand description in the brief before drawing concepts.'}
+          </div>
+        )}
+
+        {notice && (
+          <div role="status" style={{
+            padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+          }}>{notice}</div>
+        )}
+
+        {error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>{error}</span>
+            <button type="button" onClick={() => draw()} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Try again</button>
+          </div>
+        )}
+
+        {assetError && !error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>Some concept images could not load.</span>
+            <button type="button" onClick={repairImages} disabled={loading} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',fontSize:11.5,
+              fontWeight:600,border:0,cursor:loading ? 'default' : 'pointer',opacity:loading ? .6 : 1,
+            }}>{loading ? 'Repairing…' : 'Repair images'}</button>
+          </div>
+        )}
+
+        {board.length === 0 && !loading && briefReady && !error && (
+          <div style={{
+            padding:'48px 24px',textAlign:'center',borderRadius:16,
+            background:'var(--bg-elev)',boxShadow:'inset 0 0 0 1px var(--line)',
+          }}>
+            <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:16,color:'#000'}}>
+              Nothing drawn yet.
+            </div>
+            <div style={{fontSize:12.5,color:'var(--fg-3)',marginTop:6,lineHeight:1.5,maxWidth:440,margin:'6px auto 0'}}>
+              These are rough pencil sketches, not finished logos — you’re choosing
+              an idea to develop, so don’t judge the drawing. Sketch a board, like
+              what interests you, and generate the next six if nothing lands.
+            </div>
+          </div>
+        )}
+
+        {(board.length > 0 || loading) && (
+          <div className="home-grid-3" style={{display:'grid',gap:12}}>
+            {board.map((s) => (
+              <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} onImageError={() => setAssetError(true)} />
+            ))}
+            {loading && Array.from({ length: BOARD_SIZE }).map((_, i) => (
+              <div key={`pending-${i}`} style={{
+                background:'var(--bg-elev)',borderRadius:16,minHeight:196,
+                boxShadow:'inset 0 0 0 1px var(--line)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>
+                {/* One spinner for the set, not six — six spinners read as
+                    six separate waits when it is really one. */}
+                {i === 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>{busyLabel}</span>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </LogoStepShell>
+  );
+};
+
+// One version's palette: the colours this version of the mark will be drawn in.
+// The first swatch is the primary — the studio is told so — which is why the
+// order is editable rather than a set.
+const AVersionPalette = ({ index, colors, onChange, disabled }) => {
+  const setColor = (i, value) => {
+    const next = [...colors];
+    next[i] = value;
+    onChange(next);
+  };
+  const remove = (i) => onChange(colors.filter((_, j) => j !== i));
+  const add = () => onChange([...colors, '#000000']);
+
+  return (
+    <div style={{
+      padding:'12px 13px',borderRadius:12,background:'var(--bg-elev)',
+      boxShadow:'inset 0 0 0 1px var(--line)',display:'flex',
+      flexDirection:'column',gap:10,
+    }}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <span style={{
+          fontSize:9.5,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase',
+          color:'var(--fg-2)',background:'var(--bg-sunken)',padding:'3px 8px',borderRadius:99,
+        }}>Version {index + 1}</span>
+        {colors.length < MAX_VERSION_COLORS && (
+          <button type="button" onClick={add} disabled={disabled} style={{
+            padding:'4px 9px',borderRadius:8,background:'transparent',color:'var(--fg-2)',
+            boxShadow:'inset 0 0 0 1px var(--line-strong)',fontSize:11,fontWeight:600,
+            border:0,cursor:disabled ? 'default' : 'pointer',opacity:disabled ? .5 : 1,
+          }}>Add colour</button>
+        )}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:7}}>
+        {colors.map((c, i) => (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+            <input
+              type="color"
+              value={c}
+              disabled={disabled}
+              onChange={(e) => setColor(i, e.target.value)}
+              aria-label={`Version ${index + 1} colour ${i + 1}`}
+              style={{
+                width:30,height:30,padding:0,border:0,borderRadius:8,
+                background:'transparent',cursor:disabled ? 'default' : 'pointer',flex:'0 0 30px',
+              }}
+            />
+            <input
+              type="text"
+              value={c}
+              disabled={disabled}
+              spellCheck={false}
+              onChange={(e) => setColor(i, e.target.value)}
+              aria-label={`Version ${index + 1} colour ${i + 1} hex`}
+              style={{
+                flex:1,minWidth:0,padding:'6px 9px',borderRadius:8,border:0,
+                boxShadow:'inset 0 0 0 1px var(--line)',background:'var(--bg-sunken)',
+                fontFamily:'var(--font-mono)',fontSize:11.5,color:'var(--fg-1)',
+              }}
+            />
+            {i === 0
+              ? <span style={{fontSize:10,color:'var(--fg-4)',flex:'0 0 auto'}}>primary</span>
+              : (
+                <button type="button" onClick={() => remove(i)} disabled={disabled}
+                  aria-label={`Remove colour ${i + 1} from version ${index + 1}`}
+                  style={{
+                    flex:'0 0 24px',width:24,height:24,borderRadius:99,border:0,
+                    background:'var(--bg-sunken)',color:'var(--fg-3)',fontSize:13,
+                    cursor:disabled ? 'default' : 'pointer',lineHeight:1,
+                  }}>×</button>
+              )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Standalone logo studio · Step 6 · Refinement. The board is divergence; this
+// is convergence, and convergence means committing. The client briefs it: ONE
+// concept off the board, how many versions of it they want, and the colours
+// each version is drawn in. Liking stays unlimited — the board is a shelf — but
+// only one concept comes through this door. It is a single charge, so nothing
+// runs until the brief is complete and the client asks for it.
+const DirA_LogoRefine = () => {
+  const { draft, setField, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
+  const data = (draft && draft.data) || {};
+  const brandId = draft && draft.id;
+
+  const board = Array.isArray(data.logo_board) ? data.logo_board : [];
+  const likeIds = Array.isArray(data.logo_board_likes) ? data.logo_board_likes : [];
+  const liked = board.filter((s) => likeIds.includes(s.id));
+
+  // The brand's own colours seed the version palettes when it has any; with no
+  // palette saved the defaults are obvious placeholders the client will replace.
+  const brandColors = React.useMemo(() => {
+    const p = data.palette;
+    const fromPalette = Array.isArray(p && p.colors)
+      ? p.colors.map((c) => c && c.hex).filter(Boolean)
+      : [];
+    return fromPalette;
+  }, [data.palette]);
+
+  // A single liked concept needs no choosing. More than one, and the client
+  // picks — refinement develops exactly one.
+  const [conceptId, setConceptId] = React.useState(
+    data.logo_refine_concept || (liked.length === 1 ? liked[0].id : ''),
+  );
+  const concept = liked.find((s) => s.id === conceptId) || null;
+
+  const [versions, setVersions] = React.useState(() => {
+    const saved = Array.isArray(data.logo_refine_versions) ? data.logo_refine_versions : null;
+    return saved && saved.length ? saved : defaultVersionPalettes(2, brandColors);
+  });
+
+  const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [vectorizing, setVectorizing] = React.useState('');
+  const chosen = (draft && draft.logo_choice) || null;
+
+  const persistBrief = (nextConceptId, nextVersions) => {
+    setData({
+      logo_refine_concept: nextConceptId,
+      logo_refine_versions: nextVersions,
+    });
+  };
+
+  const pickConcept = (id) => {
+    setConceptId(id);
+    persistBrief(id, versions);
+  };
+
+  // Changing the count keeps the palettes already set and only fills or trims
+  // the tail, so raising it from 2 to 3 doesn't discard the two you tuned.
+  const setVersionCount = (n) => {
+    const count = Math.min(MAX_REFINE_VERSIONS, Math.max(1, n));
+    const filled = defaultVersionPalettes(count, brandColors);
+    const next = Array.from({ length: count }, (_, i) => versions[i] || filled[i]);
+    setVersions(next);
+    persistBrief(conceptId, next);
+  };
+
+  const setVersionColors = (i, colors) => {
+    const next = versions.map((v, j) => (j === i ? { colors } : v));
+    setVersions(next);
+    persistBrief(conceptId, next);
+  };
+
+  // Every version must carry at least one colour we can hand a renderer. The
+  // hex fields are free text while you type, so a half-typed "#0e0" blocks the
+  // button rather than silently shipping a colour nobody chose.
+  const briefReady = !!concept
+    && versions.length > 0
+    && versions.every((v) => (v.colors || []).some((c) => !!normaliseHex(c)));
+
+  const refine = async () => {
+    if (!brandId || loading || !briefReady) return;
+    setLoading(true); setError('');
+    // Send only the colours that parse, in order, so a stray keystroke in a
+    // hex field can't reach the studio.
+    const clean = versions.map((v) => ({
+      colors: (v.colors || []).map(normaliseHex).filter(Boolean),
+    }));
+    const res = await apiRefineLogoSketches(brandId, concept.id, clean);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      setFinalists(res.finalists);
+      // The server has already merged these onto the brand. Mirroring them into
+      // the local draft keeps the screen correct if the client steps away and
+      // comes back before the next refresh lands.
+      setData({
+        logo_finalists: res.finalists,
+        logo_refine_concept: concept.id,
+        logo_refine_versions: clean,
+        logos: res.finalists.map((f) => ({
+          name: f.name, descriptor: f.idea, svg: f.svg || '', image_url: f.image_url,
+        })),
+      });
+    }
+    setLoading(false);
+  };
+
+  // Choosing a mark is also what commissions the real vector. Cached
+  // server-side, so re-picking one already traced costs nothing.
+  const choose = async (f) => {
+    setField('logo_choice', f.name);
+    if (f.svg || vectorizing) return;
+    setVectorizing(f.id); setError('');
+    const res = await apiVectorizeLogo(brandId, f.id);
+    if (res.error) {
+      setError(res.error);
+    } else {
+      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
+      setFinalists(next);
+      setData({
+        logo_finalists: next,
+        logos: next.map((x) => ({
+          name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url,
+        })),
+      });
+    }
+    setVectorizing('');
+  };
+
+  const done = finalists.length > 0;
+  const markCount = versions.length;
+  const dockCopy = done
+    ? (chosen ? `${chosen} is your mark. Assemble the kit when you're ready.` : 'Pick the mark you want and the studio will trace it into vectors.')
+    : (liked.length === 0
+        ? 'Go back and like at least one concept first.'
+        : !concept
+          ? 'Choose the one concept you want refined.'
+          : briefReady
+            ? `“${concept.name}” in ${markCount} version${markCount === 1 ? '' : 's'}, ready to draw.`
+            : 'Every version needs at least one colour.');
+
+  const toolBtn = {
+    padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
+    display:'inline-flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
+  };
+
+  return (
+    <LogoStepShell
+      step={6}
+      title={done ? 'Choose the mark.' : 'Brief the refinement.'}
+      subtitle={done
+        ? 'Your finished marks, with the studio’s note on each.'
+        : 'Pick the one concept to develop, how many versions you want, and the colours each version is drawn in.'}
+      dockCopy={dockCopy}
+      nextLabel="Continue to export"
+      onBack={() => navigate('logo-sketches')}
+      onNext={() => { if (chosen) navigate('logo-export'); }}
+      nextDisabled={!chosen}
+    >
+      <section aria-labelledby="logo-refine-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+              Refinement{liked.length ? ` · ${liked.length} liked` : ''}{finalists.length ? ` · ${finalists.length} finished` : ''}
+            </div>
+            <h3 id="logo-refine-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>{done ? 'Your finished marks.' : 'One concept, resolved your way.'}</h3>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button type="button" onClick={refine} disabled={loading || !briefReady}
+              style={{...toolBtn,background:'#0E0F12',color:'#fff',
+                cursor:loading || !briefReady ? 'default' : 'pointer',
+                opacity:loading || !briefReady ? .5 : 1}}>
+              <Sparkle size={12} color="#FDBA50"/>
+              {loading
+                ? 'Drawing and critiquing…'
+                : (done
+                    ? 'Refine again'
+                    : `Refine ${markCount} version${markCount === 1 ? '' : 's'}`)}
+            </button>
+          </div>
+        </div>
+
+        {liked.length === 0 && (
+          <div role="status" style={{
+            padding:'14px 16px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>Refinement works from the concepts you liked, and none are marked yet.</span>
+            <button type="button" onClick={() => navigate('logo-sketches')} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Back to the board</button>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>{error}</span>
+            <button type="button" onClick={refine} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Try again</button>
+          </div>
+        )}
+
+        {/* The brief, in the order the decisions are made: which concept, how
+            many versions of it, and what each version is drawn in. */}
+        {!done && liked.length > 0 && (
+          <>
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                1 · The concept{liked.length > 1 ? ' — pick one' : ''}
+              </div>
+              <div style={{
+                padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+                boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',
+                lineHeight:1.5,marginBottom:12,
+              }}>
+                {liked.length > 1
+                  ? `You have ${liked.length} concepts saved. Refinement develops one of them — converging means committing to an idea and seeing it resolved properly. The rest stay liked on the board for later.`
+                  : 'This is the concept the studio will develop. Every mark that comes back is a resolution of it — nothing new is invented alongside it.'}
+              </div>
+              <div className="home-grid-3" style={{display:'grid',gap:12}}>
+                {liked.map((s) => {
+                  const sel = s.id === conceptId;
+                  return (
+                    <div
+                      key={s.id}
+                      role="radio"
+                      aria-checked={sel}
+                      tabIndex={0}
+                      onClick={() => pickConcept(s.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickConcept(s.id); }
+                      }}
+                      style={{
+                        borderRadius:18,cursor:'pointer',
+                        boxShadow: sel ? '0 0 0 2px #000' : 'none',
+                        opacity: sel || !concept ? 1 : .55,
+                        transition:'opacity .15s ease',
+                      }}
+                    >
+                      <ASketchCard sketch={s} liked={sel} onLike={() => pickConcept(s.id)} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                2 · How many versions
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {Array.from({ length: MAX_REFINE_VERSIONS }, (_, i) => i + 1).map((n) => {
+                  const sel = versions.length === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setVersionCount(n)}
+                      disabled={loading}
+                      aria-pressed={sel}
+                      style={{
+                        padding:'9px 16px',borderRadius:10,border:0,fontSize:12.5,fontWeight:600,
+                        background: sel ? '#0E0F12' : 'var(--bg-elev)',
+                        color: sel ? '#fff' : 'var(--fg-2)',
+                        boxShadow: sel ? 'none' : 'inset 0 0 0 1px var(--line)',
+                        cursor: loading ? 'default' : 'pointer',
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+                <span style={{fontSize:11,color:'var(--fg-4)',alignSelf:'center',lineHeight:1.4}}>
+                  Each version is a different construction of the same idea — weight,
+                  proportion, how the parts join. Four is the most one pass will draw.
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+                3 · Colours for each version
+              </div>
+              <div style={{
+                padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+                boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',
+                lineHeight:1.5,marginBottom:12,
+              }}>
+                The studio draws each version in exactly these colours and no others.
+                The first is the primary.
+                {brandColors.length === 0 && ' This brand has no palette saved yet, so these are starting points — change them to whatever you want.'}
+              </div>
+              <div className="home-grid-3" style={{display:'grid',gap:12}}>
+                {versions.map((v, i) => (
+                  <AVersionPalette
+                    key={i}
+                    index={i}
+                    colors={v.colors || []}
+                    disabled={loading}
+                    onChange={(colors) => setVersionColors(i, colors)}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {(done || loading) && (
+          <div className="home-grid-3" style={{display:'grid',gap:12}}>
+            {finalists.map((f) => (
+              <AFinalistCard key={f.id} f={f} sel={chosen === f.name}
+                busy={vectorizing === f.id} onClick={() => choose(f)} />
+            ))}
+            {loading && !done && Array.from({ length: markCount }).map((_, i) => (
+              <div key={`pending-${i}`} style={{
+                background:'var(--bg-elev)',borderRadius:16,minHeight:210,
+                boxShadow:'inset 0 0 0 1px var(--line)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>
+                {/* One spinner for the set: refinement is a single pass, and a
+                    spinner per slot would read as separate waits. */}
+                {i === 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,textAlign:'center'}}>
+                    <Thinking/>
+                    <span style={{fontSize:11,color:'var(--fg-4)',lineHeight:1.4}}>
+                      Drawing {markCount} version{markCount === 1 ? '' : 's'} of “{concept ? concept.name : 'your concept'}”…
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </LogoStepShell>
+  );
+};
+
+// Standalone logo studio · Step 7 · Export. The client says what the mark is
+// for; the formats follow from that.
+//
+// No model is consulted. Which file a browser tab wants is knowledge, not
+// judgement — it lives in a table in logo-export.ts where it can be read and
+// corrected. The uses only pre-tick the formats; every one stays editable, so a
+// client who knows they need a PDF can have one whatever they ticked above.
+const DirA_LogoExport = () => {
+  const { draft, setData } = useBrandDraft();
+  const navigate = useLogoFlowNav();
+  const embedded = !!React.useContext(LogoFlowContext);
+  const data = (draft && draft.data) || {};
+
+  const svg = pickLogoSvg(draft || {});
+  const slug = kitSlug((draft && (draft.name_choice || draft.name)) || 'brand');
+
+  const [uses, setUses] = React.useState(
+    Array.isArray(data.logo_export_uses) ? data.logo_export_uses : [],
+  );
+  // Formats the client has overridden by hand. Until they touch one, the list
+  // simply tracks the uses — tick "Browser tab" and the favicon appears.
+  const [overrides, setOverrides] = React.useState(
+    (data.logo_export_formats && typeof data.logo_export_formats === 'object')
+      ? data.logo_export_formats
+      : {},
+  );
+  const [busy, setBusy] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [note, setNote] = React.useState('');
+
+  const suggested = React.useMemo(() => recommendedFormats(uses), [uses]);
+  const isOn = (id) => (id in overrides ? !!overrides[id] : suggested.includes(id));
+  const selected = EXPORT_FORMATS.filter((f) => isOn(f.id)).map((f) => f.id);
+
+  const persist = (nextUses, nextOverrides) => {
+    setData({
+      logo_export_uses: nextUses,
+      logo_export_formats: nextOverrides,
+    });
+  };
+
+  const toggleUse = (id) => {
+    const next = uses.includes(id) ? uses.filter((u) => u !== id) : [...uses, id];
+    setUses(next);
+    persist(next, overrides);
+    setNote('');
+  };
+
+  const toggleFormat = (id) => {
+    const next = { ...overrides, [id]: !isOn(id) };
+    setOverrides(next);
+    persist(uses, next);
+  };
+
+  // Rasterise through the same canvas path the kit already uses, but from the
+  // transparent artwork: the tracer lays a white plate under every mark, and a
+  // favicon on an opaque white square is the classic giveaway of a logo that
+  // was exported carelessly.
+  const pngBytesAt = async (source, size) => {
+    const blob = await svgToPngBlob(source, size);
+    return new Uint8Array(await blob.arrayBuffer());
+  };
+
+  const download = async () => {
+    if (!svg || busy) return;
+    setBusy('Preparing files…'); setError(''); setNote('');
+    try {
+      const enc = new TextEncoder();
+      const files = [];
+      const skipped = [];
+
+      const clean = transparentSvg(svg) || svg;
+      const parsed = parseLogoSvg(svg);
+
+      if (isOn('svg')) {
+        files.push({ name: `${slug}/${slug}.svg`, bytes: enc.encode(clean) });
+      }
+
+      if (isOn('png')) {
+        setBusy('Rendering PNGs…');
+        for (const size of PNG_SIZES) {
+          files.push({
+            name: `${slug}/png/${slug}-${size}.png`,
+            bytes: await pngBytesAt(clean, size),
+          });
+        }
+      }
+
+      if (isOn('ico')) {
+        setBusy('Building the favicon…');
+        const images = [];
+        for (const size of ICO_SIZES) {
+          images.push({ size, png: await pngBytesAt(clean, size) });
+        }
+        files.push({ name: `${slug}/favicon.ico`, bytes: buildIco(images) });
+      }
+
+      if (isOn('pdf')) {
+        setBusy('Writing the PDF…');
+        try {
+          // Mark only: a white box behind the logo stops a printer overprinting
+          // it on anything other than white stock.
+          const marks = parsed ? markPaths(parsed) : null;
+          files.push({
+            name: `${slug}/${slug}.pdf`,
+            bytes: svgToPdfBytes(svg, marks && marks.length ? marks : undefined),
+          });
+        } catch (e) {
+          // One unconvertible artwork must not cost the client the other files.
+          skipped.push(e && e.message ? e.message : 'The PDF could not be written.');
+        }
+      }
+
+      if (isOn('mono')) {
+        const mono = monochromeSvg(svg, '#000000');
+        if (mono) {
+          files.push({ name: `${slug}/single-colour/${slug}-black.svg`, bytes: enc.encode(mono) });
+          files.push({ name: `${slug}/single-colour/${slug}-black-512.png`, bytes: await pngBytesAt(mono, 512) });
+        }
+      }
+
+      if (isOn('reversed')) {
+        const rev = reversedSvg(svg);
+        if (rev) {
+          files.push({ name: `${slug}/reversed/${slug}-reversed.svg`, bytes: enc.encode(rev) });
+          files.push({ name: `${slug}/reversed/${slug}-reversed-512.png`, bytes: await pngBytesAt(rev, 512) });
+        }
+      }
+
+      if (!files.length) {
+        setError('Tick at least one format to export.');
+        setBusy('');
+        return;
+      }
+
+      setBusy('Zipping…');
+      const zip = buildZip(files);
+      downloadBlob(`${slug}-logo-files.zip`, new Blob([zip], { type: 'application/zip' }));
+      setNote(
+        `${files.length} file${files.length === 1 ? '' : 's'} downloaded.` +
+        (skipped.length ? ` ${skipped.join(' ')}` : ''),
+      );
+    } catch (e) {
+      setError((e && e.message) || 'Something went wrong building the files.');
+    }
+    setBusy('');
+  };
+
+  const cardStyle = (on) => ({
+    textAlign:'left',padding:'12px 13px',borderRadius:12,cursor:'pointer',border:0,
+    background:'var(--bg-elev)',fontFamily:'inherit',
+    boxShadow: on ? '0 0 0 2px #000' : 'inset 0 0 0 1px var(--line)',
+    display:'flex',flexDirection:'column',gap:4,
+  });
+
+  return (
+    <LogoStepShell
+      step={7}
+      title="Export the mark."
+      subtitle="Say what it's for and the right files are picked for you. Change anything you like."
+      dockCopy={!svg
+        ? 'Choose a mark first — there is no artwork to export yet.'
+        : selected.length
+          ? `${selected.length} format${selected.length === 1 ? '' : 's'} selected.`
+          : 'Pick what the logo is for, or tick formats yourself.'}
+      nextLabel={embedded ? 'Continue to Style' : 'Assemble Brand Kit'}
+      onBack={() => navigate('logo-refine')}
+      onNext={() => navigate(embedded ? 'step4' : 'step5')}
+    >
+      <section aria-labelledby="logo-export-heading" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div>
+            <div className="eyebrow" style={{color:'var(--fg-3)'}}>
+              Export{selected.length ? ` · ${selected.length} selected` : ''}
+            </div>
+            <h3 id="logo-export-heading" style={{
+              margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,
+              color:'#000',letterSpacing:'-0.015em',
+            }}>The right files for the job.</h3>
+          </div>
+          <button type="button" onClick={download} disabled={!svg || !!busy || !selected.length}
+            style={{
+              padding:'9px 13px',borderRadius:9,fontSize:12,fontWeight:600,border:0,
+              display:'inline-flex',alignItems:'center',gap:7,background:'#0E0F12',color:'#fff',
+              cursor:(!svg || busy || !selected.length) ? 'default' : 'pointer',
+              opacity:(!svg || busy || !selected.length) ? .5 : 1,
+            }}>
+            {busy || 'Download files'}
+          </button>
+        </div>
+
+        {!svg && (
+          <div role="status" style={{
+            padding:'14px 16px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',
+          }}>
+            <span>Export needs a traced mark. Pick one on the refinement step and the studio will vector it.</span>
+            <button type="button" onClick={() => navigate('logo-refine')} style={{
+              padding:'5px 10px',borderRadius:8,background:'#000',color:'#fff',
+              fontSize:11.5,fontWeight:600,border:0,cursor:'pointer',
+            }}>Back to refinement</button>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" style={{
+            padding:'12px 14px',borderRadius:12,background:'rgba(253,121,71,.10)',
+            boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)',fontSize:12.5,color:'#A8421F',
+          }}>{error}</div>
+        )}
+
+        {note && (
+          <div role="status" style={{
+            padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:12.5,color:'var(--fg-2)',
+          }}>{note}</div>
+        )}
+
+        <div>
+          <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+            1 · What is the logo for
+          </div>
+          <div className="home-grid-3" style={{display:'grid',gap:10}}>
+            {USE_CASES.map((u) => {
+              const on = uses.includes(u.id);
+              return (
+                <button key={u.id} type="button" onClick={() => toggleUse(u.id)}
+                  aria-pressed={on} style={cardStyle(on)}>
+                  <span style={{
+                    fontFamily:'var(--font-display)',fontWeight:700,fontSize:13,
+                    letterSpacing:'-0.015em',color:'#000',
+                  }}>{u.label}</span>
+                  <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.4}}>{u.blurb}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="eyebrow" style={{color:'var(--fg-3)',marginBottom:8}}>
+            2 · Files{uses.length ? ' — picked for those uses' : ''}
+          </div>
+          <div style={{
+            padding:'12px 14px',borderRadius:12,background:'var(--bg-elev)',
+            boxShadow:'inset 0 0 0 1px var(--line)',fontSize:11,color:'var(--fg-3)',
+            lineHeight:1.5,marginBottom:12,
+          }}>
+            {uses.length
+              ? 'Ticked from what you chose above. Change any of them — your choice wins from then on.'
+              : 'Choose a use above and the files tick themselves, or just pick what you want here.'}
+            {' '}Everything arrives as one zip, with the mark on transparency rather than the white plate the tracer leaves behind.
+          </div>
+          <div className="home-grid-3" style={{display:'grid',gap:10}}>
+            {EXPORT_FORMATS.map((f) => {
+              const on = isOn(f.id);
+              const why = reasonsFor(f.id, uses);
+              return (
+                <button key={f.id} type="button" onClick={() => toggleFormat(f.id)}
+                  aria-pressed={on} style={cardStyle(on)}>
+                  <span style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                    <span style={{
+                      fontFamily:'var(--font-display)',fontWeight:700,fontSize:13,
+                      letterSpacing:'-0.015em',color:'#000',
+                    }}>{f.label}</span>
+                    {on && <span style={{
+                      fontSize:9.5,fontWeight:700,color:'#fff',background:'#000',
+                      padding:'2px 7px',borderRadius:99,letterSpacing:'0.04em',
+                    }}>ON</span>}
+                  </span>
+                  <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.4}}>{f.hint}</span>
+                  {why.length > 0 && (
+                    <span style={{fontSize:10,color:'var(--fg-4)',lineHeight:1.4}}>
+                      For {why.join(', ').toLowerCase()}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
-    </ALogoWizardLayout>
+    </LogoStepShell>
   );
 };
 
 // =====================================================================
+<<<<<<< HEAD
 // A3 · Step 3 · Style Selection Screen
+=======
+// A3 · Step 4 · Style Selection Screen
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 // Two paths to choose a visual direction:
 //   1. Start from an existing brand — inspiration cards showing the
 //      whole identity (hero, palette, type, descriptor). 4 by default,
@@ -1770,8 +3466,8 @@ const ALetAI = ({ onClick, active }) => (
   </button>
 );
 
-// Shown under a section the client delegated. States plainly that the choice
-// is deferred to the research step — not silently left blank.
+// Shown under a section the client delegated. States plainly that the studio
+// will decide from the brief rather than leaving the choice blank.
 const ADelegatedNote = ({ what, onClear }) => (
   <div style={{
     display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
@@ -1780,7 +3476,7 @@ const ADelegatedNote = ({ what, onClear }) => (
     fontSize:12.5, color:'#8A5A12', lineHeight:1.45,
   }}>
     <span style={{flex:1, minWidth:200}}>
-      Fluid will choose the {what} while researching your category — it won’t be
+      Fluid will choose the {what} from your brief — it won’t be
       limited to the options below.
     </span>
     <button onClick={onClear} style={{
@@ -2310,7 +4006,7 @@ const visualStyleImage = (id) => {
 };
 
 // "Let AI choose" writes this sentinel instead of resolving to one of the
-// curated options below. It means "the studio decides this during research,
+// curated options below. It means "the studio decides this from the brief,
 // unconstrained by these lists" — deliberately distinct from an unset field,
 // which just means the user hasn't decided. Mirrors DELEGATED in lib/ai/step2.
 const AI_CHOICE = '__ai__';
@@ -2430,10 +4126,10 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
 // Shared read/write for Step 2 picks, namespaced under brand data.step2 so it
 // never collides with the generated data.palette / data.typography, etc.
 const useStep2 = () => {
-  const { draft, setField } = useBrandDraft();
+  const { draft, setData } = useBrandDraft();
   const step2 = (draft && draft.data && draft.data.step2) || {};
   const setStep2 = (patch) =>
-    setField('data', { ...((draft && draft.data) || {}), step2: { ...step2, ...patch } });
+    setData({ step2: { ...step2, ...patch } });
   return { step2, setStep2 };
 };
 
@@ -2448,8 +4144,8 @@ const AVisualStyleSection = () => {
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
   const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
-  // Delegating is instant and free — no model call. The decision is made later,
-  // by the research agent, with the category evidence in hand.
+  // Delegating is instant and free — no model call. The decision is made later
+  // by the studio from the completed brief.
   const letAIChoose = () => {
     const next = delegated ? null : AI_CHOICE;
     setSelectedId(next);
@@ -2740,6 +4436,15 @@ const ATypographySection = () => {
 
 const DirA_Step3_Style = () => {
   const { step2, setStep2 } = useStep2();
+  const { draft } = useBrandDraft();
+  const { navigate } = useRouter();
+  // A style is the gate. Palette and typography can be delegated to the studio
+  // and often are, so requiring them would block the path this screen invites.
+  //
+  // It lives on the brand's own `style_id` column, not in the step2 blob —
+  // both the direction cards and "Fluid decides" write there, and delegating
+  // stores the AI_CHOICE sentinel, which counts as decided.
+  const styleReady = !!(draft && draft.style_id);
 
   // Load all preview fonts once when the step opens.
   React.useEffect(() => {
@@ -2752,6 +4457,7 @@ const DirA_Step3_Style = () => {
 
   return (
   <AWizardLayout
+<<<<<<< HEAD
     step={3}
     title="Choose your visual direction."
     subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
@@ -2759,6 +4465,19 @@ const DirA_Step3_Style = () => {
     progress="Step 3 of 5"
     nextLabel="Continue to Logo"
     onNext={() => {}}
+=======
+    step={4}
+    title="Choose your visual direction."
+    subtitle="Start from a brand you admire, or build it piece by piece. You can mix both."
+    status="Draft"
+    progress="Step 4 of 5"
+    nextLabel="Assemble Brand Kit"
+    dockCopy={styleReady
+      ? 'Style set. Your brand kit is ready to assemble.'
+      : 'Pick a visual direction — or let the studio choose one — to continue.'}
+    nextDisabled={!styleReady}
+    onNext={() => { if (styleReady) navigate('step5'); }}
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   >
     {/* ============ PART 1 · Start from an existing brand ============ */}
     <ASectionHead
@@ -2863,9 +4582,49 @@ const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
 );
 
 const NAME_GRID = 'repeat(auto-fill, minmax(150px, 1fr))';
+const NAME_STYLE_LIMIT = 3;
+const NAME_STYLE_OPTIONS = [
+  { id: 'ai', label: 'Let AI choose', description: 'Fluid finds the strongest naming territory for the brief.', ai: true },
+  { id: 'evocative', label: 'Evocative', description: 'Red Bull, Forever 21' },
+  { id: 'compound', label: 'Compound words', description: 'FedEx, Microsoft' },
+  { id: 'non_english', label: 'Non-English words', description: 'Toyota, Audi, Uber' },
+  { id: 'brandable', label: 'Brandable names', description: 'Google, Rolex' },
+  { id: 'short_phrase', label: 'Short phrase', description: 'Dollar Shave Club' },
+  { id: 'alternate_spelling', label: 'Alternate spelling', description: 'Lyft, Fiverr' },
+  { id: 'real_words', label: 'Real words', description: 'Apple, Amazon' },
+];
 
+<<<<<<< HEAD
 const DirA_Step2_Name = () => {
   const { draft, setField } = useBrandDraft();
+=======
+const ANameStyleOption = ({ option, selected, disabled, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-pressed={selected}
+    style={{
+      minHeight:104,padding:'14px 15px',borderRadius:10,textAlign:'left',cursor:disabled ? 'not-allowed' : 'pointer',
+      border:selected ? '2px solid #000' : '1px solid var(--line)',
+      background:selected ? '#fff' : 'var(--bg)',
+      boxShadow:selected ? '0 7px 16px rgba(0,0,0,.08)' : 'none',
+      opacity:disabled ? .45 : 1,display:'flex',flexDirection:'column',justifyContent:'space-between',gap:8,
+    }}
+  >
+    <span style={{display:'inline-flex',alignItems:'center',gap:7,fontFamily:'var(--font-display)',fontSize:15,fontWeight:700,color:'#000'}}>
+      {option.ai && <Sparkle size={13} color="#C77D14"/>}
+      {option.label}
+    </span>
+    <span style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.35}}>{option.description}</span>
+  </button>
+);
+
+const DirA_Step2_Name = () => {
+  const { draft, setField, setData } = useBrandDraft();
+  const { navigate } = useRouter();
+  const data = (draft && draft.data) || {};
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   // Resolved, not raw name_choice: a brand whose chosen name only survived in
   // `name` should still show that name selected here rather than looking as
   // though nothing was ever picked.
@@ -2877,12 +4636,14 @@ const DirA_Step2_Name = () => {
   // Seed from anything cached on the brand (so resuming shows the same set).
   const cachedNames = (draft && draft.data && draft.data.names) || [];
   const cachedLiked = (draft && draft.data && draft.data.liked_names) || [];
+  const aiChoosesNameStyle = data.name_generation_style_mode === 'ai';
+  const selectedNameStyles = aiChoosesNameStyle ? [] : (Array.isArray(data.name_generation_style_ids) ? data.name_generation_style_ids : []);
+  const nameDetails = String(data.name_generation_details || '');
   const [names, setNames] = React.useState(cachedNames);
   const [liked, setLiked] = React.useState(cachedLiked);
   const [likedOpen, setLikedOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
 
   // The "type your own name" input. It's controlled and shows a confirmation
   // once submitted — previously it was uncontrolled with no feedback at all,
@@ -2899,7 +4660,7 @@ const DirA_Step2_Name = () => {
 
   // Persist names + liked together, merging onto whatever else is in data.
   const persist = React.useCallback((nextNames, nextLiked) => {
-    setField('data', { ...((draft && draft.data) || {}), names: nextNames, liked_names: nextLiked });
+    setData({ names: nextNames, liked_names: nextLiked });
   }, [draft, setField]);
 
   const toggleLike = (name) => {
@@ -2908,23 +4669,35 @@ const DirA_Step2_Name = () => {
     persist(names, next);
   };
 
+  const toggleNameStyle = (id) => {
+    const next = selectedNameStyles.includes(id)
+      ? selectedNameStyles.filter((style) => style !== id)
+      : selectedNameStyles.length >= NAME_STYLE_LIMIT ? selectedNameStyles : [...selectedNameStyles, id];
+    setData({
+      name_generation_style_ids: next,
+      name_generation_style_mode: next.length ? 'manual' : null,
+    });
+  };
+
+  const toggleAiNameStyle = () => {
+    setData({
+      name_generation_style_ids: [],
+      name_generation_style_mode: aiChoosesNameStyle ? null : 'ai',
+    });
+  };
+
   const generate = React.useCallback(async () => {
     if (!brandId) return;
     setLoading(true); setError('');
-    const res = await apiGenerateNames(brandId);
+    const res = await apiGenerateNames(brandId, {
+      styleIds: selectedNameStyles,
+      aiChooses: aiChoosesNameStyle,
+      details: nameDetails,
+    });
     if (res.error) setError(res.error);
     else { setNames(res.names); persist(res.names, liked); }
     setLoading(false);
-  }, [brandId, persist, liked]);
-
-  // Auto-generate once when the step opens with a brief but no names yet.
-  React.useEffect(() => {
-    if (!brandId || !hasBrief) return;
-    if (names.length > 0) return;
-    if (requestedFor.current === brandId) return;
-    requestedFor.current = brandId;
-    generate();
-  }, [brandId, hasBrief, names.length, generate]);
+  }, [aiChoosesNameStyle, brandId, nameDetails, persist, liked, selectedNameStyles]);
 
   const toolBtn = {
     padding:'10px 14px', borderRadius:12, fontSize:12.5, fontWeight:600,
@@ -2934,15 +4707,73 @@ const DirA_Step2_Name = () => {
   return (
   <AWizardLayout
     step={2}
+<<<<<<< HEAD
     title="Find the right name."
     subtitle="Fluid drafts 50 names from your brief — pick one, like your favorites, or type your own."
     status="Draft"
     progress="Step 2 of 5"
     nextLabel="Continue to Style"
     onNext={() => {}}
+=======
+    title="Guide the name generation."
+    subtitle="Choose the naming directions that fit, then let Fluid draft options from your brief."
+    status="Draft"
+    progress="Step 2 of 5"
+    nextLabel="Continue to Logo"
+    dockCopy={chosen
+      ? `“${chosen}” it is. Set the logo direction next.`
+      : 'Choose a name before setting the logo direction.'}
+    nextDisabled={!chosen}
+    onNext={() => { if (chosen) navigate('step3'); }}
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     isThinking={loading}
   >
-    {/* Top toolbar — own name, liked names, regenerate */}
+    <section aria-labelledby="name-guidance-heading" style={{display:'flex',flexDirection:'column',gap:16,marginBottom:24}}>
+      <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16}}>
+        <div>
+          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Name style</div>
+          <h3 id="name-guidance-heading" style={{margin:'6px 0 0',fontFamily:'var(--font-display)',fontSize:20,fontWeight:700,color:'#000',letterSpacing:'-0.015em'}}>What kinds of names should we explore?</h3>
+        </div>
+        <span style={{fontSize:11.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)',whiteSpace:'nowrap'}}>
+          {aiChoosesNameStyle ? 'Fluid chooses' : `${selectedNameStyles.length} / ${NAME_STYLE_LIMIT}`}
+        </span>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:10}}>
+        {NAME_STYLE_OPTIONS.map((option) => (
+          <ANameStyleOption
+            key={option.id}
+            option={option}
+            selected={option.ai ? aiChoosesNameStyle : selectedNameStyles.includes(option.id)}
+            disabled={!option.ai && !selectedNameStyles.includes(option.id) && selectedNameStyles.length >= NAME_STYLE_LIMIT}
+            onClick={() => option.ai ? toggleAiNameStyle() : toggleNameStyle(option.id)}
+          />
+        ))}
+      </div>
+
+      <div>
+        <label htmlFor="name-generation-details" style={{display:'block',fontSize:12.5,fontWeight:700,color:'var(--fg-1)',marginBottom:8}}>Additional details</label>
+        <textarea
+          id="name-generation-details"
+          value={nameDetails}
+          onChange={(event) => setData({ name_generation_details: event.target.value.slice(0, 500) })}
+          maxLength={500}
+          rows={3}
+          placeholder="Words to avoid, ideas to explore, pronunciation preferences..."
+          style={{width:'100%',resize:'vertical',border:'1px solid var(--line)',borderRadius:10,outline:'none',background:'var(--bg)',padding:'12px 14px',fontSize:13,color:'var(--fg-1)',fontFamily:'inherit',lineHeight:1.5,boxSizing:'border-box'}}
+        />
+      </div>
+
+      <div style={{display:'flex',justifyContent:'flex-end'}}>
+        <button type="button" onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
+          ...toolBtn,background:'#000',color:'#fff',cursor:loading || !brandId ? 'default' : 'pointer',opacity:loading || !brandId ? .6 : 1,
+        }}>
+          <Sparkle size={12} color="#fff"/> {loading ? 'Generating names…' : names.length ? 'Regenerate names' : 'Generate names'}
+        </button>
+      </div>
+    </section>
+
+    {/* Top toolbar — own name and liked names */}
     <div style={{display:'flex', gap:10, alignItems:'center', marginBottom:16}}>
       <div style={{
         flex:1, display:'flex', alignItems:'center', gap:10,
@@ -2974,12 +4805,6 @@ const DirA_Step2_Name = () => {
       }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill={liked.length ? '#FD7947' : 'none'} stroke={liked.length ? '#FD7947' : 'var(--fg-2)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         Liked Names{liked.length ? ' (' + liked.length + ')' : ''}
-      </button>
-      <button onClick={() => !loading && generate()} disabled={loading || !brandId} style={{
-        ...toolBtn, background:'#000', color:'#fff',
-        cursor: loading ? 'default' : 'pointer', opacity: loading || !brandId ? 0.6 : 1,
-      }}>
-        <Sparkle size={12} color="#fff"/> {names.length ? 'Regenerate' : 'Generate names'}
       </button>
     </div>
 
@@ -3078,29 +4903,33 @@ const DirA_Step2_Name = () => {
 // finalists mirror into data.logos so Step 5 / export work unchanged.
 // =====================================================================
 
-// A low-fi croquis card: ink sketch on paper, with a like control. The
-// idea is the star — rough rendering keeps the focus on direction.
-const ASketchCard = ({ sketch, liked, onLike }) => (
+// A low-fi croquis card with a like control. The asset is presented directly
+// on the card so transparent sketches do not sit inside a second visual frame.
+const ASketchCard = ({ sketch, liked, onLike, onImageError }) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12,
     boxShadow: liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     display:'flex', flexDirection:'column', gap:10, position:'relative',
   }}>
-    {/* Paper canvas */}
+    {/* Layout-only region: the generated asset is transparent and sits directly
+        against the card instead of on a paper-colored inset surface. */}
     <div style={{
-      background:'#FBFAF6', borderRadius: 10, height: 120,
+      height: 120,
       display:'flex', alignItems:'center', justifyContent:'center',
-      boxShadow:'inset 0 0 0 1px rgba(0,0,0,.05)',
+      overflow:'hidden',
     }}>
-      <img src={sketch.image_url} alt={sketch.name} loading="lazy"
-        style={{width:'100%', height:'100%', objectFit:'contain', borderRadius:8, display:'block'}}/>
+      <img src={sketch.image_url} alt={sketch.name} loading="lazy" onError={onImageError}
+        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>
         <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{sketch.name}</div>
+        {/* Board sketches lead with the style world they were drawn in, since
+            that is what distinguishes one part of the board from another. The
+            main wizard's sketches have no world, and lead with the territory. */}
         <div style={{display:'flex', alignItems:'center', gap:6, marginTop:4, flexWrap:'wrap'}}>
-          <span style={{fontSize:9.5, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'2px 7px', borderRadius:99}}>{sketch.territory_name || sketch.territory}</span>
-          <span style={{fontSize:9.5, fontFamily:'var(--font-mono)', letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-4)'}}>{sketch.mark_type}</span>
+          <span style={{fontSize:9.5, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'2px 7px', borderRadius:99}}>{sketch.style_name || sketch.territory_name || sketch.territory}</span>
+          <span style={{fontSize:9.5, fontFamily:'var(--font-mono)', letterSpacing:'0.05em', textTransform:'uppercase', color:'var(--fg-4)'}}>{sketch.mark_type_name || sketch.mark_type}</span>
         </div>
       </div>
       <button onClick={onLike} aria-label={(liked ? 'Unlike ' : 'Like ') + sketch.name} style={{
@@ -3124,8 +4953,17 @@ const AFinalistCard = ({ f, sel, busy, onClick }) => (
     display:'flex', flexDirection:'column', gap:10,
   }}>
     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
-        {f.svg ? 'Vector ready' : f.refines ? 'From your pick' : 'New direction'}
+      <span style={{fontSize:9.5, color:'var(--fg-4)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', textTransform:'uppercase', display:'inline-flex', alignItems:'center', gap:6}}>
+        {f.version ? `Version ${f.version}` : (f.refines ? 'From your pick' : 'New direction')}
+        {f.svg && ' · vector ready'}
+        {/* The colours this version was briefed with, so a mark drawn in the
+            wrong palette is visible without opening the art direction. */}
+        {Array.isArray(f.colors) && f.colors.map((c) => (
+          <span key={c} title={c} style={{
+            width:9, height:9, borderRadius:99, background:c,
+            boxShadow:'inset 0 0 0 1px rgba(0,0,0,.18)', display:'inline-block',
+          }}/>
+        ))}
       </span>
       {busy
         ? <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:10, fontWeight:600, color:'var(--fg-2)'}}><Thinking/> tracing</span>
@@ -3143,128 +4981,7 @@ const AFinalistCard = ({ f, sel, busy, onClick }) => (
   </div>
 );
 
-// Right-rail panel showing what the studio found in the category. Research is
-// part of the deliverable — the client should see the evidence behind the work,
-// including which clichés the marks are deliberately avoiding.
-const AResearchPanel = ({ research }) => {
-  const [open, setOpen] = React.useState(false);
-  if (!research) return null;
-  const rec = [
-    research.recommended_direction && ['Direction', research.recommended_direction],
-    research.recommended_palette && ['Palette', research.recommended_palette],
-    research.recommended_typography && ['Typography', research.recommended_typography],
-  ].filter(Boolean);
-  return (
-    <div style={{
-      background:'var(--bg-elev)', borderRadius:16, padding:16,
-      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:12,
-    }}>
-      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>
-        Category research{research.category ? ' · ' + research.category : ''}
-      </div>
-      {research.landscape && (
-        <div style={{fontSize:12, color:'var(--fg-2)', lineHeight:1.5}}>{research.landscape}</div>
-      )}
 
-      {/* The studio's calls on whatever the client delegated in Step 2. */}
-      {rec.length > 0 && (
-        <div style={{display:'flex', flexDirection:'column', gap:8, padding:'10px 12px', borderRadius:10, background:'rgba(253,186,80,.10)', boxShadow:'inset 0 0 0 1px rgba(253,186,80,.30)'}}>
-          <div style={{fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'#8A5A12'}}>Fluid decided</div>
-          {rec.map(([label, r]) => (
-            <div key={label}>
-              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{label}: {r.value}</div>
-              {r.rationale && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{r.rationale}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(research.conventions || []).length > 0 && (
-        <div>
-          <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Category conventions</div>
-          <div style={{display:'flex', flexDirection:'column', gap:4}}>
-            {research.conventions.slice(0, open ? 99 : 3).map((c, i) => (
-              <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>
-                <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.pattern}</span>
-                {c.note ? ` — ${c.note}` : ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {open && (
-        <>
-          {(research.trends || []).length > 0 && (
-            <div>
-              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Current design trends</div>
-              {research.trends.map((w, i) => (
-                <div key={i} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45}}>· {w}</div>
-              ))}
-            </div>
-          )}
-          {(research.competitors || []).length > 0 && (
-            <div>
-              <div style={{fontSize:11, fontWeight:700, color:'var(--fg-1)', marginBottom:5}}>Competitor identities</div>
-              {research.competitors.map((c) => (
-                <div key={c.name} style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.45, marginBottom:3}}>
-                  <span style={{fontWeight:600, color:'var(--fg-2)'}}>{c.name}</span> — {c.identity}
-                </div>
-              ))}
-            </div>
-          )}
-          {(research.sources || []).length > 0 && (
-            <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.5, wordBreak:'break-all'}}>
-              {research.sources.length} source{research.sources.length === 1 ? '' : 's'} consulted
-            </div>
-          )}
-        </>
-      )}
-
-      <button onClick={() => setOpen((v) => !v)} style={{
-        alignSelf:'flex-start', padding:'5px 10px', borderRadius:8, border:0, cursor:'pointer',
-        background:'transparent', color:'var(--fg-2)', fontSize:11.5, fontWeight:600,
-        boxShadow:'inset 0 0 0 1px var(--line)',
-      }}>{open ? 'Show less' : 'Full findings'}</button>
-    </div>
-  );
-};
-
-// Right-rail panel showing the creative platform the board was designed
-// from — the strategy is part of the deliverable, not hidden plumbing.
-const APlatformPanel = ({ platform }) => {
-  if (!platform) return null;
-  return (
-    <div style={{
-      background:'var(--bg-elev)', borderRadius:16, padding:16,
-      boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-      display:'flex', flexDirection:'column', gap:12,
-    }}>
-      <div className="eyebrow" style={{fontSize:10, color:'var(--fg-3)'}}>Creative platform</div>
-      <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, lineHeight:1.35, letterSpacing:'-0.015em', color:'#000'}}>
-        “{platform.brand_idea}”
-      </div>
-      {(platform.personality || []).length > 0 && (
-        <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
-          {platform.personality.map((p) => (
-            <span key={p} style={{fontSize:10.5, fontWeight:600, color:'var(--fg-2)', background:'var(--bg-sunken)', padding:'3px 9px', borderRadius:99}}>{p}</span>
-          ))}
-        </div>
-      )}
-      {(platform.territories || []).length > 0 && (
-        <div style={{display:'flex', flexDirection:'column', gap:8}}>
-          {platform.territories.map((t) => (
-            <div key={t.key}>
-              <div style={{fontSize:11.5, fontWeight:700, color:'var(--fg-1)'}}>{t.name}</div>
-              <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4}}>{t.description}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ── Step 4 brief · preview illustrations ─────────────────────────────
 // Small hand-authored SVGs showing what each choice produces. These are
@@ -3287,18 +5004,12 @@ const MARK_TYPE_PREVIEW = {
       <text x="60" y="38" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="26" letterSpacing="-1.2" fill={INK}>FORMA</text>
     </svg>
   ),
-  // Two initials, tightly interlocked. It must not show a single letter: that
-  // is a letterform, and the count is the whole distinction between the two.
+  // Interlocked initials. Single-letter marks belong to this type too, but the
+  // monogram is the clearer preview — a lone letter reads as a letterform, and
+  // a bare "R" beside the wordmark card would be hard to tell apart from type.
   lettermark: (
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <text x="60" y="44" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="38" letterSpacing="-5" fill={INK}>FM</text>
-    </svg>
-  ),
-  // One oversized letter with no container — the bare letter is the whole
-  // distinction from a lettermark, which is a monogram of two or more.
-  letterform: (
-    <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
-      <text x="60" y="48" textAnchor="middle" fontFamily="var(--font-display)" fontWeight="800" fontSize="46" letterSpacing="-2" fill={INK}>R</text>
     </svg>
   ),
   pictorial: (
@@ -3309,7 +5020,7 @@ const MARK_TYPE_PREVIEW = {
   ),
   abstract: (
     // Two offset rounded squares — layered, geometric, and (unlike a circle
-    // beside a stem) impossible to misread as a letterform.
+    // beside a stem) impossible to misread as a letter.
     <svg viewBox="0 0 120 60" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">
       <rect x="40" y="9" width="30" height="30" rx="9" fill="none" stroke={INK} strokeWidth="4"/>
       <rect x="53" y="22" width="30" height="30" rx="9" fill={INK}/>
@@ -3472,39 +5183,91 @@ const AChoiceCard = ({ option, preview, refs, sel, onClick }) => {
   );
 };
 
+// Brand wizard · Step 3 · Logo.
+//
+// The same studio the standalone flow runs, as sub-steps of one wizard step.
+// Not a reimplementation: these are the very screens from that flow, rendered
+// through LogoStepShell with LogoFlowContext supplied, so a fix to the board or
+// the refinement brief lands in both places at once.
+//
+// The studio's own brief screen is skipped. The wizard already asked for the
+// name, the description, the audience and the competitors, and the one thing it
+// genuinely still needs to ask — which style world the MARK lives in, a
+// different question from the brand's visual style — is the first sub-step.
+const EMBEDDED_LOGO_SCREENS = {
+  'logo-direction': DirA_LogoDirection,
+  'logo-type': DirA_LogoType,
+  'logo-references': DirA_LogoReferences,
+  'logo-sketches': DirA_LogoSketches,
+  'logo-refine': DirA_LogoRefine,
+  'logo-export': DirA_LogoExport,
+};
+
+// Where to drop someone back into the studio, read off what the brand already
+// has. Resuming at the start when a board is already drawn would look
+// like the work had been lost.
+function resumeLogoPhase(data) {
+  const d = data || {};
+  if ((d.logo_finalists || []).length) return 'logo-export';
+  if ((d.logo_board || []).length) return 'logo-sketches';
+  if ((d.logo_types || []).length || d.logo_type_mode) return 'logo-references';
+  if (d.logo_direction) return 'logo-type';
+  return 'logo-direction';
+}
+
 const DirA_Step4_Logo = () => {
-  const { draft, setField } = useBrandDraft();
-  const brandId = draft && draft.id;
+  const { draft } = useBrandDraft();
+  const { navigate } = useRouter();
   const data = (draft && draft.data) || {};
-  const brief = String((draft && draft.brief) || '').trim();
-  const hasBrief = !!brief;
-  const name = (draft && (draft.name_choice || draft.name)) || '';
-  const styleName = (VISUAL_STYLE_OPTIONS.find((o) => o.id === (draft && draft.style_id)) || {}).name || null;
-  const chosen = (draft && draft.logo_choice) || null;
 
-  const savedConfig = data.logo_config || {};
-  const [platform, setPlatform] = React.useState(data.creative_platform || null);
-  const [research, setResearch] = React.useState(data.research || null);
-  const [sketches, setSketches] = React.useState(data.logo_sketches || []);
-  const [likes, setLikes] = React.useState(data.logo_sketch_likes || []);
-  const [finalists, setFinalists] = React.useState(data.logo_finalists || []);
-  // The Step 4 brief — the studio doesn't draw a line until the client has
-  // specified what kind of mark they're commissioning.
-  const [markType, setMarkType] = React.useState(savedConfig.mark_type || null);
-  const [designStyle, setDesignStyle] = React.useState(savedConfig.design_style || 'studio');
-  const [instructions, setInstructions] = React.useState(savedConfig.instructions || '');
-  const [phase, setPhase] = React.useState(
-    (data.logo_finalists || []).length ? 'final'
-      : (data.logo_sketches || []).length ? 'sketch'
-      : 'brief',
+  const [phase, setPhase] = React.useState(() => resumeLogoPhase(data));
+  const index = Math.max(0, EMBEDDED_LOGO_ROUTES.indexOf(phase));
+  const stepNo = index + 2; // sub-step 1 is LOGO_STEPS[1], 'Style'
+  const [furthest, setFurthest] = React.useState(stepNo);
+
+  // The active screen hands its header and dock up here. Handlers live in a ref
+  // and only the text lives in state: a screen re-renders with fresh inline
+  // callbacks constantly, and storing those in state would set state on every
+  // render of the child, which is a render loop with extra steps.
+  const handlers = React.useRef({});
+  const [chrome, setChrome] = React.useState({});
+  const publishChrome = React.useCallback((next) => {
+    handlers.current = next;
+    setChrome((prev) => (
+      prev.title === next.title
+      && prev.subtitle === next.subtitle
+      && prev.dockCopy === next.dockCopy
+      && prev.nextLabel === next.nextLabel
+      && prev.nextDisabled === next.nextDisabled
+        ? prev
+        : {
+            title: next.title,
+            subtitle: next.subtitle,
+            dockCopy: next.dockCopy,
+            nextLabel: next.nextLabel,
+            nextDisabled: next.nextDisabled,
+          }
+    ));
+  }, []);
+
+  const goPhase = React.useCallback((next) => {
+    setPhase(next);
+    const n = EMBEDDED_LOGO_ROUTES.indexOf(next) + 2;
+    setFurthest((f) => Math.max(f, n));
+  }, []);
+
+  const goToStep = React.useCallback((n) => {
+    goPhase(EMBEDDED_LOGO_ROUTES[n - 2]);
+  }, [goPhase]);
+
+  const flow = React.useMemo(
+    () => ({ setPhase: goPhase, setChrome: publishChrome, goToStep, furthest }),
+    [goPhase, publishChrome, goToStep, furthest],
   );
-  const [loadingSketches, setLoadingSketches] = React.useState(false);
-  const [loadingRefine, setLoadingRefine] = React.useState(false);
-  const [stage, setStage] = React.useState('');
-  const [error, setError] = React.useState('');
 
-  const loading = loadingSketches || loadingRefine;
+  const Screen = EMBEDDED_LOGO_SCREENS[phase] || DirA_LogoDirection;
 
+<<<<<<< HEAD
   // Phase 1 — draw one more concept sketch. Likes so far bias the new concept;
   // `fresh` starts a new board (used when the brief just changed) instead of
   // adding this concept to the existing one. The server returns the full
@@ -3621,231 +5384,32 @@ const DirA_Step4_Logo = () => {
     sketch: 'The studio sketches one concept at a time. Like the ones that feel right, or draw another — your picks steer the finished designs.',
     final: 'Nine finished marks, developed from your picks and ranked by the studio’s critique.',
   };
+=======
+  // Back out of the first sub-step lands on step 2, not on the studio's own
+  // brief screen — which this flow skipped, and which would strand the client
+  // in the standalone flow if they reached it.
+  const onBack = index === 0
+    ? () => navigate('step2')
+    : () => handlers.current.onBack && handlers.current.onBack();
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 
   return (
-  <AWizardLayout
-    step={4}
-    title={TITLES[phase]}
-    subtitle={SUBTITLES[phase]}
-    status="Draft"
-    progress="Step 4 of 5"
-    nextLabel="Assemble Brand Kit"
-    onNext={() => {}}
-    isThinking={loading}
-  >
-    <div style={{display:'grid', gridTemplateColumns:'2.6fr 1fr', gap:18, alignItems:'start'}}>
-      <div>
-        {/* ── Toolbar ─────────────────────────────────────────────── */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:14, flexWrap:'wrap'}}>
-          {phase === 'brief' ? (
-            <>
-              <div className="eyebrow" style={{color:'var(--fg-3)'}}>The brief</div>
-              {sketches.length > 0 && (
-                <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
-                  Back to sketches
-                </button>
-              )}
-            </>
-          ) : phase === 'sketch' ? (
-            <>
-              <div className="eyebrow" style={{color:'var(--fg-3)'}}>
-                Concept sketches{likes.length ? ' · ' + likes.length + ' liked' : ''}
-              </div>
-              <div style={{display:'flex', gap:8}}>
-                <button onClick={() => !loading && setPhase('brief')} disabled={loading} style={{
-                  ...toolBtn, background:'transparent', color:'var(--fg-2)',
-                  boxShadow:'inset 0 0 0 1px var(--line)',
-                  cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1,
-                }}>
-                  Edit brief
-                </button>
-                <button onClick={() => !loading && hasBrief && generateSketches(likes)} disabled={loading || !hasBrief} style={{
-                  ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)',
-                  boxShadow:'inset 0 0 0 1px var(--line)',
-                  cursor: loading || !hasBrief ? 'default' : 'pointer', opacity: loading || !hasBrief ? 0.6 : 1,
-                }}>
-                  <Sparkle size={11}/> {sketches.length ? 'Draw another concept' : 'Sketch a concept'}
-                </button>
-                <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
-                  ...toolBtn, background:'#000', color:'#fff',
-                  cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.5 : 1,
-                }}>
-                  Create high-fidelity logos {likes.length ? '(' + likes.length + ')' : ''} <ArrowRight size={11}/>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setPhase('sketch')} style={{...toolBtn, background:'transparent', color:'var(--fg-2)', boxShadow:'inset 0 0 0 1px var(--line)', cursor:'pointer'}}>
-                ← Concept sketches
-              </button>
-              <button onClick={() => !loading && likes.length > 0 && refine()} disabled={loading || likes.length === 0} style={{
-                ...toolBtn, background:'var(--bg-elev)', color:'var(--fg-1)', boxShadow:'inset 0 0 0 1px var(--line)',
-                cursor: loading || likes.length === 0 ? 'default' : 'pointer', opacity: loading || likes.length === 0 ? 0.6 : 1,
-              }}>
-                <Sparkle size={11}/> Re-run the studio
-              </button>
-            </>
-          )}
-        </div>
-
-        {error && (
-          <div style={{marginBottom:14, padding:'12px 14px', borderRadius:12, background:'rgba(253,121,71,.10)', boxShadow:'inset 0 0 0 1px rgba(253,121,71,.30)', fontSize:12.5, color:'#A8421F', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
-            <span>{error}</span>
-            <button onClick={() => phase === 'final' || finalists.length ? refine() : generateSketches(likes)} style={{padding:'5px 10px', borderRadius:8, background:'#000', color:'#fff', fontSize:11.5, fontWeight:600, border:0, cursor:'pointer'}}>Try again</button>
-          </div>
-        )}
-
-        {!hasBrief && !sketches.length && (
-          <div style={{padding:'40px 20px', textAlign:'center', color:'var(--fg-3)', fontSize:13.5, background:'var(--bg-elev)', borderRadius:18, boxShadow:'inset 0 0 0 1px var(--line)'}}>
-            Add a brief in Step 1 and the studio will sketch logo concepts here.
-          </div>
-        )}
-
-        {/* ── Phase 0 · the brief ─────────────────────────────────── */}
-        {phase === 'brief' && hasBrief && (
-          <div style={{display:'flex', flexDirection:'column', gap:22}}>
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>What kind of mark?</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Required</span>
-              </div>
-              <div className="home-grid-3" style={{display:'grid', gap:10}}>
-                {MARK_TYPE_OPTIONS.map((o) => (
-                  <AChoiceCard key={o.id} option={o} preview={MARK_TYPE_PREVIEW[o.id]}
-                    refs={logoReferencesFor(o.id)}
-                    sel={markType === o.id} onClick={() => setMarkType(o.id)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Visual language</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Current logo-design trends</span>
-              </div>
-              <div className="home-grid-3" style={{display:'grid', gap:10}}>
-                {DESIGN_STYLE_OPTIONS.map((o) => (
-                  <AChoiceCard key={o.id} option={o} preview={DESIGN_STYLE_PREVIEW[o.id]}
-                    sel={designStyle === o.id} onClick={() => setDesignStyle(o.id)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, marginBottom:10}}>
-                <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, letterSpacing:'-0.015em', color:'#000'}}>Anything else?</span>
-                <span style={{fontSize:11.5, color:'var(--fg-4)'}}>Optional</span>
-              </div>
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value.slice(0, 1000))}
-                placeholder="e.g. avoid anything circular · reference our origami packaging · must work embroidered on a cap"
-                rows={3}
-                style={{
-                  width:'100%', resize:'vertical', padding:'12px 14px', borderRadius:12,
-                  background:'var(--bg-elev)', border:0, outline:'none',
-                  boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-                  fontSize:13, lineHeight:1.5, color:'var(--fg-1)', fontFamily:'inherit',
-                }}
-              />
-              <div style={{fontSize:11, color:'var(--fg-4)', marginTop:5, textAlign:'right'}}>{instructions.length}/1000</div>
-            </div>
-
-            <div style={{display:'flex', alignItems:'center', gap:12, flexWrap:'wrap'}}>
-              <button onClick={() => !loading && markType && generateSketches([], { fresh: true })} disabled={loading || !markType} style={{
-                ...toolBtn, padding:'11px 18px', fontSize:13.5, background:'#000', color:'#fff',
-                cursor: loading || !markType ? 'default' : 'pointer', opacity: loading || !markType ? 0.5 : 1,
-              }}>
-                <Sparkle size={12} color="#fff"/> Sketch a concept <ArrowRight size={12}/>
-              </button>
-              {!markType && <span style={{fontSize:12, color:'var(--fg-4)'}}>Choose a mark type to continue.</span>}
-              {sketches.length > 0 && markType && (
-                <span style={{fontSize:12, color:'var(--fg-4)'}}>This replaces your current board.</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Phase 1 · the sketch board ──────────────────────────── */}
-        {/* One concept renders at a time; the board grows as the client asks
-            for more, rather than arriving all at once as a 9-up. */}
-        {phase === 'sketch' && hasBrief && sketches.length === 0 && (
-          <div className="home-grid-3" style={{display:'grid', gap:12}}>
-            <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-              {loadingSketches ? (
-                <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
-                  <Thinking/>
-                  <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
-                    {stage === 'research'
-                      ? 'Studying the category…'
-                      : 'Drawing a concept…'}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
-        {phase === 'sketch' && sketches.length > 0 && (
-          <>
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loadingRefine ? 0.45 : 1}}>
-              {sketches.map((s) => (
-                <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} />
-              ))}
-              {loadingSketches && (
-                <div style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:196, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:12, textAlign:'center'}}>
-                    <Thinking/>
-                    <span style={{fontSize:11, color:'var(--fg-4)', lineHeight:1.4}}>
-                      {stage === 'research' ? 'Studying the category…' : 'Drawing a concept…'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            {loadingRefine && (
-              <div style={{marginTop:14, padding:'12px 16px', borderRadius:12, background:'var(--bg-elev)', boxShadow:'inset 0 0 0 1px var(--line)', fontSize:12.5, color:'var(--fg-2)', display:'flex', alignItems:'center', gap:10}}>
-                <Thinking/> The studio is refining your directions into finished marks — this takes a minute…
-              </div>
-            )}
-            {!loadingRefine && likes.length === 0 && (
-              <div style={{marginTop:14, fontSize:12, color:'var(--fg-4)', textAlign:'center'}}>
-                Like at least one sketch to unlock high-fidelity design.
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── Phase 2 · the finalists ─────────────────────────────── */}
-        {phase === 'final' && (
-          finalists.length > 0 ? (
-            <div className="home-grid-3" style={{display:'grid', gap:12, opacity: loading ? 0.45 : 1}}>
-              {finalists.map((f) => (
-                <AFinalistCard key={f.id || f.name} f={f} sel={chosen === f.name}
-                  busy={vectorizing === f.id}
-                  onClick={() => chooseFinalist(f)} />
-              ))}
-            </div>
-          ) : (
-            <div className="home-grid-3" style={{display:'grid', gap:12}}>
-              {Array.from({length:9}).map((_, i) => (
-                <div key={i} style={{background:'var(--bg-elev)', borderRadius:16, boxShadow:'inset 0 0 0 1px var(--line)', minHeight:220, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                  {loadingRefine && i === 4 ? <Thinking/> : null}
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
-
-      {/* ── Right rail: strategy + context ───────────────────────── */}
-      <div style={{display:'flex', flexDirection:'column', gap:14}}>
-        <AResearchPanel research={research} />
-        <APlatformPanel platform={platform} />
-        <AContextPanel brief={brief || null} styleName={styleName} brandName={name || null} />
-      </div>
-    </div>
-  </AWizardLayout>
+    <AWizardLayout
+      step={3}
+      title={chrome.title || 'Design the logo.'}
+      subtitle={chrome.subtitle}
+      status="Draft"
+      progress="Step 3 of 5"
+      dockCopy={chrome.dockCopy}
+      nextLabel={chrome.nextLabel || 'Continue'}
+      nextDisabled={!!chrome.nextDisabled}
+      onBack={onBack}
+      onNext={() => handlers.current.onNext && handlers.current.onNext()}
+    >
+      <LogoFlowContext.Provider value={flow}>
+        <Screen />
+      </LogoFlowContext.Provider>
+    </AWizardLayout>
   );
 };
 
@@ -5533,20 +7097,21 @@ const DirA_Home = () => {
         </div>
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           <QuickPath
+            route={CHAT + '?flow=audit'}
             title="Rebranding"
             sub="Refresh an existing brand. Keep what works, update the rest."
             preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=logo-only'}
             title="Logo"
             sub="Skip the strategy. Drop a name, get marks in seconds."
             preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
-            route="logo-brief"
-            onClick={() => navigate('logo-brief')}
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=name-only'}
             title="Name"
             sub="Nine names with reasoning and domain status."
             previewBg="#F4F4F5"
@@ -5562,6 +7127,7 @@ const DirA_Home = () => {
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=guidelines-only'}
             title="Guidelines"
             sub="Already have a logo and palette? We'll write the rules."
             previewBg="#FFFFFF"
@@ -5910,15 +7476,6 @@ const SecFluid = () => (
   </div>
 );
 
-const SecIntegrations = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <SectionHead eyebrow="Settings · Integrations" title="Integrations." desc="Connect Fluid to the tools where your brand work actually lives." />
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-      {INTEGRATIONS.map((it) => <IntegrationCard key={it.name} it={it} />)}
-    </div>
-  </div>
-);
-
 // ---------------------------------------------------------------------
 // Section: Notifications
 // ---------------------------------------------------------------------
@@ -6079,8 +7636,9 @@ const SETTINGS_NAV = [
   { id: 'billing',      label: 'Billing',         d: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></> },
   { id: 'workspace',    label: 'Workspace',       d: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></> },
   { id: 'fluid',        label: 'Fluid AI',        d: <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></> },
-  // Members and Plan/Billing hidden until those features exist.
-  { id: 'integrations', label: 'Integrations',    d: <><path d="M6 3v12M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" /></> },
+  // Members, Plan/Billing and Integrations are hidden until those features
+  // exist. The Integrations tab mapped an INTEGRATIONS list through an
+  // IntegrationCard, neither of which was ever written — opening it threw.
   { id: 'notifications',label: 'Notifications',   d: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></> },
 ];
 
@@ -6089,7 +7647,6 @@ const SECTIONS = {
   billing: SecBilling,
   workspace: SecWorkspace,
   fluid: SecFluid,
-  integrations: SecIntegrations,
   notifications: SecNotifications,
 };
 
@@ -6174,7 +7731,7 @@ PR.useContext = React.useContext;
 // All known routes. Determines whether a route string is valid.
 const ROUTES = [
   'home', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
-  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references',
+  'step1', 'step2', 'step3', 'step4', 'step5', 'logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches', 'logo-refine', 'logo-export',
 ];
 
 // Left rail label → route.  The rail labels are rendered by the existing
@@ -6203,6 +7760,9 @@ const ROUTE_META = {
   'logo-direction': { activeNav: 'brands', breadcrumb: ['Brands', 'Logo studio'] },
   'logo-type':    { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'logo-references': { activeNav: 'brands',  breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-sketches': { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-refine':  { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
+  'logo-export':  { activeNav: 'brands',   breadcrumb: ['Brands', 'Logo studio'] },
   'step1':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step2':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
   'step3':        { activeNav: 'brands',   breadcrumb: ['Brands', 'New brand'] },
@@ -6211,6 +7771,10 @@ const ROUTE_META = {
 };
 
 // Crumb label → route the user expects to land on when clicking it.
+// Brand creation is a conversation at its own URL. resolveClick may return
+// this instead of a hash route; the delegate navigates out when it sees one.
+const CHAT = '/app/chat';
+
 const CRUMB_TO_ROUTE = {
   'Home':      'home',
   'Brands':    'brands',
@@ -6229,6 +7793,23 @@ const CRUMB_TO_ROUTE = {
 // non-routing CTAs like "Export kit".
 // ---------------------------------------------------------------------
 function resolveClick(target, currentRoute, out) {
+  // 0) Controls that navigate themselves. This delegate matches on button TEXT,
+  //    which is fine for a prototype's one-way CTAs but wrong for a control
+  //    whose destination depends on state the DOM cannot see — the wizard dock,
+  //    where "Continue" means the next sub-step of step 4, not step 5. Because
+  //    the delegate calls stopPropagation when it matches, a hijacked button
+  //    never reaches its own onClick at all. Opting out leaves the event alone.
+  if (target.closest && target.closest('[data-selfnav]')) return null;
+
+  // 0b) An explicit destination beats every heuristic below, and has to be
+  //     checked before them. `cursor` is an inherited property, so the walk in
+  //     step 4 hits the deepest child under the pointer first, reads its
+  //     fragment of text, fails to match, and returns null — never reaching
+  //     the ancestor carrying data-route. Any card with clickable-looking
+  //     children was therefore unroutable no matter what route it declared.
+  const routed = target.closest && target.closest('[data-route]');
+  if (routed && routed.dataset.route) return routed.dataset.route;
+
   // 1) Fluid wordmark in the top dock — always goes Home.
   if (target.closest && target.closest('.fl-wordmark')) return 'home';
 
@@ -6280,31 +7861,36 @@ function matchCtaText(text, currentRoute, out) {
   // Wizard dock — Back / Continue.
   if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
   if (/^Continue to Name$/.test(text))           return 'step2';
+<<<<<<< HEAD
   if (/^Continue to Style$/.test(text))          return 'step3';
   if (/^Continue to Logo$/.test(text))           return 'step4';
+=======
+  if (/^Continue to Logo$/.test(text))           return 'step3';
+  if (/^Continue to Style$/.test(text))          return 'step4';
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
 
-  // Top-level CTAs from Home / Brands.
-  if (text.includes('Start a new brand'))        return 'step1';
+  // Top-level CTAs from Home / Brands. Creating a brand is a conversation
+  // now; the step wizard is only reached by resuming one that started there.
+  if (text.includes('Start a new brand'))        return CHAT;
   if (text === 'Browse templates'
    || text === 'Browse template library')        return 'brands-empty';
   if (/^Resume [A-Z]/.test(text))                return 'step4';
   if (text === 'All brands' || text === 'All brands →') return 'brands';
-  if (text === '+ New brand' || text === 'New brand') return 'step1';
+  if (text === '+ New brand' || text === 'New brand') return CHAT;
 
   // Kit screen secondary actions.
   if (text === 'Iterate')                        return 'step4';
   if (text === 'Export kit' || text === 'Share read-only'
    || text === 'Download all') { out.toast = text + ' — coming soon'; return null; }
 
-  // Home quick paths — each card ends in "Start" + arrow.
-  if (/ Start$/.test(text)) {
-    if (/^Rebranding\b/.test(text)) return 'step1';
-    if (/^Logo\b/.test(text))       return 'logo-brief';
-    if (/^Name\b/.test(text))       return 'step1';
-    if (/^Guidelines\b/.test(text)) return 'step1';
-  }
+  // The four Home quick-path cards are NOT matched here. They carry an
+  // explicit data-route, which step 4 above reads on the way up. Text matching
+  // cannot work for them: `cursor` is an inherited property, so the first
+  // cursor:pointer node above a click is the deepest child under the pointer,
+  // and the text read is a fragment like "Start" rather than the card's. That
+  // is why those cards routed nowhere for so long.
 
   // BrandsActive — brand cards open the kit.
   if (/^(Apple|Figma|Perplexity|Tesla|Cadence|Linear|Notion|Arc|Vercel|Stripe)\b/.test(text)
@@ -6353,7 +7939,7 @@ function RouterProvider({ children }) {
   const routeRef = React.useRef(route);
   PR.useEffect(() => { routeRef.current = route; }, [route]);
 
-  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
+  const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','logo-sketches','logo-refine','logo-export','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
 
   const navigate = PR.useCallback((next) => {
     if (!ROUTES.includes(next)) return;
@@ -6370,7 +7956,10 @@ function RouterProvider({ children }) {
       if (dest) {
         e.preventDefault();
         e.stopPropagation();
-        navigate(dest);
+        // Brand creation lives at its own URL now, not in this hash router.
+        // A destination starting with "/" leaves the prototype entirely.
+        if (dest.charAt(0) === '/') location.assign(dest);
+        else navigate(dest);
       } else if (out.toast) {
         e.preventDefault();
         e.stopPropagation();
@@ -6992,10 +8581,18 @@ const SCREEN_FOR_ROUTE = {
   'logo-direction': () => <DirA_LogoDirection />,
   'logo-type':    () => <DirA_LogoType />,
   'logo-references': () => <DirA_LogoReferences />,
+  'logo-sketches': () => <DirA_LogoSketches />,
+  'logo-refine':  () => <DirA_LogoRefine />,
+  'logo-export':  () => <DirA_LogoExport />,
   'step1':        () => <DirA_Step1_Brief />,
   'step2':        () => <DirA_Step2_Name />,
+<<<<<<< HEAD
   'step3':        () => <DirA_Step3_Style />,
   'step4':        () => <DirA_Step4_Logo />,
+=======
+  'step3':        () => <DirA_Step4_Logo />,
+  'step4':        () => <DirA_Step3_Style />,
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
   'step5':        () => <DirA_KitSummary />,
 };
 
@@ -7028,10 +8625,18 @@ function QuickJump() {
     { id: 'logo-direction', label: 'Logo · 2 Direction' },
     { id: 'logo-type',    label: 'Logo · 3 Type' },
     { id: 'logo-references', label: 'Logo · 4 References' },
+    { id: 'logo-sketches', label: 'Logo · 5 Concepts' },
+    { id: 'logo-refine',  label: 'Logo · 6 Refine' },
+    { id: 'logo-export',  label: 'Logo · 7 Export' },
     { id: 'step1',        label: 'Wizard · 1 Brief' },
     { id: 'step2',        label: 'Wizard · 2 Name' },
+<<<<<<< HEAD
     { id: 'step3',        label: 'Wizard · 3 Style' },
     { id: 'step4',        label: 'Wizard · 4 Logo' },
+=======
+    { id: 'step3',        label: 'Wizard · 3 Logo' },
+    { id: 'step4',        label: 'Wizard · 4 Style' },
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
     { id: 'step5',        label: 'Brand kit' },
   ];
   return (
@@ -7145,13 +8750,13 @@ async function apiAssist(brandId, task, options) {
     return { result: j.result || {} };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for name candidates for this brand. Resolves to
+// Phase 3 — ask OpenAI for name candidates for this brand. Resolves to
 // { names } on success or { error } so the caller can show a message.
-async function apiGenerateNames(brandId) {
+async function apiGenerateNames(brandId, guidance) {
   try {
     const r = await fetch('/api/generate/names', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId }),
+      body: JSON.stringify({ brandId, guidance }),
     });
     const j = await r.json().catch(() => ({}));
     signalBalanceChanged(j.code);
@@ -7159,7 +8764,7 @@ async function apiGenerateNames(brandId) {
     return { names: j.names || [] };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for a color palette for this brand.
+// Phase 3 — ask OpenAI for a color palette for this brand.
 async function apiGeneratePalette(brandId) {
   try {
     const r = await fetch('/api/generate/palette', {
@@ -7172,7 +8777,7 @@ async function apiGeneratePalette(brandId) {
     return { palette: j.palette || null };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for a typography pairing for this brand.
+// Phase 3 — ask OpenAI for a typography pairing for this brand.
 async function apiGenerateTypography(brandId) {
   try {
     const r = await fetch('/api/generate/typography', {
@@ -7185,7 +8790,7 @@ async function apiGenerateTypography(brandId) {
     return { typography: j.typography || null };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude for SVG logo concepts for this brand.
+// Phase 3 — ask OpenAI for SVG logo concepts for this brand.
 async function apiGenerateLogos(brandId) {
   try {
     const r = await fetch('/api/generate/logo', {
@@ -7208,6 +8813,7 @@ function describeFailure(r, j, fallback) {
   return fallback;
 }
 
+<<<<<<< HEAD
 function generationIdempotencyKey() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'job-' + Date.now() + '-' + Math.random().toString(36).slice(2);
@@ -7264,6 +8870,123 @@ async function apiRefineLogoSketches(brandId, likedIds) {
   const response = await apiLogoJob('logo_refine', { brandId, likedIds: likedIds || [] }, 'Refinement failed.');
   if (response.error) return response;
   return { finalists: response.result.finalists || [] };
+=======
+// ── The activity stream ────────────────────────────────────────────────
+// The three slow routes answer with server-sent events rather than one JSON
+// blob: a run of several minutes now narrates itself instead of going quiet.
+// Every event is pushed to the log the dock renders; the terminal `result`
+// message is what the caller was waiting for all along.
+//
+// Pre-flight refusals — not signed in, out of tokens, a malformed body — are
+// still ordinary JSON with a real status code, because they are not part of a
+// run and a status code says so better than an event does.
+const ACTIVITY_EVENT = 'fluid:activity';
+
+function pushActivity(kind, payload) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind, ...payload } }));
+}
+
+async function readActivityStream(response, label) {
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/event-stream')) {
+    // A plain JSON refusal. Nothing streamed, so nothing to log.
+    const j = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: describeFailure(response, j, label), code: j.code };
+    return { data: j };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let outcome = null;
+
+  // SSE frames are separated by a blank line; a chunk can split one anywhere,
+  // so the tail stays in the buffer until its terminator arrives.
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const line = frame.split('\n').find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line.slice(5).trim()); } catch { continue; }
+      if (msg.type === 'activity') pushActivity('event', { event: msg.event });
+      else if (msg.type === 'result') outcome = { data: msg.data };
+      else if (msg.type === 'error') outcome = { error: msg.error, code: msg.code };
+    }
+  }
+
+  // The stream ended without saying how it went — a dropped connection, or the
+  // function killed mid-run. Say that rather than resolving with nothing.
+  return outcome ?? {
+    error: 'The connection closed before the run finished. Your progress was saved — try again and it will pick up where it left off.',
+  };
+}
+
+// Wraps one streamed run: opens the log, reports the outcome, closes it.
+async function runStreamed(name, request, fallback) {
+  pushActivity('start', { name });
+  try {
+    const response = await request();
+    const out = await readActivityStream(response, fallback);
+    pushActivity('end', { error: out.error || null });
+    return out;
+  } catch {
+    pushActivity('end', { error: 'Network error.' });
+    return { error: 'Network error.' };
+  }
+}
+
+// Logo studio · divergence — six pencil croquis based on the next ordered
+// batch of references the client liked.
+async function apiGenerateLogoBoard(brandId, config, fresh) {
+  const out = await runStreamed(
+    'Sketching the board',
+    () => fetch('/api/generate/logo/board', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, config: config || {}, reset: !!fresh }),
+    }),
+    'Sketching the board failed.',
+  );
+  signalBalanceChanged(out.code);
+  if (out.error) return { error: out.error, code: out.code };
+  const j = out.data || {};
+  return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0, remaining: j.remaining };
+}
+
+async function apiRepairLogoBoard(brandId) {
+  const out = await runStreamed(
+    'Repairing concept images',
+    () => fetch('/api/generate/logo/board/repair', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    }),
+    'Could not repair the concept images.',
+  );
+  if (out.error) return { error: out.error, code: out.code };
+  return { board: (out.data || {}).board || [] };
+}
+
+// Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,
+// each in the colours the client set for it.
+async function apiRefineLogoSketches(brandId, conceptId, versions) {
+  const out = await runStreamed(
+    'Refining the concept',
+    () => fetch('/api/generate/logo/refine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, conceptId, versions: versions || [] }),
+    }),
+    'Refinement failed.',
+  );
+  signalBalanceChanged(out.code);
+  if (out.error) return { error: out.error, code: out.code };
+  return { finalists: (out.data || {}).finalists || [] };
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 }
 // Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
 async function apiVectorizeLogo(brandId, conceptId) {
@@ -7278,7 +9001,7 @@ async function apiVectorizeLogo(brandId, conceptId) {
     return { svg: j.svg || '', url: j.url || '' };
   } catch { return { error: 'Network error.' }; }
 }
-// Phase 3 — ask Claude to synthesize written brand guidelines.
+// Phase 3 — ask OpenAI to synthesize written brand guidelines.
 async function apiGenerateGuidelines(brandId) {
   try {
     const r = await fetch('/api/generate/guidelines', {
@@ -7444,16 +9167,50 @@ function BrandDraftProvider({ children }) {
       : { [key]: value };
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
     const d = draftRef.current;
-    if (!d || !d.id) return;
+    if (!d || !d.id) {
+      // No draft to write to, so this click changed nothing and never will.
+      // It used to return in silence, which looks exactly like a save: the
+      // card highlights from local state and reverts the moment the screen
+      // re-reads the draft. Say so instead of losing the work quietly.
+      console.warn('Ignored an edit with no draft loaded:', Object.keys(patch).join(', '));
+      makeToast('That change was not saved — reopen the brand and try again.');
+      return;
+    }
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const toSave = pendingPatch.current;
       pendingPatch.current = {};
       const updated = await apiUpdateBrand(d.id, toSave);
-      if (updated) refresh();
+      if (updated) {
+        refresh();
+        return;
+      }
+      // A failed save used to be dropped here without a word: the patch had
+      // already been cleared from the queue, so the edit was gone for good
+      // while the screen still showed it — until something re-read the draft
+      // and it reverted. Put the keys back so the next save carries them, and
+      // say that it happened.
+      pendingPatch.current = { ...toSave, ...pendingPatch.current };
+      console.warn('Failed to save:', Object.keys(toSave).join(', '));
+      makeToast('Could not save that change — it will retry with your next edit.');
     }, 500);
   }, [refresh]);
+
+  /**
+   * Merge keys into the brand's `data` blob.
+   *
+   * Every caller used to spread a copy of `data` captured when its screen last
+   * rendered, spreading it into setField('data', ...). That is only
+   * correct while nothing else has written since that render, and the logo flow
+   * breaks the assumption constantly: a screen reads `data`, a generation route
+   * writes a creative platform to the same brand, the screen then saves its stale copy.
+   * Reading from the ref means the base is always the live draft.
+   */
+  const setData = React.useCallback((patch) => {
+    const cur = (draftRef.current && draftRef.current.data) || {};
+    setField('data', { ...cur, ...patch });
+  }, [setField]);
 
   const startNew = React.useCallback(async (input) => {
     const b = await apiCreateBrand(input || { step: 1 });
@@ -7470,7 +9227,7 @@ function BrandDraftProvider({ children }) {
   // Clear the draft whenever we leave a creation flow, so each new project
   // begins fresh (resume re-selects an explicit saved draft).
   React.useEffect(() => {
-    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references'].includes(route)) setDraft(null);
+    if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches', 'logo-refine', 'logo-export'].includes(route)) setDraft(null);
   }, [route]);
 
   // Create the correct kind of draft when either brief screen opens.
@@ -7491,7 +9248,7 @@ function BrandDraftProvider({ children }) {
     apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
   }, [route]);
 
-  const value = { brands, draft, user, billing, refreshBalance, setField, startNew, loadBrand, refresh };
+  const value = { brands, draft, user, billing, refreshBalance, setField, setData, startNew, loadBrand, refresh };
   return (
     <BrandDraftCtx.Provider value={value}>
       {children}

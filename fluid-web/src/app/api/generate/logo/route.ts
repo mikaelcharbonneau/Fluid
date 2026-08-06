@@ -73,11 +73,12 @@ export async function POST(request: Request) {
   }
   await spendTokens(user.id, TOKEN_COST.asset);
 
-  const nextData = { ...data, logos };
-  const { error: saveError } = await supabase
-    .from("brands")
-    .update({ data: nextData })
-    .eq("id", brandId);
+  // Only this route's own key, merged atomically — a full-blob write would
+  // discard whatever the client saved while this request was running.
+  const { error: saveError } = await supabase.rpc("brands_merge_data", {
+    p_id: brandId,
+    p_patch: { logos },
+  });
   if (saveError) {
     console.error("Failed to cache generated logos:", saveError.message);
   }

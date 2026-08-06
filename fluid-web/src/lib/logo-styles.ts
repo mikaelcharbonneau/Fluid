@@ -44,26 +44,19 @@ export const MARK_TYPE_OPTIONS: MarkTypeOption[] = [
     id: "lettermark",
     name: "Lettermarks",
     blurb: "The initials, built as a monogram.",
+    // Single-letter marks live here too. They were briefly split out as their
+    // own "letterform" type, but the distinction is one a client shouldn't have
+    // to make on a card — both briefs are "build the mark from the initials".
     guidance:
-      "LETTERMARK: the brand's initials as the mark — a monogram of TWO OR MORE " +
-      "letters. The ownable move lives in the relationship between them: how they " +
-      "interlock, share a stroke, nest, or mirror. Build them on one consistent " +
-      "geometry so they read as a single designed unit, not letters set side by " +
-      "side. No accompanying symbol, no full name. If the brand has only one " +
-      "initial available, treat it as a letterform instead.",
-  },
-  {
-    id: "letterform",
-    name: "Letterforms",
-    blurb: "A single letter, pushed well past type.",
-    guidance:
-      "LETTERFORM: ONE single letter — the brand's initial — as the entire mark, " +
-      "drawn far past ordinary typography. Exactly one letter: no second " +
-      "initial, no symbol, no name. Take the letter's skeleton and do something " +
-      "specific and structural to it (extend a stem, cut or rotate a counter, " +
-      "reweight one axis, fuse a join). It must still read unmistakably as that " +
-      "letter — a form so abstracted the letter is lost is an abstract mark, not " +
-      "a letterform.",
+      "LETTERMARK: the brand's initials as the mark — one letter or several, no " +
+      "full name and no accompanying symbol. With TWO OR MORE letters the " +
+      "ownable move lives in the relationship between them: how they interlock, " +
+      "share a stroke, nest, or mirror; build them on one consistent geometry so " +
+      "they read as a single designed unit rather than letters set side by side. " +
+      "With a SINGLE letter, push it well past ordinary typography — extend a " +
+      "stem, cut or rotate a counter, reweight one axis, fuse a join — while " +
+      "keeping it unmistakably that letter. A form so abstracted the letter is " +
+      "lost has become an abstract mark.",
   },
   {
     id: "pictorial",
@@ -219,24 +212,229 @@ export function designStyleById(id: string | null | undefined): DesignStyleOptio
 
 // The user's Step 4 brief, stored on brands.data.logo_config.
 export interface LogoConfig {
+  // The concrete pick used for the concept currently being drawn. The main
+  // wizard sets this directly; in the standalone flow the server derives it
+  // from the selections below.
   mark_type?: string | null;
   design_style?: string | null;
   standalone_style?: string | null;
   instructions?: string | null;
+
+  // The standalone flow keeps one mark type and one visual direction for a
+  // coherent board. Arrays remain for backwards-compatible stored drafts.
+  mark_types?: string[] | null;
+  standalone_styles?: string[] | null;
 }
 
-// The standalone flow deliberately exposes neutral style placeholders while
-// product names and imagery are being finalized. Keep their prompt treatment
-// here so a card selection still produces a consistent, distinct concept set.
-const STANDALONE_STYLE_GUIDANCE: Record<string, string> = {
-  "placeholder-01": "Use a reduced, geometric construction with crisp edges, generous negative space, and a composed, considered rhythm.",
-  "placeholder-02": "Prioritize expressive custom typography, with one confident typographic gesture and a clean overall silhouette.",
-  "placeholder-03": "Use an organic, editorial sensibility: softened forms, tactile variation, and a warm but disciplined composition.",
-  "placeholder-04": "Use a bold, high-contrast composition with strong scale shifts and an assertive, memorable focal point.",
-  "placeholder-05": "Use an understated premium approach: refined proportions, restrained detail, and calm visual confidence.",
-  "placeholder-06": "Use an energetic modular system with clear movement, adaptable parts, and a contemporary digital feel.",
-  "fluid-choice": "Derive the visual treatment from the brand brief and mark type. Choose the most ownable, strategically appropriate direction rather than a generic category convention.",
-};
+// Keep only ids that name a real mark type, preserving order and dropping
+// duplicates. MARK_TYPE_AI is allowed: it means "the studio decides".
+export function normalizeMarkTypes(raw: unknown, limit = 1): string[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const item of list) {
+    const id = markTypeById(typeof item === "string" ? item.trim() : "")?.id;
+    if (id && !out.includes(id)) out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export function normalizeStandaloneStyles(raw: unknown, limit = 1): string[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const item of list) {
+    const id = typeof item === "string" ? item.trim() : "";
+    if (id && STANDALONE_STYLE_GUIDANCE[id] && !out.includes(id)) out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Which single type and direction this concept should use.
+//
+// A board is built one concept at a time, so `attempt` (how many concepts
+// already exist) rotates through the client's selections. Rotating the two
+// lists at different rates means three types and two styles produce six
+// distinct pairings before anything repeats, rather than three.
+export function selectionForAttempt(
+  config: LogoConfig,
+  attempt: number,
+): { mark_type: string | null; standalone_style: string | null } {
+  const types = config.mark_types?.length
+    ? config.mark_types
+    : (config.mark_type ? [config.mark_type] : []);
+  const styles = config.standalone_styles?.length
+    ? config.standalone_styles
+    : (config.standalone_style ? [config.standalone_style] : []);
+  return {
+    mark_type: types.length ? types[attempt % types.length] : null,
+    standalone_style: styles.length
+      ? styles[Math.floor(attempt / Math.max(types.length, 1)) % styles.length]
+      : null,
+  };
+}
+
+// Identity of the client's selection, used to decide whether an existing board
+// is still valid. Arrays preserve compatibility with older stored drafts.
+export function logoConfigSignature(config: LogoConfig): string {
+  const types = config.mark_types?.length
+    ? [...config.mark_types].sort()
+    : (config.mark_type ? [config.mark_type] : []);
+  const styles = config.standalone_styles?.length
+    ? [...config.standalone_styles].sort()
+    : (config.standalone_style ? [config.standalone_style] : []);
+  return JSON.stringify({
+    types,
+    styles,
+    design_style: config.design_style ?? null,
+    instructions: (config.instructions ?? "").trim(),
+  });
+}
+
+export interface StandaloneStyleOption {
+  id: string;
+  name: string;
+  /** One line on the card — what world this puts the brand in. */
+  blurb: string;
+  /** Prompt treatment handed to the generators. */
+  guidance: string;
+  /**
+   * Catalogued attributes this world is built from, used to pull matching
+   * references in Step 4. Curated per style rather than derived, so the
+   * gallery reflects an editorial view of each direction.
+   */
+  attributes: string[];
+}
+
+// Overall visual directions — whole worlds a brand can live in, not isolated
+// formal qualities. Each is deliberately orthogonal to MARK TYPE: you can draw
+// a Luxury mascot or a Brutalist wordmark, so this choice never duplicates the
+// structural choice made on the logo-type step.
+export const STANDALONE_STYLE_OPTIONS: StandaloneStyleOption[] = [
+  {
+    id: "minimal",
+    name: "Minimal",
+    blurb: "Reduced to essentials. Space, restraint, nothing decorative.",
+    guidance:
+      "MINIMAL: strip the mark to the fewest elements that still carry the idea. " +
+      "Generous negative space, one clear gesture, no ornament, no gradient, no " +
+      "texture. Precision matters more than invention — every line must earn its " +
+      "place. Monochrome, or a single restrained accent.",
+    attributes: ["minimal", "geometric", "monoline", "light", "negative-space"],
+  },
+  {
+    id: "organic",
+    name: "Organic",
+    blurb: "Natural, flowing forms. Softened edges and living curves.",
+    guidance:
+      "ORGANIC: forms derived from nature rather than the grid. Curves that vary " +
+      "in weight, asymmetric growth, softened terminals. Nothing mechanically " +
+      "repeated — the silhouette should read as grown rather than constructed. " +
+      "Warm, earthy palette.",
+    attributes: ["organic", "rounded", "warm", "hand-drawn", "blobby"],
+  },
+  {
+    id: "futurist",
+    name: "Futurist",
+    blurb: "Forward-looking and engineered. Precision with an edge.",
+    guidance:
+      "FUTURIST: an engineered, forward-leaning mark. Sharp angles or exact " +
+      "geometry, tight construction, a sense of speed or system. Gradients, " +
+      "dimensional depth and modular repetition are all available. Cool palette; " +
+      "nothing nostalgic and nothing hand-made.",
+    attributes: ["technical", "geometric", "angular", "modular", "gradient", "dimensional"],
+  },
+  {
+    id: "luxury",
+    name: "Luxury",
+    blurb: "Refined and premium. High contrast, generous space, restraint.",
+    guidance:
+      "LUXURY: restraint as the signal of quality. High-contrast letterforms or a " +
+      "finely drawn symbol, generous letterspacing, considered proportion. Nothing " +
+      "loud, nothing rounded-and-friendly. Monochrome, gold, or a single deep " +
+      "colour. It must still feel expensive at small size.",
+    attributes: ["elegant", "premium", "serif", "high-contrast", "extended"],
+  },
+  {
+    id: "playful",
+    name: "Playful",
+    blurb: "Energetic and informal. Rounded, colourful, full of character.",
+    guidance:
+      "PLAYFUL: informal energy. Rounded generous forms, bouncy rhythm, unexpected " +
+      "colour. It may wink — but it must still reduce cleanly and must never drift " +
+      "into clip-art. Bright or multi-colour palette welcome.",
+    attributes: ["playful", "rounded", "blobby", "polychrome", "two-colour"],
+  },
+  {
+    id: "retro",
+    name: "Retro",
+    blurb: "Period reference. Warmth and nostalgia, deliberately dated.",
+    guidance:
+      "RETRO: reference ONE specific era rather than a vague oldness — mid-century, " +
+      "seventies, or eighties. Period-correct letterforms, warm or muted palette, " +
+      "arched or contained lockups. The nostalgia must be deliberate and coherent, " +
+      "never a pastiche of several decades at once.",
+    attributes: ["retro", "warm", "arched", "outlined", "contained"],
+  },
+  {
+    id: "editorial",
+    name: "Editorial",
+    blurb: "Typographic and considered. Intelligent rather than opulent.",
+    guidance:
+      "EDITORIAL: a typographic sensibility drawn from publishing. Considered " +
+      "proportion, a confident serif or a finely cut sans, generous measure. " +
+      "Refined without signalling expense — distinct from LUXURY, which sells " +
+      "price. Restrained and largely monochrome.",
+    attributes: ["serif", "elegant", "ligature", "light", "minimal"],
+  },
+  {
+    id: "corporate",
+    name: "Corporate",
+    blurb: "Stable and credible. Built to be trusted for decades.",
+    guidance:
+      "CORPORATE: institutional credibility. Balanced, symmetrical, unfussy " +
+      "construction that will not date. Legible at any scale and in one colour. " +
+      "Confident but deliberately unfashionable — this mark has to look correct on " +
+      "a building and on a form in twenty years.",
+    attributes: ["geometric", "symmetrical", "minimal", "technical", "contained"],
+  },
+  {
+    id: "brutalist",
+    name: "Brutalist",
+    blurb: "Raw and stark. Heavy, industrial, unapologetic.",
+    guidance:
+      "BRUTALIST: maximum presence, deliberately unpolished. Heavy weight, stark " +
+      "contrast, blunt geometry, tight spacing, oversized or crudely cut forms " +
+      "with visible structure. Weight and scale do the work, never fine detail — " +
+      "so it survives reduction. Rejects refinement: no soft radii, no gradients, " +
+      "no charm. Monochrome and industrial, but controlled and intentional rather " +
+      "than careless.",
+    // Retuned: "modular" and "technical" pulled this toward FUTURIST — the
+    // matches were clean engineered geometry rather than anything raw. These are
+    // impact-and-starkness attributes, and they also carry the "make it bold"
+    // brief now that BOLD is gone (it was a weight dial, not a world).
+    attributes: ["heavy", "uppercase", "condensed", "high-contrast", "angular"],
+  },
+  {
+    id: "fluid-choice",
+    name: "Let Fluid choose",
+    blurb: "Let the brief decide the visual world.",
+    guidance:
+      "Derive the visual treatment from the brand brief and mark type. Choose the " +
+      "most ownable, strategically appropriate direction rather than a generic " +
+      "category convention.",
+    // No attribute filter: the whole library stays open.
+    attributes: [],
+  },
+];
+
+export function standaloneStyleById(id: string | null | undefined): StandaloneStyleOption | null {
+  return STANDALONE_STYLE_OPTIONS.find((s) => s.id === id) ?? null;
+}
+
+const STANDALONE_STYLE_GUIDANCE: Record<string, string> = Object.fromEntries(
+  STANDALONE_STYLE_OPTIONS.map((s) => [s.id, s.guidance]),
+);
 
 export function getLogoConfig(data: unknown): LogoConfig {
   const d = (data ?? {}) as Record<string, unknown>;

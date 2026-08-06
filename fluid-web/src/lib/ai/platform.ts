@@ -8,7 +8,7 @@
 // typography, guidelines) so the whole brand expresses one idea — cohesion is
 // the product.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { generateOpenAIText } from "./openai";
 
 export interface CreativeTerritory {
   key: string; // slug, e.g. "quiet-precision"
@@ -31,7 +31,10 @@ export interface PlatformBrief {
   styleContext?: string | null; // resolved Step 2 choices
 }
 
-const MODEL = "claude-opus-4-8";
+// The board route reserves at least 60s of its budget before making this call.
+// Bounded a bit above that reservation so a stuck call fails clearly inside
+// the route's clock guard instead of consuming its full deadline.
+const CALL_TIMEOUT_MS = 90_000;
 
 const SYSTEM = `You are the strategy director of Fluid, a brand studio operating
 at the level of Pentagram or Wolff Olins. Before any designer sketches, you
@@ -50,9 +53,8 @@ Rules:
   could take this brand. Each is a lens, not a style: e.g. "Engineering
   honesty" vs "Neighborhood warmth" lead to different marks, palettes, and
   voices. Give each a "key" (kebab-case slug), "name", and "description"
-  (1–2 sentences on how it would look and speak). When category research is
-  supplied, the territories must earn their place against it — pull away from
-  what the research calls saturated, and toward the whitespace it identifies.
+  (1–2 sentences on how it would look and speak). Ground every territory in
+  the client's brief and explicit design choices, not category cliches.
 - "design_notes": 2–3 sentences of visual guidance that apply across ALL
   territories — what this brand should never look like, and the register it
   must hold (e.g. "premium but never precious; avoid startup gradients").
@@ -123,21 +125,13 @@ function extractPlatform(text: string): CreativePlatform {
 export async function generateCreativePlatform(
   input: PlatformBrief,
 ): Promise<CreativePlatform> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-  const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 2000,
-    thinking: { type: "adaptive" },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
+  const text = await generateOpenAIText({
+    instructions: SYSTEM,
+    input: buildUserPrompt(input),
+    maxOutputTokens: 2_000,
+    reasoningEffort: "low",
+    timeoutMs: CALL_TIMEOUT_MS,
   });
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
   return extractPlatform(text);
 }
 

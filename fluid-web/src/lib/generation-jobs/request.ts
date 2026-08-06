@@ -12,6 +12,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeInput(action: GenerationAction, body: Record<string, unknown>) {
+<<<<<<< HEAD
   if (action === "logo_research") return {};
   const likedIds = Array.isArray(body.likedIds)
     ? body.likedIds.filter((value): value is string => typeof value === "string").slice(0, 20)
@@ -19,6 +20,10 @@ function normalizeInput(action: GenerationAction, body: Record<string, unknown>)
   if (action === "logo_refine") return { likedIds };
   const config = isObject(body.config) ? body.config : {};
   return { likedIds, config, reset: body.reset === true };
+=======
+  const config = isObject(body.config) ? body.config : {};
+  return { config, reset: body.reset === true };
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 }
 
 export async function enqueueGenerationRequest(
