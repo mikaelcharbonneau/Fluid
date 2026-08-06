@@ -120,7 +120,7 @@ export const STEPS: Step[] = [
   },
   {
     key: "logo",
-    text: "First the visual identity brief — then logo options drawn from it, the way a studio would brief a designer.",
+    text: "First the visual identity brief — then one logo drawn from it, the way a studio would brief a designer.",
     skill: "brand-identity",
   },
   {

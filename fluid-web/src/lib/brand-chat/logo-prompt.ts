@@ -1,17 +1,33 @@
-// Turning the visual identity brief into an image prompt.
+// Turning the visual identity brief + a concrete construction into an image
+// prompt for GPT Image 2.
 //
-// Not the wizard's prompt. That one starts from a style keyword and a curated
-// reference, because that is what its flow collected. This one starts from the
-// brief the conversation produced: the identity concept, the described
-// construction of one mark, the palette, and the client's list of refusals.
-//
-// The structure below is deliberate. An image model weights the front of a
-// prompt most heavily, so it opens with what the thing IS — a logo of a
-// specific structural type — before any art direction. The refusals go last,
-// where they read as constraints on everything above rather than as subject
-// matter to include.
+// Long strategy alone produces SaaS mill marks. The construction supplies the
+// geometry; anti-slop rules block the defaults the model reaches for first.
 
 import type { IdentityBrief, MarkDirection } from "./contracts";
+import type { LogoConstruction } from "./logo-concept";
+
+// Kept inline (not imported from design.ts) so the pure verifier can compile
+// this module without path aliases. Stay in sync with ANTI_CLICHE in design.ts.
+const ANTI_SLOP = `Banned clichés — never produce these:
+- The generic swoosh / arc "dynamism" gesture.
+- Globe or abstract planet with latitude lines.
+- Two or three overlapping translucent circles ("connection").
+- Gradient blob / amorphous liquid shape.
+- Generic hexagon, shield, or infinity symbol as the whole idea.
+- Lowercase name with a colored full stop as the only idea.
+- Chat bubble, light bulb, rocket, or handshake for tech/ideas/growth/trust.
+- Letterform with a leaf stuck on it for anything "sustainable".
+- Any mark whose idea is "modern and clean" — that is a finish, not an idea.
+- Rounded monogram letter inside a soft pill, stadium, or lozenge container
+  (the default "app icon H" every AI logo mill draws).
+- Generic geometric sans wordmark + teal/mint accent icon that could rebrand
+  as any SaaS product by changing three letters.
+- Combination layout that is always "rounded icon left, word right" with no
+  structural relationship between the two.
+- Perfect mirror symmetry with no optical tension or ownable construction.
+- Overused tech greens/teals as the only accent when the brief specifies a
+  different palette.`;
 
 /** What each mark type actually asks the renderer to draw. */
 const TYPE_INSTRUCTION: Record<string, (name: string) => string> = {
@@ -27,10 +43,10 @@ entire mark, drawn as constructed letterforms. Nothing else — no full name, no
 symbol beside it, no container. The interest is in how the letterform is built.`,
 
   combination: (name) =>
-    `A COMBINATION MARK: one symbol beside the word "${name}", designed as a
-single lockup. Symbol on the left, name on the right, optically aligned and
-sharing a baseline. The name must be spelled exactly "${name}" and be fully
-legible. The symbol must work on its own.`,
+    `A COMBINATION MARK: one symbol and the word "${name}", designed as a single
+lockup with a structural relationship between symbol and type — not a clip-art
+icon parked next to generic sans. The name must be spelled exactly "${name}"
+and be fully legible. The symbol must work on its own.`,
 
   pictorial: () =>
     `A PICTORIAL MARK: one recognisable real-world object, radically simplified
@@ -59,13 +75,6 @@ function initials(name: string): string {
     : parts[0].slice(0, 1).toUpperCase();
 }
 
-/**
- * Whether this mark type is allowed to contain letters at all.
- *
- * Worth being explicit about: an image model asked for an "abstract mark for
- * Cadence" will cheerfully add the word Cadence underneath. Saying so once,
- * plainly, is the difference between six usable marks and six captioned ones.
- */
 function carriesText(markType: string): boolean {
   return markType === "wordmark" || markType === "lettermark" ||
     markType === "combination" || markType === "emblem";
@@ -73,9 +82,6 @@ function carriesText(markType: string): boolean {
 
 /**
  * Build the prompt for one mark from a thin JSON identity (legacy path).
- *
- * Prefer {@link logoFromVisualIdentityBrief} — the skill-native brief carries
- * far more design signal than concept + one art paragraph.
  */
 export function markPrompt(opts: {
   name: string;
@@ -103,6 +109,8 @@ export function markPrompt(opts: {
     `COLOUR: draw only from this palette — ${palette}. Use one or two of them,
 not all five. Flat solid fills only.`,
     ``,
+    ...antiSlopBlock(),
+    ``,
     ...executionRules(name, markType, avoid),
   ];
 
@@ -110,51 +118,64 @@ not all five. Flat solid fills only.`,
 }
 
 /**
- * Logo generation the way the user validated offline:
- * full visual identity brief markdown → image model.
- *
- * `variation` asks for distinct expressions *within* the brief's logo
- * direction (not six unrelated brands).
+ * Single logo from full VIB + planned construction (chat production path).
  */
 export function logoFromVisualIdentityBrief(opts: {
   name: string;
   markType: string;
   briefMarkdown: string;
-  variation: number;
-  totalVariations: number;
+  construction: LogoConstruction;
   avoid?: string[];
+  /** Feedback from a failed quality gate, if redrawing. */
+  revisionNote?: string;
 }): string {
   const name = opts.name.trim() || "Brand";
   const markType = TYPE_INSTRUCTION[opts.markType] ? opts.markType : "wordmark";
   const avoid = (opts.avoid ?? []).filter(Boolean);
-  const v = Math.max(1, opts.variation);
-  const n = Math.max(1, opts.totalVariations);
-
-  // Cap length so the image API stays within practical prompt limits while
-  // still carrying strategy, logo direction, palette, and principles.
-  const brief = opts.briefMarkdown.trim().slice(0, 12_000);
+  const brief = opts.briefMarkdown.trim().slice(0, 10_000);
+  const { construction } = opts;
 
   return [
-    `Please generate a logo for my brand based on its visual identity described below.`,
+    `Please generate ONE logo for my brand based on its visual identity brief`,
+    `and the exact construction below. This is a finished identity mark, not a`,
+    `mood board and not four variants.`,
     ``,
     `A professional brand logo, presented alone on a plain white background.`,
     ``,
     TYPE_INSTRUCTION[markType](name),
     ``,
-    `VARIATION ${v} of ${n}: a distinct expression that still obeys the same`,
-    `identity brief — same strategy, palette discipline, and logo direction.`,
-    `Do not invent a different brand personality.`,
+    `OWNABLE IDEA: ${construction.idea}`,
+    ``,
+    `CONSTRUCTION TO DRAW EXACTLY (${construction.label}):`,
+    construction.art,
     ``,
     `=== VISUAL IDENTITY BRIEF ===`,
     brief,
     `=== END BRIEF ===`,
     ``,
-    `Follow the brief closely: strategy statement, logo direction (including`,
-    `references and what to avoid), colour palette and usage rules, and design`,
-    `principles. Prefer restraint and specificity over decoration.`,
+    `Follow the brief's strategy, logo direction, palette usage, and principles.`,
+    `Borrow *mechanics* from any named references (restraint, industrial confidence,`,
+    `system thinking) — never copy their trademarked marks.`,
+    opts.revisionNote
+      ? `\nREVISION REQUIRED — a creative director rejected the last render:\n${opts.revisionNote}\nFix those failures. Do not redraw the same rounded monogram/pill.`
+      : "",
+    ``,
+    ...antiSlopBlock(),
     ``,
     ...executionRules(name, markType, avoid),
-  ].join("\n");
+  ]
+    .filter((l) => l !== "")
+    .join("\n");
+}
+
+function antiSlopBlock(): string[] {
+  return [
+    `ANTI-SLOP (automatic fail if you draw these):`,
+    ANTI_SLOP,
+    `- Do not produce a "default AI startup logo": teal rounded letter-mark +`,
+    `  Inter/geometric sans wordmark with no structural idea.`,
+    `- Distinctiveness is required: one memorable, ownable move must be visible.`,
+  ];
 }
 
 function executionRules(name: string, markType: string, avoid: string[]): string[] {

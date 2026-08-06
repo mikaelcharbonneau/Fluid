@@ -86,7 +86,16 @@ export const ANTI_CLICHE = `Banned clichés — never produce these:
 - Lowercase name with a colored full stop as the only idea.
 - Chat bubble, light bulb, rocket, or handshake for tech/ideas/growth/trust.
 - Letterform with a leaf stuck on it for anything "sustainable".
-- Any mark whose idea is "modern and clean" — that is a finish, not an idea.`;
+- Any mark whose idea is "modern and clean" — that is a finish, not an idea.
+- Rounded monogram letter inside a soft pill, stadium, or lozenge container
+  (the default "app icon H" every AI logo mill draws).
+- Generic geometric sans wordmark + teal/mint accent icon that could rebrand
+  as any SaaS product by changing three letters.
+- Combination layout that is always "rounded icon left, word right" with no
+  structural relationship between the two.
+- Perfect mirror symmetry with no optical tension or ownable construction.
+- Overused tech greens/teals as the only accent when the brief specifies a
+  different palette.`;
 
 // Scoring rubric used by the creative-director critique pass, and referenced by
 // generators so they know the bar they will be judged against.
