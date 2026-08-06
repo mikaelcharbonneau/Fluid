@@ -2,9 +2,12 @@
 //
 // Pipeline:
 //   1. brand-identity skill → full markdown visual identity brief
-//   2. gpt-5.6-sol → one concrete logo construction (geometry, not mood)
-//   3. gpt-image-2 (high quality) → one render from brief + construction
-//   4. vision quality gate → one optional redesign+redraw if it fails
+//   2. gpt-5.6-sol → one concrete logo construction
+//   3. gpt-image-2 (high) → one render
+//   4. quality score (vision) → at most ONE redraw if score is catastrophic
+//
+// There is no loop. The first successful PNG is always kept as a fallback so
+// a failed redesign or a route-timeout risk still leaves the user with a mark.
 
 import { renderLogoImage, IMAGE_MODEL } from "@/lib/ai/images";
 import type { Activity } from "@/lib/ai/activity";
@@ -48,9 +51,17 @@ const VARIATION_COUNT = 1;
 
 /** High quality unlocks GPT Image 2's stronger reasoning / fidelity path. */
 const RENDER_QUALITY = "high" as const;
+/** Slightly lighter on the optional redraw so we stay inside the route budget. */
+const RETRY_RENDER_QUALITY = "medium" as const;
 
-/** Time for one high-quality image (including a transient-status retry). */
-const RENDER_TIMEOUT_MS = 150_000;
+const RENDER_TIMEOUT_MS = 120_000;
+const RETRY_RENDER_TIMEOUT_MS = 90_000;
+
+/**
+ * Hard wall for the whole logo step inside the route's 300s. If we are past
+ * this after the first mark, we skip the quality-driven redraw entirely.
+ */
+const REDRAW_DEADLINE_MS = 200_000;
 
 /**
  * The answers a set of marks depends on.
@@ -72,6 +83,7 @@ export async function generateLogoSet(
   context: BrandContext,
   activity: Activity = silentActivity,
 ): Promise<LogoSet> {
+  const startedAt = Date.now();
   const name = (context.name ?? "").trim() || "Untitled";
   const markType = context.logoType ?? "wordmark";
   const key = logoInputsKey(context);
@@ -96,7 +108,7 @@ export async function generateLogoSet(
     `Brief ready — drawing one mark with ${IMAGE_MODEL} (high quality)`,
   );
 
-  let construction = await designLogoConstruction({
+  const construction = await designLogoConstruction({
     name,
     markType,
     briefMarkdown,
@@ -104,7 +116,7 @@ export async function generateLogoSet(
     activity,
   });
 
-  let mark = await renderOnce({
+  const first = await renderOnce({
     brandId,
     name,
     markType,
@@ -112,51 +124,73 @@ export async function generateLogoSet(
     construction,
     avoid,
     slot: 0,
+    quality: RENDER_QUALITY,
+    timeoutMs: RENDER_TIMEOUT_MS,
     activity,
   });
 
-  if (mark.image_url) {
+  // Always prefer a successful first render. The quality gate may improve on
+  // it once — it may never discard it in favour of nothing.
+  let mark = first;
+
+  if (first.image_url) {
     const verdict = await critiqueLogoImage({
-      imageUrl: mark.image_url,
+      imageUrl: first.image_url,
       name,
       construction,
       briefExcerpt: concept,
       activity,
     });
 
-    if (!verdict.pass) {
-      activity.emit("note", "Redesigning after quality gate failure");
-      construction = await designLogoConstruction({
-        name,
-        markType,
-        briefMarkdown,
-        avoid,
-        revisionNote: verdict.note,
-        activity,
-      });
-      mark = await renderOnce({
-        brandId,
-        name,
-        markType,
-        briefMarkdown,
-        construction,
-        avoid,
-        slot: 1,
-        revisionNote: verdict.note,
-        activity,
-      });
+    const elapsed = Date.now() - startedAt;
+    const timeForRetry = elapsed < REDRAW_DEADLINE_MS;
 
-      if (mark.image_url) {
-        // Second gate is advisory — we ship the redesign even if it still
-        // scores low so the user is never stuck with nothing.
-        await critiqueLogoImage({
-          imageUrl: mark.image_url,
+    if (verdict.shouldRetry && timeForRetry) {
+      // Exactly one attempt. No loop. Keep `first` if the redesign fails.
+      activity.emit(
+        "note",
+        "One redesign attempt (not a loop) — first mark kept if this fails",
+        verdict.note,
+      );
+
+      try {
+        // Re-render only: same construction, revision notes in the image prompt.
+        // A full second construction plan was blowing the 300s route budget.
+        const second = await renderOnce({
+          brandId,
           name,
+          markType,
+          briefMarkdown,
           construction,
-          briefExcerpt: concept,
+          avoid,
+          slot: 1,
+          quality: RETRY_RENDER_QUALITY,
+          timeoutMs: RETRY_RENDER_TIMEOUT_MS,
+          revisionNote: verdict.note,
           activity,
         });
+        if (second.image_url) {
+          mark = second;
+          activity.emit("note", `Shipped redesign "${second.label}"`);
+        } else {
+          activity.emit(
+            "warn",
+            "Redesign failed — shipping the first mark instead",
+            second.error,
+          );
+          mark = first;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Redesign failed.";
+        activity.emit("warn", `Redesign aborted — shipping the first mark (${message})`);
+        mark = first;
       }
+    } else if (verdict.shouldRetry && !timeForRetry) {
+      activity.emit(
+        "warn",
+        `Quality score ${verdict.score}/100 but no time left for a redraw — shipping this mark`,
+        verdict.note,
+      );
     }
   }
 
@@ -189,11 +223,13 @@ async function renderOnce(opts: {
   construction: LogoConstruction;
   avoid: string[];
   slot: number;
+  quality: "low" | "medium" | "high";
+  timeoutMs: number;
   revisionNote?: string;
   activity: Activity;
 }): Promise<LogoMark> {
   const { construction, activity } = opts;
-  const done = activity.phase(`Rendering with ${IMAGE_MODEL}`);
+  const done = activity.phase(`Rendering with ${IMAGE_MODEL} (${opts.quality})`);
   const prompt = logoFromVisualIdentityBrief({
     name: opts.name,
     markType: opts.markType,
@@ -209,8 +245,8 @@ async function renderOnce(opts: {
       phase: "chat-logo",
       slot: String(opts.slot),
       prompt,
-      quality: RENDER_QUALITY,
-      timeoutMs: RENDER_TIMEOUT_MS,
+      quality: opts.quality,
+      timeoutMs: opts.timeoutMs,
       onPrompt: (sent, model) =>
         activity.emit("prompt", `Prompt for "${construction.label}" (${model})`, sent),
     });
@@ -235,5 +271,4 @@ async function renderOnce(opts: {
   }
 }
 
-// Re-export for callers that still reference the constant.
 export { VARIATION_COUNT };
