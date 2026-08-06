@@ -504,24 +504,28 @@ const DirA_Brands = () => (
         </div>
         <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14}}>
           <QuickPath
+            route={CHAT + '?flow=audit'}
             title="Rebranding"
             sub="Refresh an existing brand. Keep what works, update the rest."
             preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=logo-only'}
             title="Logo"
             sub="Skip the strategy. Drop a name, get marks in seconds."
             preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=name-only'}
             title="Name"
             sub="Nine names with reasoning and domain status."
             preview={__assets['assets/min/preview-name.jpg']} previewBg="#F3F3F4"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>}
           />
           <QuickPath
+            route={CHAT + '?flow=guidelines-only'}
             title="Guidelines"
             sub="Already have a logo and palette? We'll write the rules."
             preview={__assets['assets/min/preview-guidelines.jpg']} previewBg="#F4F6F5"
@@ -6900,20 +6904,21 @@ const DirA_Home = () => {
         </div>
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           <QuickPath
+            route={CHAT + '?flow=audit'}
             title="Rebranding"
             sub="Refresh an existing brand. Keep what works, update the rest."
             preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=logo-only'}
             title="Logo"
             sub="Skip the strategy. Drop a name, get marks in seconds."
             preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
-            route="logo-brief"
-            onClick={() => navigate('logo-brief')}
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=name-only'}
             title="Name"
             sub="Nine names with reasoning and domain status."
             previewBg="#F4F4F5"
@@ -6929,6 +6934,7 @@ const DirA_Home = () => {
             icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>} />
           
           <QuickPath
+            route={CHAT + '?flow=guidelines-only'}
             title="Guidelines"
             sub="Already have a logo and palette? We'll write the rules."
             previewBg="#FFFFFF"
@@ -7572,6 +7578,10 @@ const ROUTE_META = {
 };
 
 // Crumb label → route the user expects to land on when clicking it.
+// Brand creation is a conversation at its own URL. resolveClick may return
+// this instead of a hash route; the delegate navigates out when it sees one.
+const CHAT = '/app/chat';
+
 const CRUMB_TO_ROUTE = {
   'Home':      'home',
   'Brands':    'brands',
@@ -7597,6 +7607,15 @@ function resolveClick(target, currentRoute, out) {
   //    the delegate calls stopPropagation when it matches, a hijacked button
   //    never reaches its own onClick at all. Opting out leaves the event alone.
   if (target.closest && target.closest('[data-selfnav]')) return null;
+
+  // 0b) An explicit destination beats every heuristic below, and has to be
+  //     checked before them. `cursor` is an inherited property, so the walk in
+  //     step 4 hits the deepest child under the pointer first, reads its
+  //     fragment of text, fails to match, and returns null — never reaching
+  //     the ancestor carrying data-route. Any card with clickable-looking
+  //     children was therefore unroutable no matter what route it declared.
+  const routed = target.closest && target.closest('[data-route]');
+  if (routed && routed.dataset.route) return routed.dataset.route;
 
   // 1) Fluid wordmark in the top dock — always goes Home.
   if (target.closest && target.closest('.fl-wordmark')) return 'home';
@@ -7654,26 +7673,26 @@ function matchCtaText(text, currentRoute, out) {
   if (text === 'Assemble Brand Kit')             return 'step5';
   if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
 
-  // Top-level CTAs from Home / Brands.
-  if (text.includes('Start a new brand'))        return 'step1';
+  // Top-level CTAs from Home / Brands. Creating a brand is a conversation
+  // now; the step wizard is only reached by resuming one that started there.
+  if (text.includes('Start a new brand'))        return CHAT;
   if (text === 'Browse templates'
    || text === 'Browse template library')        return 'brands-empty';
   if (/^Resume [A-Z]/.test(text))                return 'step4';
   if (text === 'All brands' || text === 'All brands →') return 'brands';
-  if (text === '+ New brand' || text === 'New brand') return 'step1';
+  if (text === '+ New brand' || text === 'New brand') return CHAT;
 
   // Kit screen secondary actions.
   if (text === 'Iterate')                        return 'step4';
   if (text === 'Export kit' || text === 'Share read-only'
    || text === 'Download all') { out.toast = text + ' — coming soon'; return null; }
 
-  // Home quick paths — each card ends in "Start" + arrow.
-  if (/ Start$/.test(text)) {
-    if (/^Rebranding\b/.test(text)) return 'step1';
-    if (/^Logo\b/.test(text))       return 'logo-brief';
-    if (/^Name\b/.test(text))       return 'step1';
-    if (/^Guidelines\b/.test(text)) return 'step1';
-  }
+  // The four Home quick-path cards are NOT matched here. They carry an
+  // explicit data-route, which step 4 above reads on the way up. Text matching
+  // cannot work for them: `cursor` is an inherited property, so the first
+  // cursor:pointer node above a click is the deepest child under the pointer,
+  // and the text read is a fragment like "Start" rather than the card's. That
+  // is why those cards routed nowhere for so long.
 
   // BrandsActive — brand cards open the kit.
   if (/^(Apple|Figma|Perplexity|Tesla|Cadence|Linear|Notion|Arc|Vercel|Stripe)\b/.test(text)
@@ -7739,7 +7758,10 @@ function RouterProvider({ children }) {
       if (dest) {
         e.preventDefault();
         e.stopPropagation();
-        navigate(dest);
+        // Brand creation lives at its own URL now, not in this hash router.
+        // A destination starting with "/" leaves the prototype entirely.
+        if (dest.charAt(0) === '/') location.assign(dest);
+        else navigate(dest);
       } else if (out.toast) {
         e.preventDefault();
         e.stopPropagation();

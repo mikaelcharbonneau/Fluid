@@ -62,6 +62,28 @@ export interface BrandKit {
   guidelines: string;
 }
 
+/** One mark to draw: what it is, and enough geometry to actually draw it. */
+export interface MarkDirection {
+  /** Two to four words naming the approach, e.g. "Interlocking K". */
+  label: string;
+  /** A paragraph of art direction. This is what reaches the renderer. */
+  art: string;
+}
+
+/**
+ * The visual identity brief the marks are drawn from.
+ *
+ * One skill call produces the whole thing, so the six marks are siblings —
+ * variations on one identity — rather than six unrelated ideas that happen to
+ * share a name.
+ */
+export interface IdentityBrief {
+  /** The visual idea, in two or three sentences. */
+  concept: string;
+  palette: Array<{ hex: string; role: string }>;
+  marks: MarkDirection[];
+}
+
 // ---- parsing helpers -------------------------------------------------
 //
 // Shared because every parser needs the same four, and each one hand-rolling
@@ -327,6 +349,69 @@ export function parseKit(value: unknown): BrandKit {
     });
   if (palette.length < 5) throw new Error("The studio returned fewer than five colours.");
   return { palette, guidelines: str(root.guidelines, "guidelines") };
+}
+
+// ---- visual identity brief -------------------------------------------
+
+/**
+ * What `brand-identity` is asked for before any mark is drawn.
+ *
+ * The art direction is the load-bearing field. An image model given "a modern
+ * minimal mark" returns a different lottery ticket every time; given a
+ * described construction it returns that construction. So the contract asks
+ * for geometry, and refuses adjectives standing in for a drawing.
+ */
+export function identityContract(name: string, markType: string, avoid: string[]): string {
+  return `The brand is called "${name}" and the mark is a ${markType}.
+
+Return {"concept": "...", "palette": [...], "marks": [...]}.
+
+- "concept": two or three sentences on the visual idea this identity is built
+  on. What it takes from the positioning and the personality, and what it
+  deliberately refuses.
+- "palette": exactly 5 colours, each {"hex": "#RRGGBB", "role": "..."}, ordered
+  dark to light. Six hex digits with a leading #.
+- "marks": exactly 6 objects, each {"label", "art"} — six takes on ONE identity,
+  not six unrelated ideas.
+  - "label": two to four words naming the approach, e.g. "Interlocking K" or
+    "Single arc, off-centre".
+  - "art": one paragraph describing the mark's actual construction — the
+    shapes, how they meet, what happens in the negative space, the weight of
+    the strokes, whether it is symmetrical. Concrete enough that two designers
+    given this paragraph would draw close to the same thing. Adjectives like
+    "modern", "clean" or "premium" describe a mood, not a mark: they do not
+    belong in this field on their own.
+${avoid.length ? `\nThe client has ruled these out entirely — none may appear in any mark: ${avoid.join(", ")}.` : ""}`;
+}
+
+export function parseIdentity(value: unknown): IdentityBrief {
+  const root = obj(value, "concept");
+  const palette = arr(root.palette, "palette")
+    .slice(0, 5)
+    .map((item) => {
+      const o = obj(item, "palette[]");
+      const hex = str(o.hex, "hex");
+      if (!HEX.test(hex)) throw new Error(`"${hex}" is not a six-digit hex colour.`);
+      return { hex: hex.toUpperCase(), role: str(o.role, "role") };
+    });
+  if (palette.length < 5) throw new Error("The studio returned fewer than five colours.");
+
+  const marks = arr(root.marks, "marks")
+    .slice(0, 6)
+    .map((item) => {
+      const o = obj(item, "marks[]");
+      const art = str(o.art, "art");
+      // A one-line "art" field is a mood, not a construction, and produces a
+      // different mark on every render. Catch it here rather than paying for
+      // six images to find out.
+      if (art.length < 80) {
+        throw new Error("The studio's art direction was too thin to draw from.");
+      }
+      return { label: str(o.label, "label"), art };
+    });
+  if (marks.length < 6) throw new Error("The studio returned fewer than six marks.");
+
+  return { concept: str(root.concept, "concept"), palette, marks };
 }
 
 // ---- assists ---------------------------------------------------------

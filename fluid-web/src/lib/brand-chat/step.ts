@@ -17,6 +17,7 @@ import {
   generateTaglines,
   generateVoices,
 } from "./generate";
+import { generateLogoSet, logoInputsKey, type LogoSet } from "./logo";
 import type {
   BrandKit,
   DirectionOption,
@@ -35,6 +36,7 @@ import type {
  */
 export type StepPayload =
   | { kind: "none" }
+  | { kind: "logo"; logo: LogoSet }
   | { kind: "name"; names: NameCandidate[] }
   | { kind: "direction"; directions: DirectionOption[]; recommended: string }
   | { kind: "position"; position: PositionRead }
@@ -50,21 +52,47 @@ export interface RenderedStep {
   payload: StepPayload;
 }
 
-/** Does reaching this step cost a generation? Used to price the turn. */
-export function stepGenerates(step: Step): boolean {
-  // `logo` names a skill, but the marks come from the existing image pipeline
-  // rather than from a text call here, so it is not billed by this route.
-  return !!step.skill && step.key !== "logo";
+/**
+ * Does reaching this step cost a generation? Used to price the turn.
+ *
+ * The logo step is the exception worth naming: it is the only one that also
+ * renders images, and re-entering it with an unchanged brief serves the set
+ * already paid for rather than drawing six more.
+ */
+export function stepGenerates(step: Step, context: BrandContext): boolean {
+  if (!step.skill) return false;
+  if (step.key === "logo") return !cachedLogo(context);
+  return true;
+}
+
+/** A stored mark set, if it still answers the brief the client has now. */
+function cachedLogo(context: BrandContext): LogoSet | null {
+  const cached = context.logoSet;
+  if (!cached || cached.key !== logoInputsKey(context)) return null;
+  // A set whose every render failed is not worth serving back.
+  return cached.marks.some((m) => m.image_url) ? cached : null;
 }
 
 export async function renderStep(
   step: Step,
   context: BrandContext,
   activity: Activity,
+  brandId = "",
 ): Promise<RenderedStep> {
   const base = { key: step.key, text: step.text };
 
   switch (step.key) {
+    case "logo": {
+      const cached = cachedLogo(context);
+      if (cached) {
+        activity.emit("note", "Reusing the marks already drawn for this brief");
+        return { ...base, payload: { kind: "logo", logo: cached } };
+      }
+      return {
+        ...base,
+        payload: { kind: "logo", logo: await generateLogoSet(brandId, context, activity) },
+      };
+    }
     case "name":
       return {
         ...base,

@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { STEPS, getFlow } from "@/lib/brand-chat/flow";
+import { FLOWS, STEPS, getFlow } from "@/lib/brand-chat/flow";
 import { DEFAULT_PERSONALITY, type BrandContext } from "@/lib/brand-chat/context";
 import type { RenderedStep } from "@/lib/brand-chat/step";
 import type { ActivityEvent } from "@/lib/ai/activity";
@@ -62,6 +62,13 @@ export function BrandChat() {
   const [resumeId] = useState(() =>
     new URLSearchParams(window.location.search).get("brand"),
   );
+  // ?flow=logo-only — the app's "Logo · Start" style entry points name the job
+  // up front, so the first question is answered before it is asked.
+  const [presetFlow] = useState(() => {
+    if (new URLSearchParams(window.location.search).get("brand")) return null;
+    const flow = new URLSearchParams(window.location.search).get("flow");
+    return flow && FLOWS.some((f) => f.id === flow) ? flow : null;
+  });
   const [msgs, setMsgs] = useState<Msg[]>([
     {
       id: "ai-0",
@@ -73,6 +80,7 @@ export function BrandChat() {
   ]);
   const [context, setContext] = useState<BrandContext>({});
   const [busy, setBusy] = useState(!!resumeId);
+  const started = useRef(false);
   const [status, setStatus] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [tokens, setTokens] = useState<number | null>(null);
@@ -88,6 +96,8 @@ export function BrandChat() {
   // current id without waiting for a re-render, and two rapid answers must not
   // each create their own draft brand.
   const brandRef = useRef<string | null>(resumeId);
+  // Read by callbacks that must not be re-created on every context change.
+  const contextRef = useRef<BrandContext>({});
 
   // ---- typing --------------------------------------------------------
   useEffect(() => {
@@ -132,7 +142,10 @@ export function BrandChat() {
     if (!resumeId) return;
     postTurn({ brandId: resumeId }).then((out) => {
       setBusy(false);
-      if (out.context) setContext(out.context);
+      if (out.context) {
+        contextRef.current = out.context;
+        setContext(out.context);
+      }
       if (out.error) {
         setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
         return;
@@ -188,7 +201,10 @@ export function BrandChat() {
 
       setBusy(false);
       setStatus(null);
-      if (out.context) setContext(out.context);
+      if (out.context) {
+        contextRef.current = out.context;
+        setContext(out.context);
+      }
 
       if (out.error) {
         setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
@@ -212,6 +228,13 @@ export function BrandChat() {
     },
     [busy, ensureBrand],
   );
+  // An entry point that already named the job answers the first question for
+  // the user. Guarded by a ref because running twice would create two drafts.
+  useEffect(() => {
+    if (!presetFlow || started.current) return;
+    started.current = true;
+    submit("path", presetFlow);
+  }, [presetFlow, submit]);
 
   // ---- assists -------------------------------------------------------
 
@@ -276,6 +299,36 @@ export function BrandChat() {
     [ensureBrand],
   );
 
+  // "Draw six more" re-runs the logo step. The cached set is keyed on the
+  // brief, so asking again with the same brief would serve the same six back —
+  // clearing it is what makes the button mean what it says.
+  const [redrawing, setRedrawing] = useState(false);
+  const redrawMarks = useCallback(async () => {
+    const id = brandRef.current;
+    if (!id || busy) return;
+    setRedrawing(true);
+    setContext((cur) => ({ ...cur, logoSet: undefined }));
+    const out = await postTurn(
+      { brandId: id, step: "logoType", value: contextRef.current.logoType ?? "wordmark" },
+      (event) => setStatus(event.label),
+    );
+    setRedrawing(false);
+    setStatus(null);
+    if (out.context) setContext(out.context);
+    if (out.error) {
+      setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
+      return;
+    }
+    if (out.step) {
+      const step = out.step;
+      setMsgs((cur) => {
+        const at = cur.findIndex((m) => m.step?.key === "logo");
+        const kept = at === -1 ? cur : cur.slice(0, at);
+        return [...kept, { id: `ai-logo-${kept.length}-${Date.now()}`, role: "ai", text: step.text, full: step.text, step }];
+      });
+    }
+  }, [busy]);
+
   const sendComposer = () => {
     const text = composer.trim();
     if (!text || busy) return;
@@ -325,6 +378,8 @@ export function BrandChat() {
                   setNamePage={setNamePage}
                   moreNames={moreNames}
                   moreBusy={moreBusy}
+                  redrawMarks={redrawMarks}
+                  redrawing={redrawing}
                 />
               ))}
 
@@ -417,6 +472,8 @@ interface MessageProps {
   setNamePage: (n: number) => void;
   moreNames: (shown: NameCandidate[]) => void;
   moreBusy: boolean;
+  redrawMarks: () => void;
+  redrawing: boolean;
 }
 
 function Message(props: MessageProps) {
@@ -561,7 +618,8 @@ function answeredKeys(ctx: BrandContext): Set<string> {
 // ---- widget dispatch -------------------------------------------------
 
 function Widget({
-  step, context, busy, submit, assist, rewriteBrief, nameBatches, namePage, setNamePage, moreNames, moreBusy,
+  step, context, busy, submit, assist, rewriteBrief, nameBatches, namePage, setNamePage,
+  moreNames, moreBusy, redrawMarks, redrawing,
 }: MessageProps & { step: RenderedStep }) {
   const answered = answeredKeys(context).has(step.key);
   const send = (value: unknown) => submit(step.key, value);
@@ -668,11 +726,14 @@ function Widget({
         />
       );
     case "logo":
+      if (step.payload.kind !== "logo") return null;
       return (
         <LogoWidget
           {...common}
-          name={context.name ?? "Your brand"}
-          logoType={context.logoType ?? "wordmark"}
+          logo={step.payload.logo}
+          value={context.logo?.image_url}
+          onRedraw={redrawMarks}
+          redrawing={redrawing}
           submit={send}
         />
       );
@@ -700,6 +761,7 @@ function Widget({
           name={context.name ?? "Your brand"}
           tagline={context.tagline}
           voiceSample={context.voiceSample}
+          logo={context.logo}
         />
       );
     default:

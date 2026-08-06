@@ -73,6 +73,26 @@ export interface BrandContext {
   direction?: string;
   avoid?: string[];
   logoType?: string;
+  /**
+   * The mark the client picked: its public URL and the art direction behind
+   * it. Stored so the kit can show the real logo, and so re-entering the step
+   * does not lose the choice.
+   */
+  logo?: { image_url: string; label: string; art: string };
+  /**
+   * The last set of marks drawn, and the brief they answer.
+   *
+   * Six image renders is the most expensive thing this flow does. Keeping the
+   * set means going back a step and forward again shows the marks already paid
+   * for; `logoSet.key` is what decides whether they still apply. Typed loosely
+   * here to keep this module free of a dependency on the renderer.
+   */
+  logoSet?: {
+    concept: string;
+    palette: Array<{ hex: string; role: string }>;
+    marks: Array<{ slot: number; label: string; art: string; image_url: string | null; error?: string }>;
+    key: string;
+  };
 
   /** The chosen register's name, e.g. "Quiet Coach" — not its id. */
   voice?: string;
@@ -180,6 +200,7 @@ export function renderBrandContext(ctx: BrandContext): string {
     // the original document has nowhere to put. Kept in a clearly separate
     // section so the sections above stay a faithful copy of the contract.
     "## Identity decisions (Fluid)",
+    `- **Chosen mark**: ${ctx.logo ? `${ctx.logo.label} — ${ctx.logo.art}` : NOT_CAPTURED}`,
     `- **Chosen voice**: ${text(ctx.voice)}`,
     `- **Voice, written**: ${text(ctx.voiceSample)}`,
     `- **Chosen tagline**: ${text(ctx.tagline)}`,

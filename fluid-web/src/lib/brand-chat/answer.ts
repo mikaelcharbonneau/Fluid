@@ -129,11 +129,23 @@ export function applyAnswer(
       return { ...ctx, avoid: Array.isArray(value) ? chipsAllowEmpty(value) : [] };
     case "logoType":
       return { ...ctx, logoType: text(value, "Mark type") };
-    case "logo":
-      // The chosen mark is an asset, not context — it is stored by the logo
-      // pipeline against the brand, and the context only needs to know a
-      // choice was made so downstream steps can stop asking.
-      return ctx;
+    case "logo": {
+      // The URL is one we minted and handed to this client a moment ago, but
+      // it arrives back through a browser, so it is checked rather than
+      // trusted: anything else here would end up rendered as an <img src> and
+      // written into the brand.
+      const o = (value ?? {}) as Record<string, unknown>;
+      const url = text(o.image_url, "Mark");
+      if (!/^https:\/\/[^\s]+$/i.test(url)) throw new Error("That mark could not be read.");
+      return {
+        ...ctx,
+        logo: {
+          image_url: url,
+          label: text(o.label, "Mark label").slice(0, MAX_CHIP),
+          art: typeof o.art === "string" ? o.art.trim().slice(0, MAX_TEXT) : "",
+        },
+      };
+    }
     case "voice": {
       // The register's id means nothing to a skill, and its name alone means
       // little more. What carries the decision is the line it was chosen on,

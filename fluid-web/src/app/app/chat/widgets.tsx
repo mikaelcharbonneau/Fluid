@@ -14,7 +14,6 @@ import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   AVOIDS, CATEGORIES, GOALS, LOGO_TYPES, PATHS, SLIDERS, STAGES, TIMINGS, VALUES,
-  lockups, type Lockup,
 } from "./data";
 import {
   CARD, CORAL, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER,
@@ -24,6 +23,7 @@ import { Arrow, Check, ChevronLeft, Chevron, Close, Heart, Refresh, Sparkle } fr
 import type {
   BrandKit, DirectionOption, LaunchPlan, NameCandidate, PositionRead, TaglineOption, VoiceOption,
 } from "@/lib/brand-chat/contracts";
+import type { LogoSet } from "@/lib/brand-chat/logo";
 import type { Personality } from "@/lib/brand-chat/context";
 
 export interface WidgetProps<T> {
@@ -748,120 +748,106 @@ export function LogoTypeWidget({ submit, busy, value }: WidgetProps<string> & { 
 
 // ---- marks -----------------------------------------------------------
 
-function shapeCss(shape: string, size: number, color: string): CSSProperties {
-  const base = { width: size, height: size, background: color };
-  if (shape === "square") return { ...base, borderRadius: 6 };
-  if (shape === "diamond") return { ...base, borderRadius: 4, transform: "rotate(45deg)" };
-  return { ...base, borderRadius: 99 };
-}
-
-function ringCss(shape: string, w: number, ring: string, bg: string): CSSProperties {
-  const base: CSSProperties = {
-    width: 60, height: 60, display: "flex", alignItems: "center",
-    justifyContent: "center", background: bg, boxShadow: `inset 0 0 0 ${w}px ${ring}`,
-  };
-  if (shape === "square") return { ...base, borderRadius: 10 };
-  if (shape === "diamond") return { ...base, borderRadius: 8, transform: "rotate(45deg)" };
-  return { ...base, borderRadius: 99 };
-}
-
-function Mark({ g }: { g: Lockup }) {
-  const textStyle: CSSProperties = {
-    fontFamily: g.family,
-    fontWeight: g.weight,
-    fontSize: g.size,
-    letterSpacing: g.tracking,
-    textTransform: g.transform as CSSProperties["textTransform"],
-    color: g.fg,
-    whiteSpace: "nowrap",
-    lineHeight: 1,
-  };
-
-  if (g.mode === "pending") {
-    return (
-      <div style={{
-        width: "100%", height: "100%", borderRadius: 12, backgroundColor: "#F0F0F2",
-        backgroundImage: "repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 7px,rgba(0,0,0,0) 7px 14px)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px", textAlign: "center",
-      }}>
-        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".04em", color: "rgba(0,0,0,.42)", lineHeight: 1.4 }}>
-          {g.note}
-        </span>
-      </div>
-    );
-  }
-  if (g.mode === "emblem") {
-    return (
-      <div style={ringCss(g.ringShape ?? "circle", g.ringWidth ?? 2, g.ring ?? INK, g.bg)}>
-        <span style={{ ...textStyle, ...(g.ringShape === "diamond" ? { transform: "rotate(-45deg)" } : {}) }}>
-          {g.text}
-        </span>
-      </div>
-    );
-  }
-  if (g.mode === "combo") {
-    return (
-      <>
-        <div style={shapeCss(g.shape ?? "circle", 22, g.shapeColor ?? INK)} />
-        <span style={textStyle}>{g.text}</span>
-      </>
-    );
-  }
-  return (
-    <>
-      <span style={textStyle}>{g.text}</span>
-      {g.dot ? <span style={{ ...textStyle, color: CORAL }}>.</span> : null}
-    </>
-  );
-}
-
 export function LogoWidget({
-  answered, submit, busy, name, logoType, value,
-}: WidgetProps<number> & { name: string; logoType: string; value?: number }) {
-  const [picked, setPicked] = useState<number | undefined>(value);
-  const [seed, setSeed] = useState(0);
-
-  const marks = lockups(name, logoType);
-  const drawable = marks.some((m) => m.mode !== "pending");
+  answered, submit, busy, logo, value, onRedraw, redrawing,
+}: WidgetProps<{ image_url: string; label: string; art: string }> & {
+  logo: LogoSet;
+  /** The URL of the mark already chosen, if any. */
+  value?: string;
+  onRedraw: () => void;
+  redrawing: boolean;
+}) {
+  const [picked, setPicked] = useState<number | undefined>(
+    logo.marks.find((m) => m.image_url && m.image_url === value)?.slot,
+  );
+  const chosen = logo.marks.find((m) => m.slot === picked);
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }} key={seed}>
-        {marks.map((g, i) => {
-          const selected = picked === i;
+      <div style={{ ...panel(16), gap: 6 }}>
+        <span style={label}>The identity these are drawn from</span>
+        <span style={{ fontSize: 13, color: "rgba(0,0,0,.72)", lineHeight: 1.5 }}>{logo.concept}</span>
+        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+          {logo.palette.map((p) => (
+            <span
+              key={p.hex}
+              title={`${p.hex} · ${p.role}`}
+              style={{
+                width: 22, height: 22, borderRadius: 6, background: p.hex,
+                boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+        {logo.marks.map((m) => {
+          const selected = picked === m.slot;
+          const failed = !m.image_url;
           return (
             <button
-              key={g.kind}
+              key={m.slot}
               type="button"
-              disabled={busy || g.mode === "pending"}
-              onClick={() => setPicked(i)}
-              style={{ ...card(selected), cursor: g.mode === "pending" ? "default" : "pointer" }}
+              disabled={busy || redrawing || failed}
+              onClick={() => setPicked(m.slot)}
+              title={m.art}
+              style={{ ...card(selected), cursor: failed ? "default" : "pointer" }}
             >
               <div style={{
-                height: 120, borderRadius: 12, display: "flex", alignItems: "center",
-                justifyContent: "center", gap: 10, background: g.bg,
-                boxShadow: "inset 0 0 0 1px rgba(0,0,0,.07)", overflow: "hidden", padding: "0 10px",
+                height: 150, borderRadius: 12, display: "flex", alignItems: "center",
+                justifyContent: "center", background: "#FFFFFF",
+                boxShadow: "inset 0 0 0 1px rgba(0,0,0,.07)", overflow: "hidden",
               }}>
-                <Mark g={g} />
+                {redrawing ? (
+                  <span className="bchat-skel" style={{ width: "72%", height: 84, display: "block" }} />
+                ) : failed ? (
+                  <span style={{
+                    fontFamily: MONO, fontSize: 10, letterSpacing: ".04em",
+                    color: "rgba(0,0,0,.42)", padding: "0 14px", textAlign: "center", lineHeight: 1.5,
+                  }}>
+                    This one didn’t draw. The others did.
+                  </span>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={m.image_url ?? ""}
+                    alt={m.label}
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }}
+                  />
+                )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 4px 2px" }}>
-                <span style={{ ...label, fontSize: 9.5 }}>{g.kind}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 4px 2px" }}>
+                <span style={{ ...label, fontSize: 9.5, textAlign: "left", lineHeight: 1.3 }}>{m.label}</span>
                 <span style={tick(selected)}>{selected ? <Check /> : null}</span>
               </div>
             </button>
           );
         })}
       </div>
+
       <div style={row}>
-        <Cta enabled={picked !== undefined} busy={busy} onClick={() => picked !== undefined && submit(picked)}>
+        <Cta
+          enabled={!!chosen?.image_url}
+          busy={busy || redrawing}
+          onClick={() => {
+            if (chosen?.image_url) {
+              submit({ image_url: chosen.image_url, label: chosen.label, art: chosen.art });
+            }
+          }}
+        >
           {answered ? "Update mark" : "Use this mark"}
         </Cta>
-        {drawable ? (
-          <button type="button" className="bchat-ghost" disabled={busy} onClick={() => { setSeed((s) => s + 1); setPicked(undefined); }} style={{ ...ghostButton, display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <Refresh size={12} />
-            Redraw
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="bchat-ghost"
+          disabled={busy || redrawing}
+          onClick={onRedraw}
+          style={{ ...ghostButton, display: "inline-flex", alignItems: "center", gap: 7 }}
+        >
+          <Refresh size={12} />
+          {redrawing ? "Drawing…" : "Draw six more"}
+        </button>
       </div>
     </>
   );
@@ -1038,12 +1024,13 @@ export function LaunchWidget({
 // ---- kit -------------------------------------------------------------
 
 export function KitWidget({
-  kit, name, tagline, voiceSample,
+  kit, name, tagline, voiceSample, logo,
 }: {
   kit: BrandKit;
   name: string;
   tagline?: string;
   voiceSample?: string;
+  logo?: { image_url: string; label: string };
 }) {
   // A flow that skipped the tagline or the voice still reaches the kit. Those
   // panels show what the kit does have rather than an empty box that reads as
@@ -1062,10 +1049,19 @@ export function KitWidget({
       }}>
         <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,.55)" }} />
         <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 52, letterSpacing: "-0.045em", color: INK }}>
-            {name}
-            <span style={{ color: CORAL }}>.</span>
-          </span>
+          {logo ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={logo.image_url}
+              alt={`${name} logo`}
+              style={{ maxHeight: 96, maxWidth: 320, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 52, letterSpacing: "-0.045em", color: INK }}>
+              {name}
+              <span style={{ color: CORAL }}>.</span>
+            </span>
+          )}
           <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.62)" }}>{line}</span>
         </div>
       </div>

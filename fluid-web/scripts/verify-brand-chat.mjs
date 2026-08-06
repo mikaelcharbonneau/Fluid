@@ -25,7 +25,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = mkdtempSync(join(tmpdir(), "brand-chat-verify-"));
 const require = createRequire(import.meta.url);
 
-const MODULES = ["context", "flow", "answer", "contracts"];
+const MODULES = ["context", "flow", "answer", "contracts", "logo-prompt"];
 
 try {
   execFileSync(
@@ -50,6 +50,7 @@ try {
   const flow = require(join(out, "flow.js"));
   const answer = require(join(out, "answer.js"));
   const contracts = require(join(out, "contracts.js"));
+  const logoPrompt = require(join(out, "logo-prompt.js"));
 
   let checks = 0;
   const check = (label, fn) => {
@@ -196,11 +197,41 @@ try {
     /Voice/,
   );
 
-  check("asset steps write no context", () => {
+  check("the kit writes no context — it is a document, not an answer", () => {
     const before = { brief: "x" };
-    assert.deepEqual(answer.applyAnswer("logo", { anything: true }, before), before);
     assert.deepEqual(answer.applyAnswer("kit", null, before), before);
   });
+
+  check("the chosen mark keeps its url and the art direction behind it", () => {
+    const next = answer.applyAnswer(
+      "logo",
+      {
+        image_url: "https://example.supabase.co/storage/v1/object/public/brand-assets/b/chat-logo/2.png",
+        label: "Interlocking K",
+        art: "A vertical stroke meeting a wide arc.",
+      },
+      {},
+    );
+    assert.match(next.logo.image_url, /^https:\/\//);
+    assert.equal(next.logo.label, "Interlocking K");
+  });
+
+  throws(
+    "a mark url that is not https is refused before it reaches an <img>",
+    () =>
+      answer.applyAnswer(
+        "logo",
+        { image_url: "javascript:alert(1)", label: "x", art: "y" },
+        {},
+      ),
+    /could not be read/,
+  );
+
+  throws(
+    "a mark with no url is refused",
+    () => answer.applyAnswer("logo", { label: "x" }, {}),
+    /Mark must be text/,
+  );
 
   // ---- context document ----------------------------------------------
   console.log("\ncontext");
@@ -424,6 +455,87 @@ try {
   );
 
   throws("null is refused", () => contracts.parseVoices(null), /missing "voices"/);
+
+  // ---- identity brief + logo prompt ----------------------------------
+  console.log("\nlogo");
+
+  const marks = (n, art = "A single vertical stroke meeting a wide arc at the baseline, the arc's inner edge cut square so the counter reads as a notch rather than a curve.") =>
+    Array.from({ length: n }, (_, i) => ({ label: `Mark ${i}`, art }));
+  const palette5 = [
+    { hex: "#101418", role: "ink" },
+    { hex: "#FD7947", role: "accent" },
+    { hex: "#FDBA50", role: "warm" },
+    { hex: "#B0D2E6", role: "cool" },
+    { hex: "#F4EFE7", role: "paper" },
+  ];
+  const brief = { concept: "Rhythm made visible.", palette: palette5, marks: marks(6) };
+
+  check("a full identity brief parses", () => {
+    const parsed = contracts.parseIdentity({ concept: "c", palette: palette5, marks: marks(6) });
+    assert.equal(parsed.marks.length, 6);
+    assert.equal(parsed.palette[0].hex, "#101418");
+  });
+
+  throws(
+    "art direction too thin to draw from is refused",
+    () => contracts.parseIdentity({ concept: "c", palette: palette5, marks: marks(6, "modern and clean") }),
+    /too thin/,
+  );
+
+  throws(
+    "five marks is a failure, not a short set",
+    () => contracts.parseIdentity({ concept: "c", palette: palette5, marks: marks(5) }),
+    /fewer than six/,
+  );
+
+  check("the brand name reaches a text-carrying mark's prompt", () => {
+    const p = logoPrompt.markPrompt({ name: "Cadence", markType: "wordmark", brief, mark: brief.marks[0] });
+    assert.ok(p.includes('the word "Cadence"'));
+    assert.ok(/spelled exactly "Cadence"/.test(p));
+    // A wordmark may contain its own name and nothing else.
+    assert.ok(p.includes('Any words other than "Cadence"'));
+  });
+
+  check("a mark that must carry no text says so outright", () => {
+    for (const type of ["abstract", "pictorial", "mascot"]) {
+      const p = logoPrompt.markPrompt({ name: "Cadence", markType: type, brief, mark: brief.marks[0] });
+      assert.ok(
+        p.includes("Any letter, word, number or symbol resembling text"),
+        `${type} did not forbid text`,
+      );
+    }
+  });
+
+  check("the art direction and the concept both reach the renderer", () => {
+    const p = logoPrompt.markPrompt({ name: "Keel", markType: "abstract", brief, mark: brief.marks[2] });
+    assert.ok(p.includes(brief.marks[2].art), "the mark's own art direction was dropped");
+    assert.ok(p.includes("Rhythm made visible."), "the shared concept was dropped");
+  });
+
+  check("the palette is passed as the only colours allowed", () => {
+    const p = logoPrompt.markPrompt({ name: "Keel", markType: "abstract", brief, mark: brief.marks[0] });
+    for (const c of palette5) assert.ok(p.includes(c.hex), `${c.hex} missing from the prompt`);
+  });
+
+  check("refusals are carried into the prompt", () => {
+    const p = logoPrompt.markPrompt({
+      name: "Keel", markType: "abstract", brief, mark: brief.marks[0],
+      avoid: ["Gradients", "Mascots"],
+    });
+    assert.ok(p.includes("Gradients, Mascots"));
+  });
+
+  check("an unknown mark type falls back rather than producing a broken prompt", () => {
+    const p = logoPrompt.markPrompt({ name: "Keel", markType: "nonsense", brief, mark: brief.marks[0] });
+    assert.ok(p.includes("A WORDMARK"));
+  });
+
+  check("no mockup, no sign, no second copy of the mark", () => {
+    const p = logoPrompt.markPrompt({ name: "Keel", markType: "abstract", brief, mark: brief.marks[0] });
+    for (const banned of ["no mockup", "no business card", "Draw one mark, once"]) {
+      assert.ok(p.includes(banned), `missing constraint: ${banned}`);
+    }
+  });
 
   console.log(`\n${checks} checks passed.`);
 } finally {

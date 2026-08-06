@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ done: true, step: null, context: state });
   }
 
-  const billable = stepGenerates(step);
+  const billable = stepGenerates(step, context);
   if (billable) {
     let affordable: boolean;
     try {
@@ -143,15 +143,34 @@ export async function POST(request: Request) {
     return NextResponse.json({
       done: false,
       context: state,
-      step: await renderStep(step, context, silentActivity),
+      step: await renderStep(step, context, silentActivity, brandId),
     });
   }
 
   return streamActivity(
     async (activity: Activity) => {
       activity.emit("note", `Working on: ${step.key}`);
-      const rendered = await renderStep(step, context, activity);
+      const rendered = await renderStep(step, context, activity, brandId);
       await spendTokens(user.id, TOKEN_COST.asset);
+
+      // Six image renders are the most expensive thing in this flow. Keeping
+      // the set means a step backwards and forwards again is free, and a
+      // reload does not redraw what the client already paid for.
+      if (rendered.payload.kind === "logo") {
+        const withSet = { ...context, logoSet: rendered.payload.logo };
+        const { error } = await supabase.rpc("brands_merge_data", {
+          p_id: brandId,
+          p_patch: brandContextPatch(withSet),
+        });
+        if (error) {
+          // The marks are rendered and on screen either way; only the saving
+          // failed, so this warns rather than throwing the run away.
+          console.error("Could not cache the mark set:", error.message);
+          activity.emit("warn", "The marks were drawn but could not be saved for next time.");
+        } else {
+          return { done: false, context: withSet, step: rendered };
+        }
+      }
       return { done: false, context: state, step: rendered };
     },
     {
@@ -189,11 +208,12 @@ function firstUnanswered(context: ReturnType<typeof readBrandContext>) {
     direction: !!context.direction,
     avoid: !!context.avoid,
     logoType: !!context.logoType,
+    logo: !!context.logo,
     voice: !!context.voice,
     tagline: !!context.tagline,
     launch: !!context.launchTiming,
   };
-  // `logo` and `kit` produce assets rather than context fields, so they are
-  // never "answered" — the thread stops at whichever comes first.
+  // `kit` produces a document rather than a context field, so it is never
+  // "answered" — a resumed thread stops there.
   return steps.find((s) => !answered[s.key]) ?? null;
 }
