@@ -179,6 +179,23 @@ try {
     assert.deepEqual(next.launchChannels, ["Website", "Press"]);
   });
 
+  check("the voice answer keeps the line it was chosen on", () => {
+    const next = answer.applyAnswer(
+      "voice",
+      { id: "coach", name: "Quiet Coach", sample: "You already know what today needs." },
+      {},
+    );
+    // The id is meaningless to a skill and must not be what gets stored.
+    assert.equal(next.voice, "Quiet Coach");
+    assert.equal(next.voiceSample, "You already know what today needs.");
+  });
+
+  throws(
+    "a voice with no name is refused",
+    () => answer.applyAnswer("voice", { id: "coach" }, {}),
+    /Voice/,
+  );
+
   check("asset steps write no context", () => {
     const before = { brief: "x" };
     assert.deepEqual(answer.applyAnswer("logo", { anything: true }, before), before);
@@ -223,6 +240,18 @@ try {
     assert.ok(md.includes("- **Primary Audience**: Solo founders, Indie makers"));
     assert.ok(md.includes("- **Competitors**: Sunsama, Linear"));
     assert.ok(md.includes("- **Core Values**: Craft, Restraint"));
+  });
+
+  check("the chosen register does not masquerade as a brand it admires", () => {
+    const md = context.renderBrandContext({
+      voice: "Quiet Coach",
+      voiceSample: "You already know what today needs.",
+    });
+    // "Voice Admires" upstream means OTHER brands. Answering it with our own
+    // register would put a wrong answer in front of every skill.
+    assert.ok(md.includes("- **Voice Admires**: Not captured yet"));
+    assert.ok(md.includes("- **Chosen voice**: Quiet Coach"));
+    assert.ok(md.includes("- **Voice, written**: You already know what today needs."));
   });
 
   check("the sliders become words a strategist would write", () => {

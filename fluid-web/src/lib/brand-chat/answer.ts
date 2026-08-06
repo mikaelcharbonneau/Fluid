@@ -134,8 +134,17 @@ export function applyAnswer(
       // pipeline against the brand, and the context only needs to know a
       // choice was made so downstream steps can stop asking.
       return ctx;
-    case "voice":
-      return { ...ctx, voice: text(value, "Voice") };
+    case "voice": {
+      // The register's id means nothing to a skill, and its name alone means
+      // little more. What carries the decision is the line it was chosen on,
+      // so both are stored and both reach the context document.
+      const o = (value ?? {}) as Record<string, unknown>;
+      return {
+        ...ctx,
+        voice: text(o.name, "Voice"),
+        voiceSample: typeof o.sample === "string" ? o.sample.trim().slice(0, MAX_TEXT) : undefined,
+      };
+    }
     case "tagline":
       return { ...ctx, tagline: text(value, "Tagline").slice(0, MAX_TEXT) };
     case "launch": {

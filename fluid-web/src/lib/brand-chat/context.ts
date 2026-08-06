@@ -74,7 +74,10 @@ export interface BrandContext {
   avoid?: string[];
   logoType?: string;
 
+  /** The chosen register's name, e.g. "Quiet Coach" — not its id. */
   voice?: string;
+  /** The line of copy that register was chosen on. */
+  voiceSample?: string;
   launchTiming?: string;
   launchChannels?: string[];
 }
@@ -159,7 +162,11 @@ export function renderBrandContext(ctx: BrandContext): string {
     "## Brand Personality",
     `- **Personality Words**: ${personality ? personalityWords(personality).join(", ") : NOT_CAPTURED}`,
     `- **Tone**: ${personality ? toneLine(personality) : NOT_CAPTURED}`,
-    `- **Voice Admires**: ${text(ctx.voice)}`,
+    // Upstream's "Voice Admires" means *other brands* whose voice this one
+    // wants to borrow from. The chat never asks that, and putting our own
+    // chosen register here would answer a different question — so it stays
+    // uncaptured and the register is reported below, where it belongs.
+    `- **Voice Admires**: ${NOT_CAPTURED}`,
     "",
     "## Values & Mission",
     `- **Core Values**: ${list(ctx.values)}`,
@@ -173,6 +180,8 @@ export function renderBrandContext(ctx: BrandContext): string {
     // the original document has nowhere to put. Kept in a clearly separate
     // section so the sections above stay a faithful copy of the contract.
     "## Identity decisions (Fluid)",
+    `- **Chosen voice**: ${text(ctx.voice)}`,
+    `- **Voice, written**: ${text(ctx.voiceSample)}`,
     `- **Chosen tagline**: ${text(ctx.tagline)}`,
     `- **Visual direction**: ${text(ctx.direction)}`,
     `- **Mark type**: ${text(ctx.logoType)}`,

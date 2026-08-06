@@ -74,6 +74,24 @@ export async function POST(request: Request) {
       p_id: brandId,
       p_patch: brandContextPatch(context),
     });
+
+    // The brief and the name are the brand's own columns, not chat state:
+    // the Brands list, the brand cards and the older inline assists all read
+    // them. A brand built here should look like any other, so they are
+    // mirrored across rather than left to say "Untitled brand" forever.
+    if (!saveError && (answeredKey === "brief" || answeredKey === "name")) {
+      const column = answeredKey === "brief" ? { brief: context.brief } : { name: context.name };
+      const { error: mirrorError } = await supabase
+        .from("brands")
+        .update(column)
+        .eq("id", brandId);
+      // Not fatal: the answer itself is stored, and the thread reads the
+      // context, not the column. Losing the mirror costs a nice list entry.
+      if (mirrorError) {
+        console.error(`Could not mirror ${answeredKey} to its column:`, mirrorError.message);
+      }
+    }
+
     if (saveError) {
       // Refusing here is deliberate. Generating the next question against an
       // answer that was not stored would produce work the brand cannot keep.
@@ -88,10 +106,15 @@ export async function POST(request: Request) {
     ? nextStep(context.path, answeredKey)
     : firstUnanswered(context);
 
+  // The context travels back with every turn. A thread resumed in a new tab
+  // has to repopulate its widgets from something, and re-deriving it on the
+  // client from the message history would be a second source of truth.
+  const state = context;
+
   // The end of a thread is a normal outcome, not an error: a single-job flow
   // finishes where its job finishes.
   if (!step) {
-    return NextResponse.json({ done: true, step: null });
+    return NextResponse.json({ done: true, step: null, context: state });
   }
 
   const billable = stepGenerates(step);
@@ -119,6 +142,7 @@ export async function POST(request: Request) {
   if (!billable) {
     return NextResponse.json({
       done: false,
+      context: state,
       step: await renderStep(step, context, silentActivity),
     });
   }
@@ -128,7 +152,7 @@ export async function POST(request: Request) {
       activity.emit("note", `Working on: ${step.key}`);
       const rendered = await renderStep(step, context, activity);
       await spendTokens(user.id, TOKEN_COST.asset);
-      return { done: false, step: rendered };
+      return { done: false, context: state, step: rendered };
     },
     {
       onError: (err) => ({

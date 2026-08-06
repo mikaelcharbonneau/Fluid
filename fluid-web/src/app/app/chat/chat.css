@@ -1,0 +1,118 @@
+/* Brand chat — the parts that cannot be inline styles.
+   Fonts (Metropolis, Inter, JetBrains Mono) come from design-tokens.css,
+   which the root layout already loads. */
+
+.bchat {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fafafb;
+  color: #000;
+  font-family: Metropolis, Inter, system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.bchat *,
+.bchat *::before,
+.bchat *::after {
+  box-sizing: border-box;
+}
+
+.bchat button {
+  font: inherit;
+  border: 0;
+  cursor: pointer;
+}
+
+.bchat textarea,
+.bchat input {
+  font: inherit;
+}
+
+.bchat input[type="range"] {
+  accent-color: #000;
+}
+
+@keyframes bchat-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes bchat-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bchat-caret {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.bchat-msg {
+  animation: bchat-in 380ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bchat-skel {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: bchat-shimmer 1.8s linear infinite;
+  border-radius: 8px;
+}
+
+.bchat-caret {
+  display: inline-block;
+  width: 7px;
+  height: 16px;
+  background: #000;
+  margin-left: 3px;
+  vertical-align: -2px;
+  animation: bchat-caret 1s steps(1) infinite;
+}
+
+.bchat-thread::-webkit-scrollbar {
+  width: 10px;
+}
+
+.bchat-thread::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 2.5px solid #fafafb;
+}
+
+.bchat-thread::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Hover states the design specifies. Inline styles cannot express these. */
+.bchat-soft:hover {
+  background: #e6e6e9;
+}
+
+.bchat-ghost:hover {
+  color: #000;
+}
+
+.bchat-outline:hover {
+  background: #f0f0f2;
+}
+
+.bchat-x:hover {
+  background: #f0f0f2;
+  color: #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bchat-msg,
+  .bchat-skel,
+  .bchat-caret {
+    animation: none;
+  }
+}
