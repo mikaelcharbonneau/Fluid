@@ -157,7 +157,15 @@ export async function POST(request: Request) {
       // the set means a step backwards and forwards again is free, and a
       // reload does not redraw what the client already paid for.
       if (rendered.payload.kind === "logo") {
-        const withSet = { ...context, logoSet: rendered.payload.logo };
+        const logo = rendered.payload.logo;
+        const withSet = {
+          ...context,
+          logoSet: logo,
+          // Persist the skill-native brief as its own field so later skills
+          // and reloads see the same document Claude would have written.
+          visualIdentityBrief: logo.visualIdentityBrief,
+          visualIdentityBriefKey: logo.key,
+        };
         const { error } = await supabase.rpc("brands_merge_data", {
           p_id: brandId,
           p_patch: brandContextPatch(withSet),

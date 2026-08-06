@@ -760,14 +760,16 @@ export function LogoWidget({
   const [picked, setPicked] = useState<number | undefined>(
     logo.marks.find((m) => m.image_url && m.image_url === value)?.slot,
   );
+  const [briefOpen, setBriefOpen] = useState(false);
   const chosen = logo.marks.find((m) => m.slot === picked);
+  const brief = logo.visualIdentityBrief ?? "";
 
   return (
     <>
-      <div style={{ ...panel(16), gap: 6 }}>
-        <span style={label}>The identity these are drawn from</span>
+      <div style={{ ...panel(16), gap: 8 }}>
+        <span style={label}>Visual identity brief</span>
         <span style={{ fontSize: 13, color: "rgba(0,0,0,.72)", lineHeight: 1.5 }}>{logo.concept}</span>
-        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+        <div style={{ display: "flex", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
           {logo.palette.map((p) => (
             <span
               key={p.hex}
@@ -779,9 +781,47 @@ export function LogoWidget({
             />
           ))}
         </div>
+        {brief ? (
+          <>
+            <button
+              type="button"
+              className="bchat-ghost"
+              onClick={() => setBriefOpen((o) => !o)}
+              style={{
+                ...ghostButton,
+                alignSelf: "flex-start",
+                marginTop: 4,
+                fontSize: 11.5,
+              }}
+            >
+              {briefOpen ? "Hide full brief" : "Show full brief"}
+            </button>
+            {briefOpen ? (
+              <pre
+                style={{
+                  margin: "4px 0 0",
+                  maxHeight: 280,
+                  overflow: "auto",
+                  padding: 12,
+                  borderRadius: 12,
+                  background: PAPER,
+                  boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+                  fontFamily: MONO,
+                  fontSize: 11,
+                  lineHeight: 1.45,
+                  color: "rgba(0,0,0,.78)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {brief}
+              </pre>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
         {logo.marks.map((m) => {
           const selected = picked === m.slot;
           const failed = !m.image_url;

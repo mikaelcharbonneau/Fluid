@@ -72,11 +72,10 @@ function carriesText(markType: string): boolean {
 }
 
 /**
- * Build the prompt for one mark.
+ * Build the prompt for one mark from a thin JSON identity (legacy path).
  *
- * `brief.concept` is included because the six marks have to look related. The
- * per-mark art direction is what makes them different; the concept is what
- * keeps them siblings.
+ * Prefer {@link logoFromVisualIdentityBrief} — the skill-native brief carries
+ * far more design signal than concept + one art paragraph.
  */
 export function markPrompt(opts: {
   name: string;
@@ -104,25 +103,78 @@ export function markPrompt(opts: {
     `COLOUR: draw only from this palette — ${palette}. Use one or two of them,
 not all five. Flat solid fills only.`,
     ``,
+    ...executionRules(name, markType, avoid),
+  ];
+
+  return lines.filter((l) => l !== "").join("\n");
+}
+
+/**
+ * Logo generation the way the user validated offline:
+ * full visual identity brief markdown → image model.
+ *
+ * `variation` asks for distinct expressions *within* the brief's logo
+ * direction (not six unrelated brands).
+ */
+export function logoFromVisualIdentityBrief(opts: {
+  name: string;
+  markType: string;
+  briefMarkdown: string;
+  variation: number;
+  totalVariations: number;
+  avoid?: string[];
+}): string {
+  const name = opts.name.trim() || "Brand";
+  const markType = TYPE_INSTRUCTION[opts.markType] ? opts.markType : "wordmark";
+  const avoid = (opts.avoid ?? []).filter(Boolean);
+  const v = Math.max(1, opts.variation);
+  const n = Math.max(1, opts.totalVariations);
+
+  // Cap length so the image API stays within practical prompt limits while
+  // still carrying strategy, logo direction, palette, and principles.
+  const brief = opts.briefMarkdown.trim().slice(0, 12_000);
+
+  return [
+    `Please generate a logo for my brand based on its visual identity described below.`,
+    ``,
+    `A professional brand logo, presented alone on a plain white background.`,
+    ``,
+    TYPE_INSTRUCTION[markType](name),
+    ``,
+    `VARIATION ${v} of ${n}: a distinct expression that still obeys the same`,
+    `identity brief — same strategy, palette discipline, and logo direction.`,
+    `Do not invent a different brand personality.`,
+    ``,
+    `=== VISUAL IDENTITY BRIEF ===`,
+    brief,
+    `=== END BRIEF ===`,
+    ``,
+    `Follow the brief closely: strategy statement, logo direction (including`,
+    `references and what to avoid), colour palette and usage rules, and design`,
+    `principles. Prefer restraint and specificity over decoration.`,
+    ``,
+    ...executionRules(name, markType, avoid),
+  ].join("\n");
+}
+
+function executionRules(name: string, markType: string, avoid: string[]): string[] {
+  return [
     `EXECUTION:`,
-    `- Flat vector artwork. Hard edges, solid fills, no gradients, no shading,
-  no texture, no 3D, no bevels, no drop shadows, no glow.`,
+    `- Flat vector artwork. Hard edges, solid fills, no gradients, no shading,`,
+    `  no texture, no 3D, no bevels, no drop shadows, no glow.`,
     `- One idea, made of one or two elements. Not a scene, not a collage.`,
     `- Generous empty space around the mark; it must not touch the edges.`,
     `- Centred, upright, seen straight on.`,
     `- It must still read at 16 pixels: no hairlines, no fine detail.`,
     ``,
     `THE IMAGE MUST NOT CONTAIN:`,
-    `- Any presentation dressing: no mockup, no business card, no sign, no
-  device screen, no packaging, no photograph, no frame or border.`,
+    `- Any presentation dressing: no mockup, no business card, no sign, no`,
+    `  device screen, no packaging, no photograph, no frame or border.`,
     `- Any grid, guides, swatches, annotations, dimensions or watermark.`,
     `- Multiple versions of the mark. Draw one mark, once.`,
     carriesText(markType)
-      ? `- Any words other than "${name}". No tagline, no descriptor, no
-  lorem ipsum.`
+      ? `- Any words other than "${name}". No tagline, no descriptor, no lorem ipsum.`
       : `- Any letter, word, number or symbol resembling text, anywhere.`,
     avoid.length ? `- Any of these, which the client has ruled out: ${avoid.join(", ")}.` : "",
   ];
-
-  return lines.filter((l) => l !== "").join("\n");
 }

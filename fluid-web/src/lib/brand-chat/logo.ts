@@ -1,20 +1,20 @@
-// Drawing the marks.
+// Drawing the marks from a skill-native visual identity brief.
 //
-// Two stages, and the split is the point. `brand-identity` writes a visual
-// identity brief — one concept, one palette, six described constructions —
-// and only then does anything get rendered. The image model is never asked to
-// invent an identity from a style keyword; it is asked to draw a mark that has
-// already been designed in words.
+// Pipeline (mirrors the offline test that worked well):
+//   1. brand-identity skill → full markdown visual identity brief
+//   2. OpenAI image model → logo variations, each given the entire brief
 //
-// Six renders run at once. They are independent, each is slow, and doing them
-// in sequence would spend the whole function budget on the first three.
+// The brief is the product artifact; the images are executions of it.
 
 import { renderLogoImage } from "@/lib/ai/images";
 import type { Activity } from "@/lib/ai/activity";
 import { silentActivity } from "@/lib/ai/activity";
-import { runSkill } from "./run";
-import { identityContract, parseIdentity, type IdentityBrief } from "./contracts";
-import { markPrompt } from "./logo-prompt";
+import { logoFromVisualIdentityBrief } from "./logo-prompt";
+import {
+  extractPaletteFromBrief,
+  extractStrategyFromBrief,
+  generateVisualIdentityBrief,
+} from "./identity-brief";
 import type { BrandContext } from "./context";
 
 export interface LogoMark {
@@ -22,7 +22,7 @@ export interface LogoMark {
   slot: number;
   /** The approach, from the brief — shown under the card. */
   label: string;
-  /** The art direction it was drawn from. */
+  /** The art direction it was drawn from (brief excerpt / variation note). */
   art: string;
   /** Public URL of the rendered PNG, or null if this one failed. */
   image_url: string | null;
@@ -31,27 +31,27 @@ export interface LogoMark {
 }
 
 export interface LogoSet {
+  /** Short strategy summary for the UI card. */
   concept: string;
+  /** Full skill-native visual identity brief (markdown). */
+  visualIdentityBrief: string;
   palette: Array<{ hex: string; role: string }>;
   marks: LogoMark[];
   /** Identifies the inputs these were drawn for; see `logoInputsKey`. */
   key: string;
 }
 
-/** Time for one image. Six run together, so this is the wall clock, not a sum. */
-const RENDER_TIMEOUT_MS = 120_000;
+/** How many logo options to draw. Parallel wall-clock, not sequential. */
+const VARIATION_COUNT = 4;
 
-// The brief and the renders share the route's 300s. Leave ~120s for parallel
-// image renders and a small save buffer; the rest is for the identity brief.
-// 110s was too tight once the brief had a realistic output budget for
-// reasoning models — the call aborted with "took too long" before drawing.
-const BRIEF_TIMEOUT_MS = 160_000;
+/** Time for one image. All run together, so this is wall clock, not a sum. */
+const RENDER_TIMEOUT_MS = 110_000;
 
 /**
  * The answers a set of marks depends on.
  *
- * Re-entering the step should show the marks already paid for, not spend six
- * more renders drawing them again — but only while the brief behind them is
+ * Re-entering the step should show the marks already paid for, not spend more
+ * renders drawing them again — but only while the brief behind them is
  * unchanged. Change the name, the mark type, the direction or the refusals and
  * the old set is answering a question nobody is asking any more.
  */
@@ -71,32 +71,45 @@ export async function generateLogoSet(
 ): Promise<LogoSet> {
   const name = (context.name ?? "").trim() || "Untitled";
   const markType = context.logoType ?? "wordmark";
+  const key = logoInputsKey(context);
 
-  const brief: IdentityBrief = await runSkill({
-    skill: "brand-identity",
-    // This brief decides what six images will be. Reasoning tokens share the
-    // output ceiling with the JSON, so 5k truncated and 32k+medium blew past
-    // the step deadline. Low effort with a mid-size cap finishes in time
-    // without reintroducing the output-token ceiling.
-    effort: "low",
-    maxTokens: 16_000,
-    timeoutMs: BRIEF_TIMEOUT_MS,
-    context,
-    activity,
-    contract: identityContract(name, markType, context.avoid ?? []),
-    parse: parseIdentity,
-  });
+  // Reuse a brief written for these same inputs (e.g. redraw logos only).
+  let briefMarkdown =
+    context.visualIdentityBrief && context.visualIdentityBriefKey === key
+      ? context.visualIdentityBrief
+      : null;
+
+  if (!briefMarkdown) {
+    briefMarkdown = await generateVisualIdentityBrief(context, activity);
+  }
+
+  const concept = extractStrategyFromBrief(briefMarkdown);
+  const palette = extractPaletteFromBrief(briefMarkdown);
 
   activity.emit(
     "thinking",
-    `The identity: ${brief.concept.split(/(?<=\.)\s/)[0]}`,
-    `${brief.concept}\n\nPalette: ${brief.palette.map((p) => `${p.hex} (${p.role})`).join(", ")}`,
+    "Visual identity brief ready",
+    concept.slice(0, 400),
+  );
+  activity.emit(
+    "note",
+    `Brief written — ${briefMarkdown.length} characters; drawing ${VARIATION_COUNT} logo options`,
   );
 
-  const done = activity.phase(`Drawing ${brief.marks.length} marks`);
+  const done = activity.phase(`Drawing ${VARIATION_COUNT} logo options from the brief`);
   const marks = await Promise.all(
-    brief.marks.map(async (mark, slot): Promise<LogoMark> => {
-      const prompt = markPrompt({ name, markType, brief, mark, avoid: context.avoid });
+    Array.from({ length: VARIATION_COUNT }, async (_, slot): Promise<LogoMark> => {
+      const variation = slot + 1;
+      const label = `Option ${variation}`;
+      const art = `Variation ${variation} of ${VARIATION_COUNT} from the visual identity brief.`;
+      const prompt = logoFromVisualIdentityBrief({
+        name,
+        markType,
+        briefMarkdown: briefMarkdown!,
+        variation,
+        totalVariations: VARIATION_COUNT,
+        avoid: context.avoid,
+      });
       try {
         const image = await renderLogoImage({
           brandId,
@@ -105,19 +118,14 @@ export async function generateLogoSet(
           prompt,
           quality: "medium",
           timeoutMs: RENDER_TIMEOUT_MS,
-          // The prompt is the single most useful thing to see when a mark
-          // comes back wrong, and it is assembled from the brief rather than
-          // written by hand — so log the copy that was actually sent.
           onPrompt: (sent, model) =>
-            activity.emit("prompt", `Prompt for "${mark.label}" (${model})`, sent),
+            activity.emit("prompt", `Prompt for ${label} (${model})`, sent),
         });
-        return { slot, label: mark.label, art: mark.art, image_url: image.url };
+        return { slot, label, art, image_url: image.url };
       } catch (err) {
-        // One failed render must not lose the other five. The card shows the
-        // gap and stays unpickable; the rest of the set is still usable.
         const message = err instanceof Error ? err.message : "That mark could not be drawn.";
-        activity.emit("warn", `"${mark.label}" failed: ${message}`);
-        return { slot, label: mark.label, art: mark.art, image_url: null, error: message };
+        activity.emit("warn", `"${label}" failed: ${message}`);
+        return { slot, label, art, image_url: null, error: message };
       }
     }),
   );
@@ -125,18 +133,23 @@ export async function generateLogoSet(
 
   const drawn = marks.filter((m) => m.image_url).length;
   if (drawn === 0) {
-    // Nothing to choose from is a failed step, not an empty one — say so
-    // rather than presenting six broken cards.
     throw new Error(
       marks[0]?.error ?? "None of the marks could be drawn. Try again in a moment.",
     );
   }
-  activity.emit("note", `Drew ${drawn} of ${marks.length} marks`);
+  activity.emit("note", `Drew ${drawn} of ${marks.length} marks from the identity brief`);
 
   return {
-    concept: brief.concept,
-    palette: brief.palette,
+    concept,
+    visualIdentityBrief: briefMarkdown,
+    palette:
+      palette.length > 0
+        ? palette
+        : [
+            { hex: "#14161A", role: "Primary" },
+            { hex: "#F5F2ED", role: "Background" },
+          ],
     marks,
-    key: logoInputsKey(context),
+    key,
   };
 }
