@@ -1,0 +1,402 @@
+// Exercises the pure half of the brand-chat backend: the flow machine, the
+// answer validator, the brand-context renderer, and every parser that reads a
+// model's reply.
+//
+// These are the parts that decide what a skill is told and what gets believed
+// when it answers, and they are all pure — so they can be checked properly
+// with no API key, no database and no network. The model call itself is not
+// covered here; nothing meaningful can be asserted about it offline.
+//
+//   npm run verify:brand-chat
+//
+// The modules under test import each other with extensionless specifiers and
+// no path aliases, so they are compiled to CommonJS in a temp directory and
+// required from there. That keeps the source free of test-only concessions.
+
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const out = mkdtempSync(join(tmpdir(), "brand-chat-verify-"));
+const require = createRequire(import.meta.url);
+
+const MODULES = ["context", "flow", "answer", "contracts"];
+
+try {
+  execFileSync(
+    "npx",
+    [
+      "tsc",
+      ...MODULES.map((m) => join(root, "src/lib/brand-chat", `${m}.ts`)),
+      "--outDir",
+      out,
+      "--module",
+      "commonjs",
+      "--target",
+      "es2022",
+      "--moduleResolution",
+      "node",
+      "--skipLibCheck",
+    ],
+    { cwd: root, stdio: "inherit" },
+  );
+
+  const context = require(join(out, "context.js"));
+  const flow = require(join(out, "flow.js"));
+  const answer = require(join(out, "answer.js"));
+  const contracts = require(join(out, "contracts.js"));
+
+  let checks = 0;
+  const check = (label, fn) => {
+    fn();
+    checks++;
+    console.log(`  ok  ${label}`);
+  };
+  const throws = (label, fn, match) => check(label, () => assert.throws(fn, match));
+
+  // ---- flow ----------------------------------------------------------
+  console.log("\nflow");
+
+  check("every flow step resolves to a definition", () => {
+    for (const f of flow.FLOWS) {
+      const steps = flow.flowSteps(f.id);
+      assert.equal(
+        steps.length,
+        f.steps.length,
+        `${f.id} has a step key with no definition in STEPS`,
+      );
+    }
+  });
+
+  check("every flow has a skill behind it", () => {
+    for (const f of flow.FLOWS) {
+      assert.ok(flow.FLOW_SKILL[f.id], `${f.id} has no entry in FLOW_SKILL`);
+    }
+  });
+
+  check("every flow starts at the path question", () => {
+    for (const f of flow.FLOWS) assert.equal(f.steps[0], "path");
+  });
+
+  check("a short flow ends where its job ends", () => {
+    // Naming stops at the name. Reaching a positioning map would mean the
+    // subset logic silently fell through to the full script.
+    assert.equal(flow.nextStep("name-only", "name"), null);
+    assert.equal(flow.nextStep("name-only", "competitors").key, "name");
+  });
+
+  check("the full flow runs every step", () => {
+    assert.equal(flow.flowSteps("new").length, flow.STEPS.length);
+  });
+
+  check("an unknown step key restarts rather than throwing", () => {
+    assert.equal(flow.nextStep("new", "not-a-step").key, "path");
+  });
+
+  check("an unknown path falls back to the full flow", () => {
+    assert.equal(flow.getFlow("nonsense").id, "new");
+  });
+
+  check("the audit flow does not ask an existing brand to be renamed", () => {
+    const keys = flow.flowSteps("audit").map((s) => s.key);
+    assert.ok(!keys.includes("name"), "audit should not run the naming step");
+  });
+
+  // ---- answers -------------------------------------------------------
+  console.log("\nanswer");
+
+  check("a valid answer lands in its own field and nothing else", () => {
+    const next = answer.applyAnswer("brief", "  A calm daily OS.  ", { name: "Keel" });
+    assert.equal(next.brief, "A calm daily OS.");
+    assert.equal(next.name, "Keel", "an unrelated field was disturbed");
+  });
+
+  throws("an empty brief is refused", () => answer.applyAnswer("brief", "   ", {}), /cannot be empty/);
+  throws("a non-string brief is refused", () => answer.applyAnswer("brief", 42, {}), /must be text/);
+  throws("an unknown path is refused", () => answer.applyAnswer("path", "hack", {}), /Unknown path/);
+
+  check("a known path is accepted", () => {
+    assert.equal(answer.applyAnswer("path", "logo-only", {}).path, "logo-only");
+  });
+
+  check("chips are trimmed, de-duplicated case-insensitively, and capped", () => {
+    const next = answer.applyAnswer(
+      "audience",
+      ["  Founders ", "founders", "FOUNDERS", "Indie makers"],
+      {},
+    );
+    assert.deepEqual(next.audience, ["Founders", "Indie makers"]);
+  });
+
+  check("values are capped at five", () => {
+    const ten = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+    assert.equal(answer.applyAnswer("values", ten, {}).values.length, 5);
+  });
+
+  check("a position is clamped to the unit square", () => {
+    const next = answer.applyAnswer("position", { x: 5, y: -3 }, {});
+    assert.deepEqual(next.position, { x: 1, y: 0 });
+  });
+
+  check("a slider that did not serialise falls back rather than losing the turn", () => {
+    const next = answer.applyAnswer("personality", { tone: 8, formality: "x" }, {});
+    assert.equal(next.personality.tone, 8);
+    assert.equal(next.personality.formality, context.DEFAULT_PERSONALITY.formality);
+  });
+
+  check("sliders are clamped to 1–8", () => {
+    const next = answer.applyAnswer("personality", { tone: 99, volume: -4 }, {});
+    assert.equal(next.personality.tone, 8);
+    assert.equal(next.personality.volume, 1);
+  });
+
+  check("the differentiator is skippable", () => {
+    assert.equal(answer.applyAnswer("differentiator", "", {}).differentiator, "");
+  });
+
+  check("'nothing off-limits' is a real answer", () => {
+    assert.deepEqual(answer.applyAnswer("avoid", [], {}).avoid, []);
+  });
+
+  throws(
+    "an empty audience is refused — it is not the same as skipping",
+    () => answer.applyAnswer("audience", [], {}),
+    /cannot be empty/,
+  );
+
+  check("launch splits timing from channels", () => {
+    const next = answer.applyAnswer(
+      "launch",
+      { timing: "Next month", channels: ["Website", "Website", "Press"] },
+      {},
+    );
+    assert.equal(next.launchTiming, "Next month");
+    assert.deepEqual(next.launchChannels, ["Website", "Press"]);
+  });
+
+  check("asset steps write no context", () => {
+    const before = { brief: "x" };
+    assert.deepEqual(answer.applyAnswer("logo", { anything: true }, before), before);
+    assert.deepEqual(answer.applyAnswer("kit", null, before), before);
+  });
+
+  // ---- context document ----------------------------------------------
+  console.log("\ncontext");
+
+  check("an empty context renders every field as not captured", () => {
+    const md = context.renderBrandContext({});
+    assert.ok(md.includes("- **Name**: Not captured yet"));
+    assert.ok(md.includes("- **Competitors**: Not captured yet"));
+    // A skill must be able to tell "unknown" from "the user chose blank".
+    assert.ok(!md.includes("undefined"), "an undefined leaked into the document");
+    assert.ok(!md.includes("[object Object]"));
+  });
+
+  check("the headings match the brand-context skill's contract", () => {
+    const md = context.renderBrandContext({});
+    for (const heading of [
+      "# Brand Context",
+      "## Brand",
+      "## Audience",
+      "## Positioning",
+      "## Brand Personality",
+      "## Values & Mission",
+      "## Goals",
+    ]) {
+      assert.ok(md.includes(heading), `missing heading: ${heading}`);
+    }
+  });
+
+  check("collected values reach the document", () => {
+    const md = context.renderBrandContext({
+      name: "Keel",
+      audience: ["Solo founders", "Indie makers"],
+      competitors: ["Sunsama", "Linear"],
+      values: ["Craft", "Restraint"],
+    });
+    assert.ok(md.includes("- **Name**: Keel"));
+    assert.ok(md.includes("- **Primary Audience**: Solo founders, Indie makers"));
+    assert.ok(md.includes("- **Competitors**: Sunsama, Linear"));
+    assert.ok(md.includes("- **Core Values**: Craft, Restraint"));
+  });
+
+  check("the sliders become words a strategist would write", () => {
+    const words = context.personalityWords({
+      tone: 8,
+      formality: 1,
+      price: 8,
+      era: 1,
+      volume: 8,
+    });
+    assert.deepEqual(words, ["Serious", "Casual", "Premium", "Classic", "Bold"]);
+  });
+
+  check("the map click becomes the vocabulary the skills use", () => {
+    assert.match(context.marketPosition({ x: 0.9, y: 0.9 }), /^premium \(emotional/);
+    assert.match(context.marketPosition({ x: 0.1, y: 0.1 }), /^value \(functional/);
+    assert.match(context.marketPosition({ x: 0.5, y: 0.5 }), /^mid-market/);
+  });
+
+  check("the chat's state is namespaced away from the wizard's", () => {
+    const patch = context.brandContextPatch({ brief: "x" });
+    assert.deepEqual(Object.keys(patch), ["chat"]);
+    // The wizard writes flat keys on the same blob; reading must ignore them.
+    assert.deepEqual(context.readBrandContext({ step2: {}, logo_types: ["wordmark"] }), {});
+    assert.equal(context.readBrandContext({ chat: { brief: "y" } }).brief, "y");
+    assert.deepEqual(context.readBrandContext(null), {});
+    assert.deepEqual(context.readBrandContext({ chat: "not an object" }), {});
+  });
+
+  // ---- parsers -------------------------------------------------------
+  console.log("\ncontracts");
+
+  const names = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `N${i}`,
+      why: "because",
+      domain: `n${i}.com`,
+    }));
+
+  check("ten good names parse", () => {
+    const parsed = contracts.parseNames({ names: names(10) });
+    assert.equal(parsed.length, 10);
+  });
+
+  check("extra names are dropped rather than shown", () => {
+    assert.equal(contracts.parseNames({ names: names(14) }).length, 10);
+  });
+
+  throws(
+    "nine names is a failure, not a short list",
+    () => contracts.parseNames({ names: names(9) }),
+    /fewer than ten/,
+  );
+
+  throws(
+    "a name missing its reasoning is refused",
+    () => contracts.parseNames({ names: [...names(9), { name: "X", domain: "x.com" }] }),
+    /missing "why"/,
+  );
+
+  check("a domain is normalised, and availability is never claimed", () => {
+    const [first] = contracts.parseNames({
+      names: [{ name: "N", why: "w", domain: "HTTPS://Cadence.SO" }, ...names(9)],
+    });
+    assert.equal(first.domain, "cadence.so");
+    assert.ok(!("free" in first), "availability must not be part of the shape");
+  });
+
+  check("a recommendation outside the list falls back to the first", () => {
+    const dirs = Array.from({ length: 6 }, (_, i) => ({
+      id: `d${i}`,
+      name: `D${i}`,
+      note: "n",
+    }));
+    assert.equal(contracts.parseDirections({ directions: dirs, recommended: "d3" }).recommended, "d3");
+    assert.equal(
+      contracts.parseDirections({ directions: dirs, recommended: "ghost" }).recommended,
+      "d0",
+    );
+  });
+
+  check("a competitor dot with no coordinates is dropped, not placed at the origin", () => {
+    const parsed = contracts.parsePosition({
+      read: "The category is crowded at the bottom.",
+      competitors: [
+        { label: "Real", x: 0.7, y: 0.3 },
+        { label: "Broken" },
+        { x: 0.2, y: 0.2 },
+      ],
+    });
+    assert.equal(parsed.competitors.length, 1);
+    assert.equal(parsed.competitors[0].label, "Real");
+    assert.equal(parsed.suggested, undefined);
+  });
+
+  check("out-of-range coordinates are clamped onto the map", () => {
+    const parsed = contracts.parsePosition({
+      read: "r",
+      competitors: [{ label: "Wide", x: 4, y: -2 }],
+      suggested: { x: 0.6, y: 0.4 },
+    });
+    assert.deepEqual(parsed.competitors[0], { label: "Wide", x: 1, y: 0 });
+    assert.deepEqual(parsed.suggested, { x: 0.6, y: 0.4 });
+  });
+
+  check("a voice without a written sample is refused", () => {
+    const good = Array.from({ length: 6 }, (_, i) => ({
+      id: `v${i}`,
+      name: `V${i}`,
+      axes: "warm 3",
+      sample: "A real line.",
+      note: "n",
+    }));
+    assert.equal(contracts.parseVoices({ voices: good }).length, 6);
+    const missing = good.map((v, i) => (i === 2 ? { ...v, sample: "" } : v));
+    assert.throws(() => contracts.parseVoices({ voices: missing }), /missing "sample"/);
+  });
+
+  check("five taglines parse and the style is normalised", () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({
+      text: `Line ${i}`,
+      style: i === 0 ? "Witty" : "functional",
+      why: "w",
+    }));
+    const parsed = contracts.parseTaglines({ taglines: five });
+    assert.equal(parsed.length, 5);
+    assert.equal(parsed[0].style, "witty");
+  });
+
+  throws(
+    "a bad hex is refused rather than rendered as transparent",
+    () =>
+      contracts.parseKit({
+        palette: [
+          { hex: "#101418", role: "ink" },
+          { hex: "coral", role: "accent" },
+          { hex: "#FDBA50", role: "warm" },
+          { hex: "#B0D2E6", role: "cool" },
+          { hex: "#F4EFE7", role: "paper" },
+        ],
+        guidelines: "g",
+      }),
+    /not a six-digit hex/,
+  );
+
+  check("a good palette is upper-cased for consistency", () => {
+    const parsed = contracts.parseKit({
+      palette: [
+        { hex: "#101418", role: "ink" },
+        { hex: "#fd7947", role: "accent" },
+        { hex: "#FDBA50", role: "warm" },
+        { hex: "#B0D2E6", role: "cool" },
+        { hex: "#F4EFE7", role: "paper" },
+      ],
+      guidelines: "One cap-height of air on every side.",
+    });
+    assert.equal(parsed.palette[1].hex, "#FD7947");
+  });
+
+  throws(
+    "a missing top-level key names the field",
+    () => contracts.parseLaunch({ note: "n" }),
+    /missing "channels"/,
+  );
+
+  throws(
+    "an array where an object belongs is refused",
+    () => contracts.parseNames([]),
+    /missing "names"/,
+  );
+
+  throws("null is refused", () => contracts.parseVoices(null), /missing "voices"/);
+
+  console.log(`\n${checks} checks passed.`);
+} finally {
+  rmSync(out, { recursive: true, force: true });
+}

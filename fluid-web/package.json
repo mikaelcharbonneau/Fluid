@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs"
+    "skills:build": "node scripts/build-skills.mjs",
+    "skills:check": "node scripts/build-skills.mjs --check",
+    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs",
+    "verify:brand-chat": "node scripts/verify-brand-chat.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
