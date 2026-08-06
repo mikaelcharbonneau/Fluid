@@ -16,22 +16,19 @@
 import { generateOpenAIText } from "@/lib/ai/openai";
 import { getSkill, FOUNDATION_SKILL } from "@/lib/skills";
 import { renderBrandContext, type BrandContext } from "./context";
+import { getFlow } from "./flow";
 import type { Activity } from "@/lib/ai/activity";
 import { silentActivity } from "@/lib/ai/activity";
 
-/** Long enough for a real strategy answer, short of the route's own budget. */
-const CALL_TIMEOUT_MS = 100_000;
-const MAX_OUTPUT_TOKENS = 8_000;
+// The route has 300s. A step that is only a text call can have most of it;
+// the logo step, which follows its brief with six image renders, passes a
+// smaller budget of its own.
+const DEFAULT_TIMEOUT_MS = 180_000;
+const DEFAULT_MAX_TOKENS = 4_000;
 
 export interface RunSkillOptions<T> {
   /** The skill whose instructions drive this call. */
   skill: string;
-  /**
-   * A second skill injected as background — the one the whole thread is
-   * running. Naming inside a full brand build should know it is serving a
-   * strategy, not answering in isolation.
-   */
-  supportingSkill?: string;
   context: BrandContext;
   /** What this call must return, in prose. Format only — never direction. */
   contract: string;
@@ -40,10 +37,21 @@ export interface RunSkillOptions<T> {
   /** Rejects the parsed value with a readable message; returns the typed value. */
   parse: (value: unknown) => T;
   activity?: Activity;
+  /**
+   * How hard to think. Most steps do not need much: six directions with a
+   * six-word note each is a formatting job once the context is written, and
+   * reasoning effort is the single biggest lever on how long a call takes.
+   * Reserve "medium" for the steps where judgement is the product.
+   */
+  effort?: "low" | "medium" | "high";
+  /** Cap on the answer. Generous caps let a reasoning model spend more. */
+  maxTokens?: number;
+  /** Deadline for this one call. Must fit inside whatever else the step does. */
+  timeoutMs?: number;
 }
 
-function composeInstructions(skill: string, supporting: string | undefined): string {
-  const parts = [
+function composeInstructions(skill: string): string {
+  return [
     // The foundation skill explains what the context document is and that
     // everything else is written to read it first. Without it the main skill's
     // opening line ("check if .agents/brand-context.md exists") reads as an
@@ -59,23 +67,16 @@ skill below. Follow it as written, with two adjustments to how it is delivered:
 
 --- SKILL: ${skill} ---
 ${getSkill(skill).body}`,
-  ];
-
-  if (supporting && supporting !== skill) {
-    parts.push(
-      `--- SUPPORTING SKILL: ${supporting} ---
-Background only. This is the wider job the brand is being taken through; use it
-for consistency of judgement, not as a second set of steps to run.
-
-${getSkill(supporting).body}`,
-    );
-  }
-
-  return parts.join("\n\n");
+  ].join("\n\n");
 }
 
 function composeInput(context: BrandContext, contract: string, note?: string): string {
   return [
+    // What the wider job is, in one line. The flow's own skill used to be
+    // injected in full for this; naming the job costs a sentence and conveys
+    // the same thing the 2,300-token version did.
+    `The client is here to do one job: ${getFlow(context.path).label.toLowerCase()}.`,
+    "",
     `--- ${FOUNDATION_SKILL.toUpperCase()} ---`,
     renderBrandContext(context),
     note ? `\n--- ALSO RELEVANT ---\n${note}` : "",
@@ -89,6 +90,16 @@ function composeInput(context: BrandContext, contract: string, note?: string): s
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function isTimeout(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { name?: string; message?: string };
+  return (
+    e.name === "TimeoutError" ||
+    e.name === "AbortError" ||
+    /timed? ?out|aborted/i.test(e.message ?? "")
+  );
 }
 
 /**
@@ -117,14 +128,16 @@ function extractJson(text: string): unknown {
 
 export async function runSkill<T>({
   skill,
-  supportingSkill,
   context,
   contract,
   note,
   parse,
   activity = silentActivity,
+  effort = "low",
+  maxTokens = DEFAULT_MAX_TOKENS,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: RunSkillOptions<T>): Promise<T> {
-  const instructions = composeInstructions(skill, supportingSkill);
+  const instructions = composeInstructions(skill);
   const input = composeInput(context, contract, note);
 
   const done = activity.phase(`Running ${skill}`);
@@ -138,11 +151,22 @@ export async function runSkill<T>({
     text = await generateOpenAIText({
       instructions,
       input,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
-      reasoningEffort: "medium",
-      timeoutMs: CALL_TIMEOUT_MS,
+      maxOutputTokens: maxTokens,
+      reasoningEffort: effort,
+      timeoutMs,
       json: true,
     });
+  } catch (err) {
+    // A raw abort surfaces as "The operation was aborted due to timeout",
+    // which tells the client nothing about what to do next. The answer that
+    // led here is already saved — the route stores it before generating — so
+    // the useful thing to say is that retrying resumes rather than restarts.
+    if (isTimeout(err)) {
+      throw new Error(
+        `The studio took too long on this step. Everything you have answered is saved — try it again and it picks up from here.`,
+      );
+    }
+    throw err;
   } finally {
     done();
   }
