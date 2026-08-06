@@ -384,11 +384,15 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   const activity = input.activity ?? silentActivity;
 
   const designed = activity.phase(`Designing ${input.slots.length} concepts`);
+  // No max_output_tokens cap: six structured concept briefs + reasoning need
+  // room, and a hard ceiling was truncating the board plan. acceptPartial
+  // keeps any complete concepts if the model still stops early.
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     reasoningEffort: "low",
     timeoutMs: DESIGN_TIMEOUT_MS,
+    acceptPartial: true,
   });
   designed();
   input.clock?.lap("design");

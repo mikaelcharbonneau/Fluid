@@ -142,6 +142,8 @@ export function parseCaptionResponse(raw: string): ReferenceCaption | null {
 export async function captionReferenceImage(
   imageUrl: string,
 ): Promise<ReferenceCaption | null> {
+  // Vision + structured caption is reasoning-heavy; 2k left no room for the
+  // model to finish the JSON after thinking and truncated mid-response.
   const text = await generateOpenAIText({
     instructions: "Analyze the supplied reference image according to the user's instructions.",
     input: [{
@@ -151,10 +153,11 @@ export async function captionReferenceImage(
         { type: "input_text", text: PROMPT },
       ],
     }],
-    maxOutputTokens: 2_000,
+    maxOutputTokens: 16_000,
     reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
     json: true,
+    acceptPartial: true,
   });
   return parseCaptionResponse(text);
 }

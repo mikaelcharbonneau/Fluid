@@ -75,8 +75,10 @@ export async function generateLogoSet(
     skill: "brand-identity",
     // The one place the extra thinking earns its cost: this brief decides what
     // six images will be, and a weak construction cannot be recovered later.
+    // Keep maxTokens high: reasoning counts against the same ceiling as the
+    // identity brief JSON, and 5k was truncating mid-response.
     effort: "medium",
-    maxTokens: 5_000,
+    maxTokens: 32_000,
     timeoutMs: BRIEF_TIMEOUT_MS,
     context,
     activity,
