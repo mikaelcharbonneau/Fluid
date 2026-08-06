@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-import { enqueueGenerationRequest } from "@/lib/generation-jobs/request";
-=======
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { styleContext } from "@/lib/ai/step2";
@@ -19,16 +16,10 @@ import { getLogoConfig } from "@/lib/logo-styles";
 import { startClock } from "@/lib/ai/budget";
 import { streamActivity } from "@/lib/sse";
 import type { Activity } from "@/lib/ai/activity";
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
-<<<<<<< HEAD
-// Backwards-compatible action endpoint. Refinement is persisted as a job
-// rather than tied to the request that started it.
-export async function POST(request: Request) {
-  return enqueueGenerationRequest(request, "logo_refine");
-=======
 // The standalone logo flow deliberately skips the old research/platform phase.
 // Refinement still benefits from a stable brand idea, but it must not block a
 // real board simply because that legacy record was never created.
@@ -232,5 +223,4 @@ export async function POST(request: Request) {
       message: err instanceof Error ? err.message : "Logo refinement failed.",
     }),
   });
->>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 }
