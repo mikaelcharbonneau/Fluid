@@ -13,8 +13,11 @@ import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_EDIT_URL = "https://api.openai.com/v1/images/edits";
-const MODEL = "gpt-image-2";
-export const TRANSPARENT_IMAGE_MODEL = "gpt-image-1.5";
+// GPT Image 2 is the flagship image model (reasoning before draw, strong type).
+// Override with OPENAI_IMAGE_MODEL only for experiments.
+const MODEL = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
+export const TRANSPARENT_IMAGE_MODEL =
+  process.env.OPENAI_TRANSPARENT_IMAGE_MODEL?.trim() || "gpt-image-1.5";
 const BUCKET = "brand-assets";
 
 /** Exported so a prompt preview can report which model would receive it. */

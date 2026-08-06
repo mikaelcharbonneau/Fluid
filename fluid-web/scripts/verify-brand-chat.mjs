@@ -46,11 +46,19 @@ try {
     { cwd: root, stdio: "inherit" },
   );
 
-  const context = require(join(out, "context.js"));
-  const flow = require(join(out, "flow.js"));
-  const answer = require(join(out, "answer.js"));
-  const contracts = require(join(out, "contracts.js"));
-  const logoPrompt = require(join(out, "logo-prompt.js"));
+  // tsc may nest under brand-chat/ when sibling modules are pulled in for types.
+  const brandChatOut = (name) => {
+    try {
+      return require(join(out, "brand-chat", `${name}.js`));
+    } catch {
+      return require(join(out, `${name}.js`));
+    }
+  };
+  const context = brandChatOut("context");
+  const flow = brandChatOut("flow");
+  const answer = brandChatOut("answer");
+  const contracts = brandChatOut("contracts");
+  const logoPrompt = brandChatOut("logo-prompt");
 
   let checks = 0;
   const check = (label, fn) => {
@@ -553,17 +561,23 @@ try {
       name: "Muster",
       markType: "wordmark",
       briefMarkdown: md,
-      variation: 2,
-      totalVariations: 4,
+      construction: {
+        label: "Open muster",
+        idea: "Assembly as a precise open counter, not a robot glyph.",
+        art: "A custom wordmark for Muster with a constructed M whose counters open toward a single geometric node; tight tracking, no icon container, monochrome ink on white, optical corrections on the terminals.",
+      },
       avoid: ["Neon blue"],
     });
-    assert.ok(p.includes("Please generate a logo for my brand based on its visual identity"));
+    assert.ok(p.includes("Please generate ONE logo for my brand based on its visual identity brief"));
     assert.ok(p.includes("=== VISUAL IDENTITY BRIEF ==="));
     assert.ok(p.includes("Linear, Rivian, Vercel"));
     assert.ok(p.includes("#14161A"));
-    assert.ok(p.includes("VARIATION 2 of 4"));
+    assert.ok(p.includes("CONSTRUCTION TO DRAW EXACTLY"));
+    assert.ok(p.includes("Open muster"));
+    assert.ok(p.includes("ANTI-SLOP"));
     assert.ok(p.includes('the word "Muster"'));
     assert.ok(p.includes("Neon blue"));
+    assert.ok(!p.includes("VARIATION"));
   });
 
   console.log(`\n${checks} checks passed.`);

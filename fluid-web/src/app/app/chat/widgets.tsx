@@ -757,9 +757,13 @@ export function LogoWidget({
   onRedraw: () => void;
   redrawing: boolean;
 }) {
-  const [picked, setPicked] = useState<number | undefined>(
-    logo.marks.find((m) => m.image_url && m.image_url === value)?.slot,
-  );
+  const [picked, setPicked] = useState<number | undefined>(() => {
+    const fromValue = logo.marks.find((m) => m.image_url && m.image_url === value)?.slot;
+    if (fromValue !== undefined) return fromValue;
+    // Single mark: pre-select so the user can accept without an extra click.
+    const only = logo.marks.filter((m) => m.image_url);
+    return only.length === 1 ? only[0].slot : undefined;
+  });
   const [briefOpen, setBriefOpen] = useState(false);
   const chosen = logo.marks.find((m) => m.slot === picked);
   const brief = logo.visualIdentityBrief ?? "";
@@ -821,7 +825,12 @@ export function LogoWidget({
         ) : null}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: logo.marks.length === 1 ? "1fr" : "repeat(2,1fr)",
+        gap: 12,
+        maxWidth: logo.marks.length === 1 ? 420 : undefined,
+      }}>
         {logo.marks.map((m) => {
           const selected = picked === m.slot;
           const failed = !m.image_url;
@@ -835,7 +844,7 @@ export function LogoWidget({
               style={{ ...card(selected), cursor: failed ? "default" : "pointer" }}
             >
               <div style={{
-                height: 150, borderRadius: 12, display: "flex", alignItems: "center",
+                height: logo.marks.length === 1 ? 220 : 150, borderRadius: 12, display: "flex", alignItems: "center",
                 justifyContent: "center", background: "#FFFFFF",
                 boxShadow: "inset 0 0 0 1px rgba(0,0,0,.07)", overflow: "hidden",
               }}>
@@ -886,7 +895,7 @@ export function LogoWidget({
           style={{ ...ghostButton, display: "inline-flex", alignItems: "center", gap: 7 }}
         >
           <Refresh size={12} />
-          {redrawing ? "Drawing…" : "Draw six more"}
+          {redrawing ? "Drawing…" : "Draw again"}
         </button>
       </div>
     </>
