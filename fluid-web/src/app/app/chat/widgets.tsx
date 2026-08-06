@@ -765,8 +765,31 @@ export function LogoWidget({
     return only.length === 1 ? only[0].slot : undefined;
   });
   const [briefOpen, setBriefOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const chosen = logo.marks.find((m) => m.slot === picked);
   const brief = logo.visualIdentityBrief ?? "";
+  const imagePrompt =
+    chosen?.image_prompt ??
+    logo.imagePrompt ??
+    logo.marks.find((m) => m.image_prompt)?.image_prompt ??
+    "";
+  const imageModel =
+    chosen?.image_model ??
+    logo.imageModel ??
+    logo.marks.find((m) => m.image_model)?.image_model ??
+    "";
+
+  const copyPrompt = async () => {
+    if (!imagePrompt) return;
+    try {
+      await navigator.clipboard.writeText(imagePrompt);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
     <>
@@ -785,43 +808,84 @@ export function LogoWidget({
             />
           ))}
         </div>
-        {brief ? (
-          <>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+          {brief ? (
             <button
               type="button"
               className="bchat-ghost"
-              onClick={() => setBriefOpen((o) => !o)}
-              style={{
-                ...ghostButton,
-                alignSelf: "flex-start",
-                marginTop: 4,
-                fontSize: 11.5,
-              }}
+              onClick={() => { setBriefOpen((o) => !o); if (!briefOpen) setPromptOpen(false); }}
+              style={{ ...ghostButton, alignSelf: "flex-start", fontSize: 11.5 }}
             >
               {briefOpen ? "Hide full brief" : "Show full brief"}
             </button>
-            {briefOpen ? (
-              <pre
-                style={{
-                  margin: "4px 0 0",
-                  maxHeight: 280,
-                  overflow: "auto",
-                  padding: 12,
-                  borderRadius: 12,
-                  background: PAPER,
-                  boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  lineHeight: 1.45,
-                  color: "rgba(0,0,0,.78)",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
+          ) : null}
+          {imagePrompt ? (
+            <button
+              type="button"
+              className="bchat-ghost"
+              onClick={() => { setPromptOpen((o) => !o); if (!promptOpen) setBriefOpen(false); }}
+              style={{ ...ghostButton, alignSelf: "flex-start", fontSize: 11.5 }}
+            >
+              {promptOpen ? "Hide image prompt" : "Show image prompt"}
+            </button>
+          ) : null}
+        </div>
+        {briefOpen && brief ? (
+          <pre
+            style={{
+              margin: "4px 0 0",
+              maxHeight: 280,
+              overflow: "auto",
+              padding: 12,
+              borderRadius: 12,
+              background: PAPER,
+              boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+              fontFamily: MONO,
+              fontSize: 11,
+              lineHeight: 1.45,
+              color: "rgba(0,0,0,.78)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {brief}
+          </pre>
+        ) : null}
+        {promptOpen && imagePrompt ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span style={{ ...label, fontSize: 9.5 }}>
+                Images API prompt{imageModel ? ` · ${imageModel}` : ""} · {imagePrompt.length} chars
+              </span>
+              <button
+                type="button"
+                className="bchat-ghost"
+                onClick={copyPrompt}
+                style={{ ...ghostButton, fontSize: 11 }}
               >
-                {brief}
-              </pre>
-            ) : null}
-          </>
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre
+              style={{
+                margin: 0,
+                maxHeight: 320,
+                overflow: "auto",
+                padding: 12,
+                borderRadius: 12,
+                background: PAPER,
+                boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+                fontFamily: MONO,
+                fontSize: 11,
+                lineHeight: 1.45,
+                color: "rgba(0,0,0,.78)",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {imagePrompt}
+            </pre>
+          </div>
         ) : null}
       </div>
 
