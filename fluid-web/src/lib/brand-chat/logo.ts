@@ -41,10 +41,11 @@ export interface LogoSet {
 /** Time for one image. Six run together, so this is the wall clock, not a sum. */
 const RENDER_TIMEOUT_MS = 120_000;
 
-// The brief and the renders share the route's 300s, so this step cannot take
-// the whole budget the way a text-only step can. The two together are capped
-// well under it, leaving room for the save that follows.
-const BRIEF_TIMEOUT_MS = 110_000;
+// The brief and the renders share the route's 300s. Leave ~120s for parallel
+// image renders and a small save buffer; the rest is for the identity brief.
+// 110s was too tight once the brief had a realistic output budget for
+// reasoning models — the call aborted with "took too long" before drawing.
+const BRIEF_TIMEOUT_MS = 160_000;
 
 /**
  * The answers a set of marks depends on.
@@ -73,12 +74,12 @@ export async function generateLogoSet(
 
   const brief: IdentityBrief = await runSkill({
     skill: "brand-identity",
-    // The one place the extra thinking earns its cost: this brief decides what
-    // six images will be, and a weak construction cannot be recovered later.
-    // Keep maxTokens high: reasoning counts against the same ceiling as the
-    // identity brief JSON, and 5k was truncating mid-response.
-    effort: "medium",
-    maxTokens: 32_000,
+    // This brief decides what six images will be. Reasoning tokens share the
+    // output ceiling with the JSON, so 5k truncated and 32k+medium blew past
+    // the step deadline. Low effort with a mid-size cap finishes in time
+    // without reintroducing the output-token ceiling.
+    effort: "low",
+    maxTokens: 16_000,
     timeoutMs: BRIEF_TIMEOUT_MS,
     context,
     activity,
