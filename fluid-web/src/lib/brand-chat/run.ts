@@ -22,9 +22,10 @@ import { silentActivity } from "@/lib/ai/activity";
 
 // The route has 300s. A step that is only a text call can have most of it;
 // the logo step, which follows its brief with six image renders, passes a
-// smaller budget of its own.
-const DEFAULT_TIMEOUT_MS = 180_000;
-const DEFAULT_MAX_TOKENS = 4_000;
+// smaller budget of its own. 180s was still tight for medium-effort naming
+// and messaging once reasoning models spend a long first pass thinking.
+const DEFAULT_TIMEOUT_MS = 220_000;
+const DEFAULT_MAX_TOKENS = 8_000;
 
 export interface RunSkillOptions<T> {
   /** The skill whose instructions drive this call. */
@@ -155,6 +156,9 @@ export async function runSkill<T>({
       reasoningEffort: effort,
       timeoutMs,
       json: true,
+      // Prefer a salvageable partial over a hard abort when the model hits the
+      // output ceiling after already writing usable JSON.
+      acceptPartial: true,
     });
   } catch (err) {
     // A raw abort surfaces as "The operation was aborted due to timeout",

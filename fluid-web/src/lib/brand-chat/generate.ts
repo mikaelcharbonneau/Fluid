@@ -54,12 +54,11 @@ interface StepInput {
   activity?: Activity;
 }
 
-// Reasoning effort is the biggest lever on how long a step takes, and most
-// steps do not need much of it: once the context document is written, six
-// directions with a six-word note each is closer to formatting than to
-// thinking. "medium" is reserved for the two steps where the judgement IS the
-// product — the names and the taglines — because that is what the user is
-// paying for there.
+// Reasoning effort is the biggest lever on how long a step takes. Default to
+// low once the context document is written: six directions, ten names, or a
+// handful of taglines is closer to formatting than to multi-minute planning.
+// Medium effort was timing out against the route budget on reasoning models
+// that spend most of the call thinking before writing any JSON.
 //
 // The thread previously injected the flow's own skill as background on every
 // call. For the full build that meant attaching brand-strategy — 2,300 tokens
@@ -75,8 +74,11 @@ export async function generateNames(
   const seen = exclude.map((n) => n.trim()).filter(Boolean);
   return runSkill({
     skill: "brand-naming",
-    effort: "medium",
-    maxTokens: 6_000,
+    // Low effort + enough output room is faster and more reliable than medium
+    // reasoning that spends the deadline thinking before writing ten names.
+    effort: "low",
+    maxTokens: 12_000,
+    timeoutMs: 220_000,
     context,
     activity,
     // "10 more" has to mean ten the user has not already rejected.
@@ -138,7 +140,9 @@ export async function generateTaglines({
 }: StepInput): Promise<TaglineOption[]> {
   return runSkill({
     skill: "brand-messaging",
-    effort: "medium",
+    effort: "low",
+    maxTokens: 8_000,
+    timeoutMs: 220_000,
     context,
     activity,
     contract: TAGLINES_CONTRACT,
