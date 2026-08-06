@@ -306,9 +306,9 @@ export function BrandChat() {
     [ensureBrand],
   );
 
-  // "Draw six more" re-runs the logo step. The cached set is keyed on the
-  // brief, so asking again with the same brief would serve the same six back —
-  // clearing it is what makes the button mean what it says.
+  // "Draw more options" re-runs the logo step. The cached set is keyed on the
+  // inputs; clearing logoSet forces new image renders. The visual identity
+  // brief is kept when its key still matches so redraw reuses the skill doc.
   const [redrawing, setRedrawing] = useState(false);
   const redrawMarks = useCallback(async () => {
     const id = brandRef.current;

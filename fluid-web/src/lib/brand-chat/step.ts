@@ -70,7 +70,18 @@ function cachedLogo(context: BrandContext): LogoSet | null {
   const cached = context.logoSet;
   if (!cached || cached.key !== logoInputsKey(context)) return null;
   // A set whose every render failed is not worth serving back.
-  return cached.marks.some((m) => m.image_url) ? cached : null;
+  if (!cached.marks.some((m) => m.image_url)) return null;
+  const brief =
+    cached.visualIdentityBrief ??
+    (context.visualIdentityBriefKey === cached.key ? context.visualIdentityBrief : undefined) ??
+    "";
+  return {
+    concept: cached.concept,
+    visualIdentityBrief: brief,
+    palette: cached.palette,
+    marks: cached.marks,
+    key: cached.key,
+  };
 }
 
 export async function renderStep(

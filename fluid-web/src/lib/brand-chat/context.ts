@@ -80,15 +80,25 @@ export interface BrandContext {
    */
   logo?: { image_url: string; label: string; art: string };
   /**
+   * Full visual identity brief from the brand-identity skill (markdown).
+   * This is the same class of deliverable Claude writes offline — logo gen
+   * and later kit work should read it whole, not a JSON stub.
+   */
+  visualIdentityBrief?: string;
+  /** logoInputsKey the brief was written for; used to decide reuse vs rewrite. */
+  visualIdentityBriefKey?: string;
+  /**
    * The last set of marks drawn, and the brief they answer.
    *
-   * Six image renders is the most expensive thing this flow does. Keeping the
-   * set means going back a step and forward again shows the marks already paid
-   * for; `logoSet.key` is what decides whether they still apply. Typed loosely
-   * here to keep this module free of a dependency on the renderer.
+   * Image renders are expensive. Keeping the set means going back a step and
+   * forward again shows the marks already paid for; `logoSet.key` decides
+   * whether they still apply. Typed loosely here to keep this module free of
+   * a dependency on the renderer.
    */
   logoSet?: {
     concept: string;
+    /** Full markdown brief (may duplicate visualIdentityBrief). */
+    visualIdentityBrief?: string;
     palette: Array<{ hex: string; role: string }>;
     marks: Array<{ slot: number; label: string; art: string; image_url: string | null; error?: string }>;
     key: string;
@@ -209,7 +219,14 @@ export function renderBrandContext(ctx: BrandContext): string {
     `- **Never use**: ${list(ctx.avoid)}`,
     `- **Launch timing**: ${text(ctx.launchTiming)}`,
     `- **Launch channels**: ${list(ctx.launchChannels)}`,
+    `- **Visual identity brief**: ${ctx.visualIdentityBrief ? "captured (see document below)" : NOT_CAPTURED}`,
     "",
+    // When present, the full brief is appended so downstream skills (voice,
+    // guidelines) and any re-run of identity can read the same artifact Claude
+    // would have left on disk as a markdown file.
+    ctx.visualIdentityBrief
+      ? ["## Visual Identity Brief (full document)", "", ctx.visualIdentityBrief, ""].join("\n")
+      : "",
   ].join("\n");
 }
 

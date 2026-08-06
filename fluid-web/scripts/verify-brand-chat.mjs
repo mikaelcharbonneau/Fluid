@@ -537,6 +537,35 @@ try {
     }
   });
 
+  check("logo-from-brief embeds the full visual identity markdown", () => {
+    const md = [
+      "# Muster — Visual Identity Brief",
+      "",
+      "## 01 — Identity Strategy Statement",
+      "Premium engineered confidence without sci-fi blue.",
+      "",
+      "## 02 — Logo Direction",
+      "Wordmark-led. References: Linear, Rivian, Vercel.",
+      "",
+      "Primary color: Ink Black — #14161A.",
+    ].join("\n");
+    const p = logoPrompt.logoFromVisualIdentityBrief({
+      name: "Muster",
+      markType: "wordmark",
+      briefMarkdown: md,
+      variation: 2,
+      totalVariations: 4,
+      avoid: ["Neon blue"],
+    });
+    assert.ok(p.includes("Please generate a logo for my brand based on its visual identity"));
+    assert.ok(p.includes("=== VISUAL IDENTITY BRIEF ==="));
+    assert.ok(p.includes("Linear, Rivian, Vercel"));
+    assert.ok(p.includes("#14161A"));
+    assert.ok(p.includes("VARIATION 2 of 4"));
+    assert.ok(p.includes('the word "Muster"'));
+    assert.ok(p.includes("Neon blue"));
+  });
+
   console.log(`\n${checks} checks passed.`);
 } finally {
   rmSync(out, { recursive: true, force: true });
