@@ -75,12 +75,20 @@ function cachedLogo(context: BrandContext): LogoSet | null {
     cached.visualIdentityBrief ??
     (context.visualIdentityBriefKey === cached.key ? context.visualIdentityBrief : undefined) ??
     "";
+  const imagePrompt =
+    cached.imagePrompt ??
+    cached.marks.find((m) => m.image_prompt)?.image_prompt;
+  const imageModel =
+    cached.imageModel ??
+    cached.marks.find((m) => m.image_model)?.image_model;
   return {
     concept: cached.concept,
     visualIdentityBrief: brief,
     palette: cached.palette,
     marks: cached.marks,
     key: cached.key,
+    imagePrompt,
+    imageModel,
   };
 }
 

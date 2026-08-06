@@ -100,8 +100,20 @@ export interface BrandContext {
     /** Full markdown brief (may duplicate visualIdentityBrief). */
     visualIdentityBrief?: string;
     palette: Array<{ hex: string; role: string }>;
-    marks: Array<{ slot: number; label: string; art: string; image_url: string | null; error?: string }>;
+    marks: Array<{
+      slot: number;
+      label: string;
+      art: string;
+      image_url: string | null;
+      error?: string;
+      /** Exact Images API prompt for this mark. */
+      image_prompt?: string;
+      image_model?: string;
+    }>;
     key: string;
+    /** Prompt that produced the shipped mark (Images API `prompt` field). */
+    imagePrompt?: string;
+    imageModel?: string;
   };
 
   /** The chosen register's name, e.g. "Quiet Coach" — not its id. */

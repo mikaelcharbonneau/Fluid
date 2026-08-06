@@ -33,6 +33,13 @@ export interface LogoMark {
   image_url: string | null;
   /** Why it is missing, when it is. */
   error?: string;
+  /**
+   * Exact `prompt` string passed to the Images API for this mark.
+   * Persisted so a run can be audited without catching the SSE stream.
+   */
+  image_prompt?: string;
+  /** Model id reported at render time (e.g. gpt-image-2). */
+  image_model?: string;
 }
 
 export interface LogoSet {
@@ -44,6 +51,13 @@ export interface LogoSet {
   marks: LogoMark[];
   /** Identifies the inputs these were drawn for; see `logoInputsKey`. */
   key: string;
+  /**
+   * The prompt that produced the shipped mark — same string as
+   * `marks[0].image_prompt` when present. Duplicated at set level so older
+   * clients and support tooling can find it without walking marks.
+   */
+  imagePrompt?: string;
+  imageModel?: string;
 }
 
 /** Chat ships a single mark, not a mill grid of near-duplicates. */
@@ -199,6 +213,12 @@ export async function generateLogoSet(
   }
 
   activity.emit("note", `Drew "${mark.label}" from the identity brief`);
+  if (mark.image_prompt) {
+    activity.emit(
+      "note",
+      `Image prompt saved (${mark.image_model ?? IMAGE_MODEL}, ${mark.image_prompt.length} chars)`,
+    );
+  }
 
   return {
     concept,
@@ -212,6 +232,8 @@ export async function generateLogoSet(
           ],
     marks: [mark],
     key,
+    imagePrompt: mark.image_prompt,
+    imageModel: mark.image_model,
   };
 }
 
@@ -239,6 +261,10 @@ async function renderOnce(opts: {
     revisionNote: opts.revisionNote,
   });
 
+  // Capture whatever the renderer actually receives (model id + full string).
+  let sentPrompt = prompt;
+  let sentModel = IMAGE_MODEL;
+
   try {
     const image = await renderLogoImage({
       brandId: opts.brandId,
@@ -247,14 +273,19 @@ async function renderOnce(opts: {
       prompt,
       quality: opts.quality,
       timeoutMs: opts.timeoutMs,
-      onPrompt: (sent, model) =>
-        activity.emit("prompt", `Prompt for "${construction.label}" (${model})`, sent),
+      onPrompt: (sent, model) => {
+        sentPrompt = sent;
+        sentModel = model;
+        activity.emit("prompt", `Prompt for "${construction.label}" (${model})`, sent);
+      },
     });
     return {
       slot: 0,
       label: construction.label,
       art: construction.art,
       image_url: image.url,
+      image_prompt: sentPrompt,
+      image_model: sentModel,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "That mark could not be drawn.";
@@ -265,6 +296,9 @@ async function renderOnce(opts: {
       art: construction.art,
       image_url: null,
       error: message,
+      // Still persist the prompt that was attempted so a failed run is debuggable.
+      image_prompt: sentPrompt,
+      image_model: sentModel,
     };
   } finally {
     done();
