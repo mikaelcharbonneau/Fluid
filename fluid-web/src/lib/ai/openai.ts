@@ -33,6 +33,7 @@ export async function generateOpenAIText({
   timeoutMs = 120_000,
   json = false,
   prompt,
+  acceptPartial = false,
 }: {
   instructions?: string;
   input: string | unknown[];
@@ -43,6 +44,12 @@ export async function generateOpenAIText({
   json?: boolean;
   /** A reusable prompt saved in the OpenAI platform. */
   prompt?: { id: string; version?: string };
+  /**
+   * When the model hits max_output_tokens mid-response, return whatever text
+   * was produced instead of failing. Useful for large JSON lists where a
+   * truncated array is still usable.
+   */
+  acceptPartial?: boolean;
 }): Promise<string> {
   // Dashboard prompts own their configured model and reasoning settings. The
   // standard code-managed calls retain the app's established defaults.
@@ -75,6 +82,18 @@ export async function generateOpenAIText({
 
   const payload = await response.json() as OpenAIResponse;
   if (payload.status && payload.status !== "completed") {
+    const partial = outputText(payload);
+    if (
+      acceptPartial &&
+      partial &&
+      payload.incomplete_details?.reason === "max_output_tokens"
+    ) {
+      console.warn(
+        "[openai] response truncated at max_output_tokens; returning partial text",
+        { model: selectedModel || "(prompt)", chars: partial.length },
+      );
+      return partial;
+    }
     if (payload.incomplete_details?.reason === "max_output_tokens") {
       throw new Error("OpenAI stopped before completing the response because it reached its output-token limit.");
     }

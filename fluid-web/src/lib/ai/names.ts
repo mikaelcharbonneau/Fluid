@@ -1,7 +1,7 @@
 // Phase 3 · Brand-name generation.
 // A single, focused OpenAI call per wizard step (the "workflow" approach) —
 // not a multi-agent system. Given the brief the user captured, ask OpenAI for
-// a large set of distinct name candidates and return them as structured data
+// a short list of distinct name candidates and return them as structured data
 // the wizard's name grid can render directly.
 
 import { generateOpenAIText } from "./openai";
@@ -20,7 +20,7 @@ export interface NameBrief {
   additionalDetails?: string | null;
 }
 
-const COUNT = 50;
+const COUNT = 10;
 const MODEL = "gpt-5.6-luna";
 
 // Leave enough room for the route to persist the results after the OpenAI
@@ -28,8 +28,8 @@ const MODEL = "gpt-5.6-luna";
 const CALL_TIMEOUT_MS = 105_000;
 
 const SYSTEM = `You are Fluid, an expert brand strategist and naming consultant.
-Given a short brand brief, you generate a large, varied set of distinct,
-memorable brand name candidates.
+Given a short brand brief, you generate a varied set of distinct, memorable
+brand name candidates.
 
 Rules for the names you propose:
 - Return exactly ${COUNT} candidates, ordered best-fit first.
@@ -73,20 +73,47 @@ function buildUserPrompt(input: NameBrief): string {
   return lines.join("\n");
 }
 
-// Pull the JSON array out of the model's text response, tolerating stray prose
-// or markdown fences even though we ask for neither.
-function extractNames(text: string): GeneratedName[] {
+// Pull a JSON array out of model text. Reasoning models sometimes hit the
+// output-token ceiling mid-array; when that happens we still salvage every
+// complete object rather than failing the whole generation.
+function parseNameArray(text: string): unknown[] {
   let raw = text.trim();
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) raw = fence[1].trim();
+
   const start = raw.indexOf("[");
+  if (start === -1) throw new Error("No JSON array found in model response.");
+  raw = raw.slice(start);
+
+  const tryParse = (slice: string): unknown[] | null => {
+    try {
+      const parsed = JSON.parse(slice) as unknown;
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
   const end = raw.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("No JSON array found in model response.");
+  if (end > 0) {
+    const complete = tryParse(raw.slice(0, end + 1));
+    if (complete) return complete;
   }
 
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as unknown;
-  if (!Array.isArray(parsed)) throw new Error("Model response was not an array.");
+  // Truncated mid-array: close after the last complete object.
+  const lastObj = raw.lastIndexOf("}");
+  if (lastObj === -1) throw new Error("No JSON array found in model response.");
+  const repaired = `${raw.slice(0, lastObj + 1).replace(/,\s*$/, "")}]`;
+  const partial = tryParse(repaired);
+  if (partial) return partial;
+
+  throw new Error("No JSON array found in model response.");
+}
+
+// Pull the JSON array out of the model's text response, tolerating stray prose
+// or markdown fences even though we ask for neither.
+function extractNames(text: string): GeneratedName[] {
+  const parsed = parseNameArray(text);
 
   const cleaned: GeneratedName[] = [];
   const seen = new Set<string>();
@@ -112,13 +139,17 @@ function extractNames(text: string): GeneratedName[] {
 export async function generateBrandNames(
   input: NameBrief,
 ): Promise<GeneratedName[]> {
+  // Reasoning models charge thinking tokens against max_output_tokens. Ten
+  // short name objects are cheap; the thinking budget is not. Leave headroom
+  // and accept a partial array if the model still truncates.
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     model: MODEL,
-    maxOutputTokens: 8_000,
+    maxOutputTokens: 32_000,
     reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
+    acceptPartial: true,
   });
 
   return extractNames(text);
