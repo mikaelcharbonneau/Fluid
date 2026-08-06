@@ -1,5 +1,11 @@
 export const GENERATION_ACTIONS = [
+<<<<<<< HEAD
+  "logo_research",
+  "logo_sketches",
+  "logo_refine",
+=======
   "logo_board",
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 ] as const;
 
 export type GenerationAction = (typeof GENERATION_ACTIONS)[number];
@@ -31,7 +37,13 @@ export interface GenerationJob {
 }
 
 export const JOB_CREDIT_COST: Record<GenerationAction, number> = {
+<<<<<<< HEAD
+  logo_research: 0,
+  logo_sketches: 3,
+  logo_refine: 3,
+=======
   logo_board: 3,
+>>>>>>> 526f552e43aa092f99e217410cabf41e6b9dbf9f
 };
 
 export function isGenerationAction(value: unknown): value is GenerationAction {
