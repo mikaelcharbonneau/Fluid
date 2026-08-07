@@ -24,7 +24,7 @@ import type { ActivityEvent } from "@/lib/ai/activity";
 import { createBrand, postAssist, postTurn } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
 import {
-  CARD, CORAL, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, label,
+  CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, label,
 } from "./ui";
 import {
   Assets, Chevron, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
@@ -86,6 +86,11 @@ export function BrandChat() {
   const [status, setStatus] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [tokens, setTokens] = useState<number | null>(null);
+  // The answer currently in flight. Selection widgets read their highlight
+  // from the stored context, which only arrives when the turn comes back —
+  // and a turn that has to generate the next step takes tens of seconds.
+  // Without this the click looks like it did nothing for that whole wait.
+  const [pendingAnswer, setPendingAnswer] = useState<{ step: string; value: unknown } | null>(null);
 
   // Extra name batches, newest first. Kept out of the thread so "10 more"
   // does not push the question off the screen each time.
@@ -184,6 +189,7 @@ export function BrandChat() {
       if (busy) return;
       setBusy(true);
       setStatus(null);
+      setPendingAnswer({ step: stepKey, value });
 
       const id = await ensureBrand();
       if (!id) {
@@ -211,6 +217,11 @@ export function BrandChat() {
       if (out.context) {
         contextRef.current = out.context;
         setContext(out.context);
+        // The server's own value supersedes the local echo. Deliberately not
+        // cleared when no context came back (a 402, or a generation that
+        // failed): the route stores the answer before it generates, so the
+        // echo is still what the brand holds.
+        setPendingAnswer(null);
       }
 
       if (out.error) {
@@ -369,6 +380,10 @@ export function BrandChat() {
   })();
   const composerDisabled = busy || !!pending;
   const flowLabel = getFlow(context.path).label;
+  // What the widgets render from: the stored context plus whatever answer is
+  // still in flight, so a selection lights up on click rather than when the
+  // next step finishes generating.
+  const shownContext = withPendingAnswer(context, pendingAnswer);
 
   return (
     <div className="bchat">
@@ -383,8 +398,7 @@ export function BrandChat() {
                   key={m.id}
                   msg={m}
                   isLast={i === msgs.length - 1}
-                  hasWorkBelow={msgs.slice(i + 1).some((n) => !!n.step)}
-                  context={context}
+                  context={shownContext}
                   busy={busy}
                   submit={submit}
                   assist={assist}
@@ -478,7 +492,6 @@ function note(seq: number, text: string, error = false, retry = false): Msg {
 interface MessageProps {
   msg: Msg;
   isLast: boolean;
-  hasWorkBelow: boolean;
   context: BrandContext;
   busy: boolean;
   submit: (step: string, value: unknown) => void;
@@ -495,7 +508,7 @@ interface MessageProps {
 }
 
 function Message(props: MessageProps) {
-  const { msg, context, busy, hasWorkBelow, retryTurn } = props;
+  const { msg, context, busy, retryTurn } = props;
 
   if (msg.role === "user") {
     return (
@@ -557,7 +570,6 @@ function Message(props: MessageProps) {
 
         {msg.step && ready ? (
           <>
-            {answeredKeys(context).has(msg.step.key) && hasWorkBelow ? <RerunNote /> : null}
             {/*
               Widgets hold a local draft — half-typed text, chips not yet
               submitted — which must survive every re-render of the thread.
@@ -579,18 +591,54 @@ function Message(props: MessageProps) {
   );
 }
 
-function RerunNote() {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
-      borderRadius: 12, background: "#FFF7ED", boxShadow: "inset 0 0 0 1px rgba(253,121,71,.35)",
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: 99, background: CORAL, flex: "0 0 6px" }} />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "#8A3E1C", lineHeight: 1.45 }}>
-        Work below was built on this answer. Changing it re-runs everything after it.
-      </span>
-    </div>
-  );
+/**
+ * The context with the answer currently in flight already folded in.
+ *
+ * Only the steps whose widget is stateless need this — a token list or a
+ * slider row holds its own draft and already shows what the user did. A chip
+ * or a card reads its highlight straight from the context, so until the turn
+ * returns there is nothing to read.
+ *
+ * This is a display concern only: `contextRef` keeps the server's truth, and
+ * anything the server sends back replaces this. Nothing here validates —
+ * `applyAnswer` on the server remains the only thing that decides what the
+ * brand actually stores.
+ */
+function withPendingAnswer(
+  ctx: BrandContext,
+  pending: { step: string; value: unknown } | null,
+): BrandContext {
+  if (!pending) return ctx;
+  const { step, value } = pending;
+
+  // Steps stored as the submitted string, under a field of the same name.
+  const SAME_NAME = ["path", "category", "stage", "goal", "name", "direction", "tagline", "logoType"];
+  if (typeof value === "string" && SAME_NAME.includes(step)) {
+    return { ...ctx, [step]: value };
+  }
+
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    if (step === "voice" && typeof o.name === "string") {
+      return {
+        ...ctx,
+        voice: o.name,
+        voiceSample: typeof o.sample === "string" ? o.sample : ctx.voiceSample,
+      };
+    }
+    if (step === "logo" && typeof o.image_url === "string" && typeof o.label === "string") {
+      return {
+        ...ctx,
+        logo: {
+          image_url: o.image_url,
+          label: o.label,
+          art: typeof o.art === "string" ? o.art : "",
+        },
+      };
+    }
+  }
+
+  return ctx;
 }
 
 /**
