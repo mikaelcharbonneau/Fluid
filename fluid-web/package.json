@@ -10,8 +10,7 @@
     "skills:build": "node scripts/build-skills.mjs",
     "skills:check": "node scripts/build-skills.mjs --check",
     "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs",
-    "verify:brand-chat": "node scripts/verify-brand-chat.mjs",
-    "verify:brand-agent": "node scripts/verify-brand-agent.mjs"
+    "verify:brand-chat": "node scripts/verify-brand-chat.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

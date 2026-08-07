@@ -197,12 +197,11 @@
      viewport instead of reflowing. Step them down instead. */
   .home-grid-4 { grid-template-columns: repeat(4, 1fr); }
   .home-grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .home-grid-5 { grid-template-columns: repeat(5, 1fr); }
   @media (max-width: 900px) {
-    .home-grid-4, .home-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+    .home-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
   }
   @media (max-width: 560px) {
-    .home-grid-4, .home-grid-3, .home-grid-5 { grid-template-columns: 1fr !important; }
+    .home-grid-4, .home-grid-3 { grid-template-columns: 1fr !important; }
   }
 
   /* Home hero: text column vs. a decorative, fixed 432px-wide scrolling
