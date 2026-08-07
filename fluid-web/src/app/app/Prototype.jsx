@@ -500,9 +500,27 @@ const DirA_Brands = () => (
       <div>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:18}}>
           <div className="eyebrow" style={{color:'var(--fg-3)'}}>Or, focus on one thing</div>
-          <div style={{fontSize:12,color:'var(--fg-4)'}}>4 quick paths</div>
+          <div style={{fontSize:12,color:'var(--fg-4)'}}>5 quick paths</div>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14}}>
+          <QuickPath
+            route={'/app/brand-agent'}
+            title="Guided by AI"
+            sub="One question at a time. AI runs the whole interview, you just answer."
+            previewBg="#14161A"
+            customPreview={
+              <div style={{position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8}}>
+                <div style={{display:'flex', alignItems:'center', gap:6}}>
+                  <span style={{width:6,height:6,borderRadius:99,background:'#44D9C7'}} />
+                  <span style={{fontFamily:'var(--font-mono)', fontSize:9.5, letterSpacing:'0.06em', color:'rgba(255,255,255,.55)'}}>ASKING…</span>
+                </div>
+                <div style={{fontFamily:'var(--font-display)', fontWeight:600, fontSize:13, color:'#fff', maxWidth:170, textAlign:'center', lineHeight:1.35}}>
+                  “Who is this for, really?”
+                </div>
+              </div>
+            }
+            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>}
+          />
           <QuickPath
             route={CHAT + '?flow=audit'}
             title="Rebranding"
@@ -6900,9 +6918,27 @@ const DirA_Home = () => {
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
           <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Or, focus on one thing</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>4 quick paths</div>
+          <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>5 quick paths</div>
         </div>
-        <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
+        <div className="home-grid-5" style={{ display: 'grid', gap: 14 }}>
+          <QuickPath
+            route={'/app/brand-agent'}
+            title="Guided by AI"
+            sub="One question at a time. AI runs the whole interview, you just answer."
+            previewBg="#14161A"
+            customPreview={
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 99, background: '#44D9C7' }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.06em', color: 'rgba(255,255,255,.55)' }}>ASKING…</span>
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13, color: '#fff', maxWidth: 170, textAlign: 'center', lineHeight: 1.35 }}>
+                  “Who is this for, really?”
+                </div>
+              </div>
+            }
+            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>} />
+
           <QuickPath
             route={CHAT + '?flow=audit'}
             title="Rebranding"
