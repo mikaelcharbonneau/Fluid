@@ -5,7 +5,7 @@
 // produce, which questions a voice brief cannot skip. They were written for a
 // coding agent with a filesystem, so they say things like "write the result to
 // `.agents/brand-context.md`". We run them somewhere with no filesystem and no
-// user watching a terminal, so the runner in `lib/brand-chat/run.ts` supplies
+// user watching a terminal, so a runner (e.g. `lib/brand-kit/run.ts`) supplies
 // the context they expect to read and an output contract in place of the file
 // they expect to write. This module is only the lookup.
 //

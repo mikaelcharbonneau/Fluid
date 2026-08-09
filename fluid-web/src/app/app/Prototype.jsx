@@ -499,38 +499,20 @@ const DirA_Brands = () => (
 
       <div>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:18}}>
-          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Or, focus on one thing</div>
-          <div style={{fontSize:12,color:'var(--fg-4)'}}>4 quick paths</div>
+          <div className="eyebrow" style={{color:'var(--fg-3)'}}>Or, start from a look</div>
+          <div style={{fontSize:12,color:'var(--fg-4)'}}>4 visual moods</div>
         </div>
         <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14}}>
-          <QuickPath
-            route={CHAT + '?flow=audit'}
-            title="Rebranding"
-            sub="Refresh an existing brand. Keep what works, update the rest."
-            preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>}
-          />
-          <QuickPath
-            route={CHAT + '?flow=logo-only'}
-            title="Logo"
-            sub="Skip the strategy. Drop a name, get marks in seconds."
-            preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>}
-          />
-          <QuickPath
-            route={CHAT + '?flow=name-only'}
-            title="Name"
-            sub="Nine names with reasoning and domain status."
-            preview={__assets['assets/min/preview-name.jpg']} previewBg="#F3F3F4"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>}
-          />
-          <QuickPath
-            route={CHAT + '?flow=guidelines-only'}
-            title="Guidelines"
-            sub="Already have a logo and palette? We'll write the rules."
-            preview={__assets['assets/min/preview-guidelines.jpg']} previewBg="#F4F6F5"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><line x1="9" y1="7" x2="16" y2="7" /></svg>}
-          />
+          {QUICK_VISUAL_MODES.map((m) => (
+            <QuickPath
+              key={m.id}
+              route={CHAT + '?mode=' + m.id}
+              title={m.title}
+              sub={m.sub}
+              preview={__assets[m.preview]} previewBg={m.previewBg}
+              icon={m.icon}
+            />
+          ))}
         </div>
       </div>
 
@@ -6166,7 +6148,6 @@ const BA_EmptyState = ({ onCreate }) => (
 // Assets & Guides have no real content until brand generation (Phase 3), so
 // new accounts see honest empty states rather than demo-brand material.
 const DirA_AssetsScreen = () => {
-  const { navigate } = useRouter();
   return (
     <AShell activeNav="assets" breadcrumb={['Assets']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -6179,7 +6160,7 @@ const DirA_AssetsScreen = () => {
             title="No assets yet"
             body="Logos, wordmarks, app icons and exports show up here once you build a brand. Create one to get started."
             ctaLabel="Create a brand"
-            onCta={() => navigate('step1')}
+            onCta={() => location.assign(CHAT)}
           />
         </div>
       </div>
@@ -6188,7 +6169,6 @@ const DirA_AssetsScreen = () => {
 };
 
 const DirA_GuidesScreen = () => {
-  const { navigate } = useRouter();
   return (
     <AShell activeNav="guides" breadcrumb={['Guides']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -6201,7 +6181,7 @@ const DirA_GuidesScreen = () => {
             title="No guidelines yet"
             body="Fluid writes usage rules for your logo, color, type and voice once your brand is generated. Build a brand to see them here."
             ctaLabel="Create a brand"
-            onCta={() => navigate('step1')}
+            onCta={() => location.assign(CHAT)}
           />
         </div>
       </div>
@@ -6264,6 +6244,9 @@ function hexToRgba(hex, a) {
 //   • neither → a neutral surface (never the Fluid gradient — that's Fluid's
 //     mark, not the user's brand)
 const BA_CardVisual = ({ brand, height = 132 }) => {
+  // A one-shot brand-kit board is already a finished piece of art — show it
+  // directly rather than falling back to the svg/palette/initial tile below.
+  const boardImage = brand.data && brand.data.brandkit && brand.data.brandkit.imageUrl;
   const svg = pickLogoSvg(brand);
   const colors = (((brand.data || {}).palette || {}).colors) || [];
   const hasColors = colors.length > 0;
@@ -6273,6 +6256,18 @@ const BA_CardVisual = ({ brand, height = 132 }) => {
   const tile = Math.round(height * 0.56);
   const initialSize = Math.round(height * 0.30);
   const stripH = height < 110 ? 5 : 6;
+
+  if (boardImage) {
+    return (
+      <div style={{ position: 'relative', height, background: 'var(--bg-sunken)', overflow: 'hidden' }}>
+        <img
+          src={boardImage}
+          alt={brandDisplayName(brand) + ' brand kit board'}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+        />
+      </div>
+    );
+  }
 
   let background;
   if (svg) {
@@ -6432,7 +6427,7 @@ const DirA_BrandsActive = () => {
 
           {/* ── Brand grid / empty state ───────────────────────────── */}
           {brands.length === 0 ? (
-            <BA_EmptyState onCreate={() => navigate('step1')} />
+            <BA_EmptyState onCreate={() => location.assign(CHAT)} />
           ) : (
             <div className="bacard-grid">
               {shown.map((b) => (
@@ -6440,6 +6435,13 @@ const DirA_BrandsActive = () => {
                   key={b.id}
                   brand={b}
                   onOpen={() => {
+                    // A one-shot brand-kit board lives at its own URL, not in
+                    // this hash router — open its result view directly rather
+                    // than dropping it into the legacy step wizard below.
+                    if (b.data && b.data.brandkit) {
+                      location.assign(CHAT + '?brand=' + b.id);
+                      return;
+                    }
                     loadBrand(b.id);
                     const step = b.data && b.data.workflow === 'logo'
                       ? 'logo-brief'
@@ -6703,6 +6705,34 @@ const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, l
   </div>;
 
 
+// ---- Quick-start visual moods -------------------------------------------
+// A one-shot generator has no "logo-only" vs "full brand" distinction
+// anymore — every run produces the same board — so these shortcut cards
+// pre-select one of the brandkit skill's named visual modes instead of a
+// partial flow. `?mode=<id>` is read by BrandChat.tsx to preselect the chip.
+const QUICK_VISUAL_MODES = [
+  {
+    id: 'dark-security', title: 'Security', sub: 'Shield forms, radar lines, vigilant and precise.',
+    preview: 'assets/min/preview-rebranding.jpg', previewBg: '#EC4C34',
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" /></svg>,
+  },
+  {
+    id: 'voice', title: 'Voice', sub: 'Waveform, mic motif, fluid and intimate.',
+    preview: 'assets/min/preview-logo.jpg', previewBg: '#1E6BF5',
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>,
+  },
+  {
+    id: 'luxury', title: 'Luxury', sub: 'Serif wordmark, embossing, tasteful and expensive.',
+    preview: 'assets/min/preview-name.jpg', previewBg: '#F3F3F4',
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>,
+  },
+  {
+    id: 'dark-developer', title: 'Developer', sub: 'Terminal windows, prompt bars, sharp and builder-native.',
+    preview: 'assets/min/preview-guidelines.jpg', previewBg: '#0E0F12',
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>,
+  },
+];
+
 // ---- Quick path card — focus on one thing ------------------------------
 const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }) =>
 <div data-route={route} onClick={onClick} style={{
@@ -6820,7 +6850,7 @@ const DirA_Home = () => {
             </div>
           ))}
         </div>
-        <button onClick={() => navigate('step1')} style={{ padding: '12px 22px', borderRadius: 12, background: '#fff', color: '#0E0F12', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <button onClick={() => location.assign(CHAT)} style={{ padding: '12px 22px', borderRadius: 12, background: '#fff', color: '#0E0F12', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           Create your first brand <ArrowRight size={14} />
         </button>
       </section>
@@ -6881,7 +6911,7 @@ const DirA_Home = () => {
             Tell Fluid about your idea. We'll draft a strategy, name, logo, palette and type — in about 60&nbsp;seconds.
           </p>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('step1')} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+            <button onClick={() => location.assign(CHAT)} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
               Start a new brand <ArrowRight size={14} />
             </button>
             <button onClick={() => navigate('brands')} style={{ padding: '12px 18px', borderRadius: 12, background: 'transparent', color: 'var(--fg-1)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px var(--line-strong)', whiteSpace: 'nowrap' }}>
@@ -6896,63 +6926,23 @@ const DirA_Home = () => {
         </div>
       </div>
 
-      {/* ── Focus on one thing — quick paths (part of the same section) ── */}
+      {/* ── Start from a look — quick paths (part of the same section) ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Or, focus on one thing</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>4 quick paths</div>
+          <div className="eyebrow" style={{ color: 'var(--fg-3)' }}>Or, start from a look</div>
+          <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>4 visual moods</div>
         </div>
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
-          <QuickPath
-            route={CHAT + '?flow=audit'}
-            title="Rebranding"
-            sub="Refresh an existing brand. Keep what works, update the rest."
-            preview={__assets['assets/min/preview-rebranding.jpg']} previewBg="#EC4C34"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>} />
-          
-          <QuickPath
-            route={CHAT + '?flow=logo-only'}
-            title="Logo"
-            sub="Skip the strategy. Drop a name, get marks in seconds."
-            preview={__assets['assets/min/preview-logo.jpg']} previewBg="#1E6BF5"
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>} />
-          
-          <QuickPath
-            route={CHAT + '?flow=name-only'}
-            title="Name"
-            sub="Nine names with reasoning and domain status."
-            previewBg="#F4F4F5"
-            customPreview={
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 34, letterSpacing: '-0.03em', color: '#0E0E0E', lineHeight: 1 }}>Cadence<span style={{ color: '#FD7947' }}>.</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 99, background: '#2BBBA3' }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.04em', color: 'var(--fg-3)' }}>.com available · +8 names</span>
-                </div>
-              </div>
-            }
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>} />
-          
-          <QuickPath
-            route={CHAT + '?flow=guidelines-only'}
-            title="Guidelines"
-            sub="Already have a logo and palette? We'll write the rules."
-            previewBg="#FFFFFF"
-            customPreview={
-            <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-                <div style={{ flex: '0 0 42%', background: '#0E0F12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, color: '#fff', letterSpacing: '-0.03em' }}>Aa</span>
-                </div>
-                <div style={{ flex: 1, background: '#FFFFFF', padding: '0 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--fg-4)' }}>01 · LOGO</span>
-                  {[1, 0.7, 0.85].map((w, i) =>
-                <div key={i} style={{ height: 4, width: `${w * 100}%`, background: '#E6E6E8', borderRadius: 2 }} />
-                )}
-                </div>
-              </div>
-            }
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><line x1="9" y1="7" x2="16" y2="7" /></svg>} />
-          
+          {QUICK_VISUAL_MODES.map((m) => (
+            <QuickPath
+              key={m.id}
+              route={CHAT + '?mode=' + m.id}
+              title={m.title}
+              sub={m.sub}
+              preview={__assets[m.preview]} previewBg={m.previewBg}
+              icon={m.icon}
+            />
+          ))}
         </div>
       </div>
 

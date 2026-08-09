@@ -9,8 +9,7 @@
     "lint": "eslint",
     "skills:build": "node scripts/build-skills.mjs",
     "skills:check": "node scripts/build-skills.mjs --check",
-    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs",
-    "verify:brand-chat": "node scripts/verify-brand-chat.mjs"
+    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

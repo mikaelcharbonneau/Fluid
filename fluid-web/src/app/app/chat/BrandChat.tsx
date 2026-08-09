@@ -1,140 +1,55 @@
 "use client";
 
-// The conversation.
+// One-shot brand-kit generation.
 //
-// The server owns the script — which question comes next, and what its widget
-// needs. This component owns the thread: what has been said, what is currently
-// being typed, and which answers are still editable.
-//
-// Two rules the rest of the file follows:
-//
-//   • An answer is never echoed as a chat bubble. It stays in its widget,
-//     where it can still be changed. Only free-form composer messages become
-//     user bubbles.
-//   • Re-answering a question truncates everything below it and asks the
-//     server again from that point. That is what makes an earlier answer feel
-//     editable rather than final.
+// Replaces the old 20-step conversation: a brief in, one composite
+// brand-kit board image out. Three phases live in this one component —
+// `form` (collect the brief), `generating` (stream activity while the
+// studio works), `result` (show the board) — chosen by whether `?brand=`
+// resolves to a brand that already has `data.brandkit`.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { FLOWS, STEPS, getFlow } from "@/lib/brand-chat/flow";
-import { DEFAULT_PERSONALITY, type BrandContext } from "@/lib/brand-chat/context";
-import type { RenderedStep } from "@/lib/brand-chat/step";
 import type { ActivityEvent } from "@/lib/ai/activity";
-import { createBrand, postAssist, postTurn } from "./api";
+import { fetchBrand, postGenerate } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
 import {
-  CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, label,
+  CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, chip, cta, label, panel,
 } from "./ui";
 import {
-  Assets, Chevron, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
+  Assets, Chevron, ChevronLeft, Download, Grid, Guides, Home, Refresh, Search, Settings, Token,
 } from "./icons";
-import {
-  AvoidWidget, BriefWidget, CategoryWidget, DirectionWidget, GoalWidget, KitWidget,
-  LaunchWidget, LogoTypeWidget, LogoWidget, NameWidget, PathWidget, PersonalityWidget,
-  PositionWidget, StageWidget, TaglineWidget, TextWidget, TokenWidget, ValuesWidget,
-  VoiceWidget,
-} from "./widgets";
-import type { NameCandidate } from "@/lib/brand-chat/contracts";
+import { AVOIDS, CATEGORIES } from "./data";
+import { LAYOUTS, VISUAL_MODES } from "@/lib/brand-kit/types";
+import type { BrandKitBrief, BrandKitLayout, BrandKitResult, VisualMode } from "@/lib/brand-kit/types";
 import "./chat.css";
 
-interface Msg {
-  id: string;
-  role: "ai" | "user";
-  /** What is on screen now — grows while typing. */
-  text: string;
-  /** The whole line. Equal to `text` once typing finishes. */
-  full: string;
-  step?: RenderedStep;
-  /** A failure, styled as a warning rather than as Fluid speaking. */
-  error?: boolean;
-  /** A failure the user can do something about, with the button to do it. */
-  retry?: boolean;
-}
-
-const TYPE_MS = 16;
-const CHARS_PER_TICK = 3;
-
-const firstStep = STEPS[0];
+type Phase = "loading" | "form" | "generating" | "result";
 
 export function BrandChat() {
-  // Read once, lazily, before the first paint: whether this is a resumed
-  // thread decides both the starting spinner and the ref below, and neither
-  // should flicker through a "new thread" state first.
-  const [resumeId] = useState(() =>
-    new URLSearchParams(window.location.search).get("brand"),
-  );
-  // ?flow=logo-only — the app's "Logo · Start" style entry points name the job
-  // up front, so the first question is answered before it is asked.
-  const [presetFlow] = useState(() => {
-    if (new URLSearchParams(window.location.search).get("brand")) return null;
-    const flow = new URLSearchParams(window.location.search).get("flow");
-    return flow && FLOWS.some((f) => f.id === flow) ? flow : null;
+  const [resumeId] = useState(() => new URLSearchParams(window.location.search).get("brand"));
+  const [presetMode] = useState<VisualMode | null>(() => {
+    const m = new URLSearchParams(window.location.search).get("mode");
+    return m && VISUAL_MODES.some((v) => v.id === m) ? (m as VisualMode) : null;
   });
-  const [msgs, setMsgs] = useState<Msg[]>([
-    {
-      id: "ai-0",
-      role: "ai",
-      text: "",
-      full: firstStep.text,
-      step: { key: firstStep.key, text: firstStep.text, payload: { kind: "none" } },
-    },
-  ]);
-  const [context, setContext] = useState<BrandContext>({});
-  const [busy, setBusy] = useState(!!resumeId);
-  const started = useRef(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [composer, setComposer] = useState("");
+
+  const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "form");
+  const [brandId, setBrandId] = useState<string | null>(resumeId);
+  const [result, setResult] = useState<BrandKitResult | null>(null);
   const [tokens, setTokens] = useState<number | null>(null);
-  // The answer currently in flight. Selection widgets read their highlight
-  // from the stored context, which only arrives when the turn comes back —
-  // and a turn that has to generate the next step takes tens of seconds.
-  // Without this the click looks like it did nothing for that whole wait.
-  const [pendingAnswer, setPendingAnswer] = useState<{ step: string; value: unknown } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Extra name batches, newest first. Kept out of the thread so "10 more"
-  // does not push the question off the screen each time.
-  const [nameBatches, setNameBatches] = useState<NameCandidate[][]>([]);
-  const [namePage, setNamePage] = useState(0);
-  const [moreBusy, setMoreBusy] = useState(false);
+  const [name, setName] = useState("");
+  const [brief, setBrief] = useState("");
+  const [category, setCategory] = useState("");
+  const [audience, setAudience] = useState("");
+  const [visualMode, setVisualMode] = useState<VisualMode | null>(presetMode);
+  const [layout, setLayout] = useState<BrandKitLayout>("3x3");
+  const [avoid, setAvoid] = useState<string[]>([]);
+  const [refineOpen, setRefineOpen] = useState(!!presetMode);
 
-  const threadRef = useRef<HTMLDivElement>(null);
-  // Written only from callbacks, never during render: `ensureBrand` needs the
-  // current id without waiting for a re-render, and two rapid answers must not
-  // each create their own draft brand.
-  const brandRef = useRef<string | null>(resumeId);
-  // Read by callbacks that must not be re-created on every context change.
-  const contextRef = useRef<BrandContext>({});
-  // The turn that failed, kept so "Try again" has something to send. The
-  // answer itself is already stored server-side — the route saves before it
-  // generates — so retrying re-runs the generation, it does not re-ask.
-  const lastTurn = useRef<{ step: string; value: unknown } | null>(null);
-
-  // ---- typing --------------------------------------------------------
-  useEffect(() => {
-    const typing = msgs.findIndex((m) => m.text.length < m.full.length);
-    if (typing === -1) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const id = setTimeout(
-      () =>
-        setMsgs((cur) =>
-          cur.map((m, i) =>
-            i === typing
-              ? { ...m, text: reduced ? m.full : m.full.slice(0, m.text.length + CHARS_PER_TICK) }
-              : m,
-          ),
-        ),
-      reduced ? 0 : TYPE_MS,
-    );
-    return () => clearTimeout(id);
-  }, [msgs]);
-
-  useEffect(() => {
-    const el = threadRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs, busy, status]);
-
-  // ---- token balance -------------------------------------------------
+  // ---- token balance ---------------------------------------------------
   useEffect(() => {
     let live = true;
     fetch("/api/billing/status")
@@ -146,336 +61,117 @@ export function BrandChat() {
     return () => {
       live = false;
     };
-  }, [busy]);
+  }, [phase]);
 
-  // ---- resume --------------------------------------------------------
+  // ---- resume ------------------------------------------------------------
   useEffect(() => {
     if (!resumeId) return;
-    postTurn({ brandId: resumeId }).then((out) => {
-      setBusy(false);
-      if (out.context) {
-        contextRef.current = out.context;
-        setContext(out.context);
-      }
-      if (out.error) {
-        setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
+    fetchBrand(resumeId).then(({ brand, error: err }) => {
+      if (err || !brand) {
+        setError(err ?? "That brand could not be found.");
+        setPhase("form");
         return;
       }
-      if (out.step) {
-        setMsgs([{ id: "ai-resume", role: "ai", text: "", full: out.step.text, step: out.step }]);
+      setName(brand.name ?? "");
+      setBrief(brand.brief ?? "");
+      setAudience(brand.audience ?? "");
+      const brandkit = brand.data?.brandkit;
+      if (brandkit) {
+        setResult(brandkit);
+        setPhase("result");
+      } else {
+        setPhase("form");
       }
     });
   }, [resumeId]);
 
-  // ---- turns ---------------------------------------------------------
-
-  const ensureBrand = useCallback(async (): Promise<string | null> => {
-    if (brandRef.current) return brandRef.current;
-    const { id, error } = await createBrand();
-    if (!id) {
-      setMsgs((cur) => [...cur, note(cur.length, error ?? "Could not start a new brand.", true)]);
-      return null;
-    }
-    brandRef.current = id;
-    // Survives a reload, and makes the thread linkable.
-    const url = new URL(window.location.href);
-    url.searchParams.set("brand", id);
-    window.history.replaceState(null, "", url);
-    return id;
-  }, []);
-
-  const submit = useCallback(
-    async (stepKey: string, value: unknown) => {
-      if (busy) return;
-      setBusy(true);
-      setStatus(null);
-      setPendingAnswer({ step: stepKey, value });
-
-      const id = await ensureBrand();
-      if (!id) {
-        setBusy(false);
-        return;
-      }
-
-      // Re-answering: drop everything the old answer produced before asking
-      // again, so the thread never shows two versions of the same question.
-      setMsgs((cur) => {
-        const at = cur.findIndex((m) => m.step?.key === stepKey);
-        return at === -1 ? cur : cur.slice(0, at + 1);
-      });
-      if (stepKey === "name") {
-        setNameBatches([]);
-        setNamePage(0);
-      }
-
-      lastTurn.current = { step: stepKey, value };
-      const onActivity = (event: ActivityEvent) => setStatus(event.label);
-      const out = await postTurn({ brandId: id, step: stepKey, value }, onActivity);
-
-      setBusy(false);
-      setStatus(null);
-      if (out.context) {
-        contextRef.current = out.context;
-        setContext(out.context);
-        // The server's own value supersedes the local echo. Deliberately not
-        // cleared when no context came back (a 402, or a generation that
-        // failed): the route stores the answer before it generates, so the
-        // echo is still what the brand holds.
-        setPendingAnswer(null);
-      }
-
-      if (out.error) {
-        setMsgs((cur) => [...cur, note(cur.length, out.error!, true, true)]);
-        return;
-      }
-      if (out.done || !out.step) {
-        setMsgs((cur) => [
-          ...cur,
-          note(
-            cur.length,
-            "That's the job done. It's saved against the brand — change any answer above and I'll re-run what depends on it.",
-          ),
-        ]);
-        return;
-      }
-      const step = out.step;
-      setMsgs((cur) => [
-        ...cur,
-        { id: `ai-${step.key}-${cur.length}`, role: "ai", text: "", full: step.text, step },
-      ]);
-    },
-    [busy, ensureBrand],
-  );
-  // An entry point that already named the job answers the first question for
-  // the user. Guarded by a ref because running twice would create two drafts.
-  useEffect(() => {
-    if (!presetFlow || started.current) return;
-    started.current = true;
-    submit("path", presetFlow);
-  }, [presetFlow, submit]);
-
-  // ---- assists -------------------------------------------------------
-
-  const assist = useCallback(
-    async (kind: "audience" | "competitors") => {
-      const id = await ensureBrand();
-      if (!id) return null;
-      const out = await postAssist({ brandId: id, kind });
-      if (out.error) {
-        setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
-        return null;
-      }
-      return (kind === "audience" ? out.audience : out.competitors) ?? null;
-    },
-    [ensureBrand],
-  );
-
-  const rewriteBrief = useCallback(
-    async (task: "brief_shorter" | "brief_punchier" | "brief_sharper") => {
-      const id = await ensureBrand();
-      if (!id) return null;
-      try {
-        const r = await fetch("/api/generate/assist", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ brandId: id, task }),
-        });
-        const j = (await r.json().catch(() => ({}))) as { text?: string; error?: string };
-        if (!r.ok || !j.text) {
-          setMsgs((cur) => [...cur, note(cur.length, j.error ?? "That rewrite failed.", true)]);
-          return null;
-        }
-        return j.text;
-      } catch {
-        setMsgs((cur) => [...cur, note(cur.length, "Couldn't reach the studio for that rewrite.", true)]);
-        return null;
-      }
-    },
-    [ensureBrand],
-  );
-
-  const moreNames = useCallback(
-    async (shown: NameCandidate[]) => {
-      const id = await ensureBrand();
-      if (!id) return;
-      setMoreBusy(true);
-      const out = await postAssist({
-        brandId: id,
-        kind: "names",
-        exclude: shown.map((n) => n.name),
-      });
-      setMoreBusy(false);
-      if (out.error) {
-        setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
-        return;
-      }
-      if (out.names) {
-        setNameBatches((cur) => [out.names!, ...cur]);
-        setNamePage(0);
-      }
-    },
-    [ensureBrand],
-  );
-
-  // "Draw more options" re-runs the logo step. The cached set is keyed on the
-  // inputs; clearing logoSet forces new image renders. The visual identity
-  // brief is kept when its key still matches so redraw reuses the skill doc.
-  const [redrawing, setRedrawing] = useState(false);
-  const redrawMarks = useCallback(async () => {
-    const id = brandRef.current;
-    if (!id || busy) return;
-    setRedrawing(true);
-    setContext((cur) => ({ ...cur, logoSet: undefined }));
-    const out = await postTurn(
-      { brandId: id, step: "logoType", value: contextRef.current.logoType ?? "wordmark" },
-      (event) => setStatus(event.label),
-    );
-    setRedrawing(false);
+  // ---- generate ------------------------------------------------------------
+  const generate = useCallback(async () => {
+    if (!name.trim() || !brief.trim() || phase === "generating") return;
+    setPhase("generating");
+    setError(null);
     setStatus(null);
-    if (out.context) setContext(out.context);
+
+    const payload: BrandKitBrief = {
+      name: name.trim(),
+      brief: brief.trim(),
+      category: category || undefined,
+      audience: audience.trim() || undefined,
+      visualMode: visualMode ?? undefined,
+      layout,
+      avoid: avoid.length ? avoid : undefined,
+    };
+
+    const out = await postGenerate(brandId, payload, (event: ActivityEvent) => setStatus(event.label));
+    setStatus(null);
+
+    if (out.brandId && out.brandId !== brandId) {
+      setBrandId(out.brandId);
+      const url = new URL(window.location.href);
+      url.searchParams.set("brand", out.brandId);
+      window.history.replaceState(null, "", url);
+    }
+
     if (out.error) {
-      setMsgs((cur) => [...cur, note(cur.length, out.error!, true)]);
+      setError(out.error);
+      setPhase("form");
       return;
     }
-    if (out.step) {
-      const step = out.step;
-      setMsgs((cur) => {
-        const at = cur.findIndex((m) => m.step?.key === "logo");
-        const kept = at === -1 ? cur : cur.slice(0, at);
-        return [...kept, { id: `ai-logo-${kept.length}-${Date.now()}`, role: "ai", text: step.text, full: step.text, step }];
-      });
+    if (out.brandkit) {
+      setResult(out.brandkit);
+      setPhase("result");
+      return;
     }
-  }, [busy]);
+    setError("Something went wrong — no board came back.");
+    setPhase("form");
+  }, [name, brief, category, audience, visualMode, layout, avoid, brandId, phase]);
 
-  const retryTurn = useCallback(() => {
-    const last = lastTurn.current;
-    if (!last || busy) return;
-    // Drop the failure notice: the thread should show one attempt, not a
-    // growing column of them.
-    setMsgs((cur) => cur.filter((m) => !m.retry));
-    submit(last.step, last.value);
-  }, [busy, submit]);
+  const startOver = useCallback(() => {
+    setError(null);
+    setPhase("form");
+  }, []);
 
-  const sendComposer = () => {
-    const text = composer.trim();
-    if (!text || busy) return;
-    setComposer("");
-    setMsgs((cur) => [
-      ...cur,
-      { id: `u-${cur.length}`, role: "user", text, full: text },
-      note(
-        cur.length + 1,
-        "I can't take free-form changes yet — that's the next piece. Everything above is still live, though: change an answer in place and I'll re-run whatever depends on it.",
-      ),
-    ]);
-  };
-
-  // ---- derived -------------------------------------------------------
-
-  const pending = (() => {
-    const last = msgs[msgs.length - 1];
-    if (!last?.step || last.text.length < last.full.length) return null;
-    if (last.step.key === "kit") return null;
-    return last.step.key;
-  })();
-  const composerDisabled = busy || !!pending;
-  const flowLabel = getFlow(context.path).label;
-  // What the widgets render from: the stored context plus whatever answer is
-  // still in flight, so a selection lights up on click rather than when the
-  // next step finishes generating.
-  const shownContext = withPendingAnswer(context, pendingAnswer);
+  const canGenerate = !!name.trim() && !!brief.trim() && phase !== "generating";
+  const breadcrumb = name.trim() || "New brand";
 
   return (
     <div className="bchat">
-      <Header breadcrumb={flowLabel} tokens={tokens} />
+      <Header breadcrumb={breadcrumb} tokens={tokens} />
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <Sidebar />
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-          <div ref={threadRef} className="bchat-thread" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "36px 24px 24px" }}>
-            <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 26 }}>
-              {msgs.map((m, i) => (
-                <Message
-                  key={m.id}
-                  msg={m}
-                  isLast={i === msgs.length - 1}
-                  context={shownContext}
-                  busy={busy}
-                  submit={submit}
-                  assist={assist}
-                  rewriteBrief={rewriteBrief}
-                  nameBatches={nameBatches}
-                  namePage={namePage}
-                  setNamePage={setNamePage}
-                  moreNames={moreNames}
-                  moreBusy={moreBusy}
-                  redrawMarks={redrawMarks}
-                  redrawing={redrawing}
-                  retryTurn={retryTurn}
-                />
-              ))}
-
-              {busy ? (
-                <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                  <div style={{ flex: "0 0 28px", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ThinkingOrb />
-                  </div>
-                  <span style={{ fontSize: 13, color: "rgba(0,0,0,.42)" }}>{status ?? "Thinking…"}</span>
-                </div>
-              ) : null}
-
-              <div style={{ height: 8 }} />
-            </div>
-          </div>
-
-          <div style={{ flex: "0 0 auto", padding: "0 24px 22px", background: "linear-gradient(to top,#FAFAFB 62%,rgba(250,250,251,0))" }}>
-            <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "12px 12px 12px 18px",
-                borderRadius: 16, background: composerDisabled ? "#F4F4F5" : CARD,
-                boxShadow: `inset 0 0 0 1px rgba(0,0,0,${composerDisabled ? ".07" : ".12"})${composerDisabled ? "" : ",0 6px 18px rgba(0,0,0,.06)"}`,
-                transition: "background 180ms,box-shadow 180ms",
-              }}>
-                <input
-                  value={composer}
-                  onChange={(e) => setComposer(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !composerDisabled) {
-                      e.preventDefault();
-                      sendComposer();
-                    }
-                  }}
-                  disabled={composerDisabled}
-                  placeholder={
-                    pending ? "Answer above to keep going…" : busy ? "Fluid is thinking…" : "Ask a question…"
-                  }
-                  aria-label="Message Fluid"
-                  style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: 14.5, color: INK }}
-                />
-                <button
-                  type="button"
-                  aria-label="Send"
-                  disabled={composerDisabled || !composer.trim()}
-                  onClick={sendComposer}
-                  style={{
-                    width: 34, height: 34, borderRadius: 10, display: "inline-flex",
-                    alignItems: "center", justifyContent: "center",
-                    background: composerDisabled || !composer.trim() ? "#EDEDEF" : INK,
-                    color: composerDisabled || !composer.trim() ? "rgba(0,0,0,.30)" : "#fff",
-                  }}
-                >
-                  <Send size={15} />
-                </button>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px" }}>
-                <span style={{ ...label, fontSize: 10, color: FAINT }}>
-                  {pending ? "Waiting on you above" : busy ? "Fluid is working" : "Everything above stays editable"}
-                </span>
-                <div style={{ flex: 1 }} />
-                <a href="/app#brands" className="bchat-ghost" style={{ ...label, fontSize: 10, color: FAINT, background: "transparent" }}>
-                  Leave
-                </a>
-              </div>
-            </div>
+        <main style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "40px 24px 60px" }}>
+          <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+            {phase === "loading" ? (
+              <Busy label="Loading…" />
+            ) : phase === "result" && result ? (
+              <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
+            ) : (
+              <FormView
+                name={name}
+                setName={setName}
+                brief={brief}
+                setBrief={setBrief}
+                category={category}
+                setCategory={setCategory}
+                audience={audience}
+                setAudience={setAudience}
+                visualMode={visualMode}
+                setVisualMode={setVisualMode}
+                layout={layout}
+                setLayout={setLayout}
+                avoid={avoid}
+                setAvoid={setAvoid}
+                refineOpen={refineOpen}
+                setRefineOpen={setRefineOpen}
+                busy={phase === "generating"}
+                status={status}
+                error={error}
+                canGenerate={canGenerate}
+                onGenerate={generate}
+                hasPriorResult={!!result}
+                onBackToResult={() => setPhase("result")}
+              />
+            )}
           </div>
         </main>
       </div>
@@ -483,378 +179,255 @@ export function BrandChat() {
   );
 }
 
-function note(seq: number, text: string, error = false, retry = false): Msg {
-  return { id: `note-${seq}`, role: "ai", text, full: text, error, retry };
-}
+// ---- form --------------------------------------------------------------
 
-// ---- one message -----------------------------------------------------
-
-interface MessageProps {
-  msg: Msg;
-  isLast: boolean;
-  context: BrandContext;
+interface FormViewProps {
+  name: string;
+  setName: (v: string) => void;
+  brief: string;
+  setBrief: (v: string) => void;
+  category: string;
+  setCategory: (v: string) => void;
+  audience: string;
+  setAudience: (v: string) => void;
+  visualMode: VisualMode | null;
+  setVisualMode: (v: VisualMode | null) => void;
+  layout: BrandKitLayout;
+  setLayout: (v: BrandKitLayout) => void;
+  avoid: string[];
+  setAvoid: (v: string[]) => void;
+  refineOpen: boolean;
+  setRefineOpen: (v: boolean) => void;
   busy: boolean;
-  submit: (step: string, value: unknown) => void;
-  assist: (kind: "audience" | "competitors") => Promise<string[] | null>;
-  rewriteBrief: (task: "brief_shorter" | "brief_punchier" | "brief_sharper") => Promise<string | null>;
-  nameBatches: NameCandidate[][];
-  namePage: number;
-  setNamePage: (n: number) => void;
-  moreNames: (shown: NameCandidate[]) => void;
-  moreBusy: boolean;
-  redrawMarks: () => void;
-  redrawing: boolean;
-  retryTurn: () => void;
+  status: string | null;
+  error: string | null;
+  canGenerate: boolean;
+  onGenerate: () => void;
+  hasPriorResult: boolean;
+  onBackToResult: () => void;
 }
 
-function Message(props: MessageProps) {
-  const { msg, context, busy, retryTurn } = props;
+function FormView(props: FormViewProps) {
+  const {
+    name, setName, brief, setBrief, category, setCategory, audience, setAudience,
+    visualMode, setVisualMode, layout, setLayout, avoid, setAvoid,
+    refineOpen, setRefineOpen, busy, status, error, canGenerate, onGenerate,
+    hasPriorResult, onBackToResult,
+  } = props;
 
-  if (msg.role === "user") {
-    return (
-      <div className="bchat-msg" style={{ display: "flex", justifyContent: "flex-end" }}>
-        <div style={{
-          maxWidth: "70%", background: INK, color: "#fff", padding: "11px 16px",
-          borderRadius: "16px 16px 4px 16px", fontSize: 14, lineHeight: 1.5,
-        }}>
-          {msg.text}
-        </div>
-      </div>
-    );
-  }
-
-  // A widget only appears once its question has finished typing — otherwise
-  // the controls sit under half a sentence.
-  const typing = msg.text.length < msg.full.length;
-  const ready = !typing;
+  const toggleAvoid = (item: string) => {
+    setAvoid(avoid.includes(item) ? avoid.filter((a) => a !== item) : [...avoid, item]);
+  };
 
   return (
-    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <ThinkingOrb />
+    <div style={{ display: "flex", flexDirection: "column", gap: 22, paddingTop: 8 }}>
+      {hasPriorResult ? (
+        <button type="button" onClick={onBackToResult} style={{ ...ghostLink, alignSelf: "flex-start" }}>
+          <ChevronLeft size={11} /> Back to the board
+        </button>
+      ) : null}
+
+      <div>
+        <h1 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 32, letterSpacing: "-0.03em", margin: 0, color: INK }}>
+          Let&rsquo;s build the brand.
+        </h1>
+        <p style={{ fontSize: 14.5, color: MUTED, marginTop: 8, lineHeight: 1.5, maxWidth: 560 }}>
+          Tell Fluid what this is. It will draft the strategy, the mark, the palette, the
+          type, and put the whole thing on one premium brand-kit board.
+        </p>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{
-          fontFamily: DISPLAY, fontSize: 16.5, lineHeight: 1.55,
-          color: msg.error ? "#8A3E1C" : "rgba(0,0,0,.86)", letterSpacing: "-0.012em",
-        }}>
-          {msg.text}
-          {typing ? <span className="bchat-caret" /> : null}
+
+      <div style={panel()}>
+        <div style={fieldGroup}>
+          <span style={label}>Brand name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Northwind"
+            disabled={busy}
+            style={inputStyle}
+          />
         </div>
+        <div style={fieldGroup}>
+          <span style={label}>Brief</span>
+          <textarea
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            placeholder="What is this, who is it for, what does it do?"
+            disabled={busy}
+            rows={4}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+          />
+        </div>
+      </div>
 
-        {msg.retry ? (
-          <div>
-            <button
-              type="button"
+      <button
+        type="button"
+        onClick={() => setRefineOpen(!refineOpen)}
+        style={{ ...ghostLink, alignSelf: "flex-start" }}
+      >
+        <span style={{ display: "inline-flex", transform: refineOpen ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 140ms" }}>
+          <Chevron size={11} />
+        </span>
+        {refineOpen ? "Hide refinements" : "Refine (optional)"}
+      </button>
+
+      {refineOpen ? (
+        <div style={{ ...panel(), gap: 18 }}>
+          <div style={fieldGroup}>
+            <span style={label}>Category</span>
+            <div style={chipRow}>
+              {CATEGORIES.map((c) => (
+                <button key={c} type="button" disabled={busy} onClick={() => setCategory(c === category ? "" : c)} style={chip(c === category)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldGroup}>
+            <span style={label}>Audience</span>
+            <input
+              value={audience}
+              onChange={(e) => setAudience(e.target.value)}
+              placeholder="Who is this for?"
               disabled={busy}
-              onClick={retryTurn}
-              style={{
-                padding: "9px 16px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
-                background: busy ? "#EDEDEF" : INK, color: busy ? FAINT : "#fff",
-                cursor: busy ? "not-allowed" : "pointer",
-                display: "inline-flex", alignItems: "center", gap: 7,
-              }}
-            >
-              <Refresh size={12} />
-              Try again
-            </button>
-          </div>
-        ) : null}
-
-        {msg.step && !ready ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "4px 0" }}>
-            <div className="bchat-skel" style={{ height: 14, width: "38%" }} />
-            <div className="bchat-skel" style={{ height: 96, width: "100%", borderRadius: 16 }} />
-          </div>
-        ) : null}
-
-        {msg.step && ready ? (
-          <>
-            {/*
-              Widgets hold a local draft — half-typed text, chips not yet
-              submitted — which must survive every re-render of the thread.
-              But when the stored answer itself changes, the draft is stale and
-              has to be replaced. Keying on the stored value does exactly that:
-              React remounts with fresh state on a real change, and leaves the
-              draft alone otherwise.
-            */}
-            <Widget
-              {...props}
-              key={storedValueKey(context, msg.step.key)}
-              step={msg.step}
-              busy={busy}
+              style={inputStyle}
             />
-          </>
-        ) : null}
+          </div>
+
+          <div style={fieldGroup}>
+            <span style={label}>Visual mode</span>
+            <div style={chipRow}>
+              <button type="button" disabled={busy} onClick={() => setVisualMode(null)} style={chip(visualMode === null)}>
+                Let AI choose
+              </button>
+              {VISUAL_MODES.map((m) => (
+                <button key={m.id} type="button" disabled={busy} onClick={() => setVisualMode(m.id)} style={chip(visualMode === m.id)} title={m.note}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldGroup}>
+            <span style={label}>Layout</span>
+            <div style={chipRow}>
+              {LAYOUTS.map((l) => (
+                <button key={l.id} type="button" disabled={busy} onClick={() => setLayout(l.id)} style={chip(l.id === layout)} title={l.note}>
+                  {l.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldGroup}>
+            <span style={label}>Avoid</span>
+            <div style={chipRow}>
+              {AVOIDS.map((a) => (
+                <button key={a} type="button" disabled={busy} onClick={() => toggleAvoid(a)} style={chip(avoid.includes(a))}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5 }}>
+          {error}
+        </div>
+      ) : null}
+
+      {busy ? (
+        <Busy label={status ?? "Working…"} />
+      ) : (
+        <button type="button" disabled={!canGenerate} onClick={onGenerate} style={{ ...cta(canGenerate), alignSelf: "flex-start", padding: "13px 22px", fontSize: 14 }}>
+          Generate the brand kit
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---- result --------------------------------------------------------------
+
+function ResultView({
+  result,
+  name,
+  onRegenerate,
+}: {
+  result: BrandKitResult;
+  name: string;
+  onRegenerate: () => void;
+}) {
+  const { strategy } = result;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 8 }}>
+      <div>
+        <div style={{ ...label, marginBottom: 8 }}>Brand kit</div>
+        <h1 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 32, letterSpacing: "-0.03em", margin: 0, color: INK }}>
+          {name}
+        </h1>
+        <p style={{ fontSize: 15, color: MUTED, marginTop: 8, fontStyle: "italic" }}>&ldquo;{strategy.tagline}&rdquo;</p>
+      </div>
+
+      <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: `0 2px 6px rgba(0,0,0,.06), inset 0 0 0 1px ${HAIRLINE}` }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={result.imageUrl} alt={`${name} brand kit board`} style={{ display: "block", width: "100%", height: "auto" }} />
+      </div>
+
+      <div style={{ display: "flex", gap: 6 }}>
+        {strategy.palette.map((p) => (
+          <div key={p.hex} title={`${p.role} — ${p.hex}`} style={{ flex: 1, height: 34, borderRadius: 10, background: p.hex, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }} />
+        ))}
+      </div>
+
+      <div style={{ ...panel(), gap: 10 }}>
+        <Row k="Category" v={strategy.category} />
+        <Row k="Audience" v={strategy.audience} />
+        <Row k="Personality" v={strategy.personality} />
+        <Row k="Core metaphor" v={strategy.coreMetaphor} />
+        <Row k="Logo idea" v={strategy.logoIdea} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <a href={result.imageUrl} download target="_blank" rel="noreferrer" style={{ ...cta(true), textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Download size={14} /> Download
+        </a>
+        <button type="button" onClick={onRegenerate} style={{ ...cta(true), background: CARD, color: INK, boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Refresh size={13} /> Regenerate
+        </button>
+        <a href="/app#brands" style={{ ...ghostLink }}>
+          Back to brands
+        </a>
       </div>
     </div>
   );
 }
 
-/**
- * The context with the answer currently in flight already folded in.
- *
- * Only the steps whose widget is stateless need this — a token list or a
- * slider row holds its own draft and already shows what the user did. A chip
- * or a card reads its highlight straight from the context, so until the turn
- * returns there is nothing to read.
- *
- * This is a display concern only: `contextRef` keeps the server's truth, and
- * anything the server sends back replaces this. Nothing here validates —
- * `applyAnswer` on the server remains the only thing that decides what the
- * brand actually stores.
- */
-function withPendingAnswer(
-  ctx: BrandContext,
-  pending: { step: string; value: unknown } | null,
-): BrandContext {
-  if (!pending) return ctx;
-  const { step, value } = pending;
-
-  // Steps stored as the submitted string, under a field of the same name.
-  const SAME_NAME = ["path", "category", "stage", "goal", "name", "direction", "tagline", "logoType"];
-  if (typeof value === "string" && SAME_NAME.includes(step)) {
-    return { ...ctx, [step]: value };
-  }
-
-  if (value && typeof value === "object") {
-    const o = value as Record<string, unknown>;
-    if (step === "voice" && typeof o.name === "string") {
-      return {
-        ...ctx,
-        voice: o.name,
-        voiceSample: typeof o.sample === "string" ? o.sample : ctx.voiceSample,
-      };
-    }
-    if (step === "logo" && typeof o.image_url === "string" && typeof o.label === "string") {
-      return {
-        ...ctx,
-        logo: {
-          image_url: o.image_url,
-          label: o.label,
-          art: typeof o.art === "string" ? o.art : "",
-        },
-      };
-    }
-  }
-
-  return ctx;
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: "flex", gap: 14 }}>
+      <span style={{ ...label, flex: "0 0 130px" }}>{k}</span>
+      <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)", lineHeight: 1.5 }}>{v}</span>
+    </div>
+  );
 }
 
-/**
- * A stable string for whatever the server has stored against one step.
- *
- * Used only as a remount key, so it needs to change when the answer changes
- * and not otherwise — it is never parsed back.
- */
-function storedValueKey(ctx: BrandContext, step: string): string {
-  const value: Record<string, unknown> = {
-    path: ctx.path,
-    brief: ctx.brief,
-    category: ctx.category,
-    stage: ctx.stage,
-    audience: ctx.audience,
-    problem: ctx.problem,
-    competitors: ctx.competitors,
-    position: ctx.position,
-    differentiator: ctx.differentiator,
-    personality: ctx.personality,
-    values: ctx.values,
-    goal: ctx.goal,
-    name: ctx.name,
-    direction: ctx.direction,
-    avoid: ctx.avoid,
-    logoType: ctx.logoType,
-    voice: ctx.voice,
-    tagline: ctx.tagline,
-    launch: [ctx.launchTiming, ctx.launchChannels],
-  };
-  return `${step}:${JSON.stringify(value[step] ?? null)}`;
+function Busy({ label: text }: { label: string }) {
+  return (
+    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "center" }}>
+      <div style={{ flex: "0 0 28px", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <ThinkingOrb />
+      </div>
+      <span style={{ fontSize: 13, color: MUTED }}>{text}</span>
+    </div>
+  );
 }
 
-/** Which questions the context can prove were answered. */
-function answeredKeys(ctx: BrandContext): Set<string> {
-  const keys = new Set<string>();
-  const mark = (key: string, has: unknown) => {
-    if (has !== undefined && has !== null && !(Array.isArray(has) && has.length === 0)) keys.add(key);
-  };
-  mark("path", ctx.path);
-  mark("brief", ctx.brief);
-  mark("category", ctx.category);
-  mark("stage", ctx.stage);
-  mark("audience", ctx.audience);
-  mark("problem", ctx.problem);
-  mark("competitors", ctx.competitors);
-  mark("position", ctx.position);
-  if (ctx.differentiator !== undefined) keys.add("differentiator");
-  mark("personality", ctx.personality);
-  mark("values", ctx.values);
-  mark("goal", ctx.goal);
-  mark("name", ctx.name);
-  mark("direction", ctx.direction);
-  if (ctx.avoid !== undefined) keys.add("avoid");
-  mark("logoType", ctx.logoType);
-  mark("voice", ctx.voice);
-  mark("tagline", ctx.tagline);
-  mark("launch", ctx.launchTiming);
-  return keys;
-}
-
-// ---- widget dispatch -------------------------------------------------
-
-function Widget({
-  step, context, busy, submit, assist, rewriteBrief, nameBatches, namePage, setNamePage,
-  moreNames, moreBusy, redrawMarks, redrawing,
-}: MessageProps & { step: RenderedStep }) {
-  const answered = answeredKeys(context).has(step.key);
-  const send = (value: unknown) => submit(step.key, value);
-  const common = { answered, busy };
-
-  switch (step.key) {
-    case "path":
-      return <PathWidget {...common} value={context.path} submit={send} />;
-    case "brief":
-      return <BriefWidget {...common} value={context.brief ?? ""} submit={send} onAssist={rewriteBrief} />;
-    case "category":
-      return <CategoryWidget {...common} value={context.category} submit={send} />;
-    case "stage":
-      return <StageWidget {...common} value={context.stage} submit={send} />;
-    case "goal":
-      return <GoalWidget {...common} value={context.goal} submit={send} />;
-    case "audience":
-      return (
-        <TokenWidget
-          {...common}
-          value={context.audience ?? []}
-          submit={send}
-          placeholder="Solo founders, 25–40, already in Notion…"
-          suggestLabel="Suggest from the brief"
-          ctaLabel="That’s them"
-          onSuggest={() => assist("audience")}
-        />
-      );
-    case "competitors":
-      return (
-        <TokenWidget
-          {...common}
-          initials
-          value={context.competitors ?? []}
-          submit={send}
-          placeholder="Name or URL…"
-          suggestLabel="Suggest three"
-          ctaLabel="That’s the field"
-          onSuggest={() => assist("competitors")}
-        />
-      );
-    case "problem":
-      return (
-        <TextWidget
-          {...common}
-          value={context.problem ?? ""}
-          submit={send}
-          placeholder="The week gets planned. The day gets improvised — and lost."
-          hint="Their words, not yours, if you have them."
-          ctaLabel="Continue"
-        />
-      );
-    case "differentiator":
-      return (
-        <TextWidget
-          {...common}
-          value={context.differentiator ?? ""}
-          submit={send}
-          placeholder="They optimise the quarter. We optimise the day."
-          hint="Something a competitor couldn't say back."
-          ctaLabel="Continue"
-          onSkip={() => send("")}
-        />
-      );
-    case "personality":
-      return <PersonalityWidget {...common} value={context.personality ?? DEFAULT_PERSONALITY} submit={send} />;
-    case "values":
-      return <ValuesWidget {...common} value={context.values ?? []} submit={send} />;
-    case "avoid":
-      return <AvoidWidget {...common} value={context.avoid ?? []} submit={send} />;
-    case "logoType":
-      return <LogoTypeWidget {...common} value={context.logoType} submit={send} />;
-    case "position":
-      if (step.payload.kind !== "position") return null;
-      return <PositionWidget {...common} read={step.payload.position} value={context.position} submit={send} />;
-    case "name": {
-      if (step.payload.kind !== "name") return null;
-      // Page 0 is the newest batch; the original always sits at the bottom.
-      const pages = [...nameBatches, step.payload.names];
-      const shown = pages[Math.min(namePage, pages.length - 1)];
-      return (
-        <NameWidget
-          {...common}
-          names={shown}
-          value={context.name}
-          submit={send}
-          page={namePage}
-          pages={pages.length}
-          onPage={setNamePage}
-          moreBusy={moreBusy}
-          onMore={() => moreNames(pages.flat())}
-        />
-      );
-    }
-    case "direction":
-      if (step.payload.kind !== "direction") return null;
-      return (
-        <DirectionWidget
-          {...common}
-          directions={step.payload.directions}
-          recommended={step.payload.recommended}
-          value={context.direction}
-          submit={send}
-        />
-      );
-    case "logo":
-      if (step.payload.kind !== "logo") return null;
-      return (
-        <LogoWidget
-          {...common}
-          logo={step.payload.logo}
-          value={context.logo?.image_url}
-          onRedraw={redrawMarks}
-          redrawing={redrawing}
-          submit={send}
-        />
-      );
-    case "voice":
-      if (step.payload.kind !== "voice") return null;
-      return <VoiceWidget {...common} voices={step.payload.voices} value={context.voice} submit={send} />;
-    case "tagline":
-      if (step.payload.kind !== "tagline") return null;
-      return <TaglineWidget {...common} taglines={step.payload.taglines} value={context.tagline} submit={send} />;
-    case "launch":
-      if (step.payload.kind !== "launch") return null;
-      return (
-        <LaunchWidget
-          {...common}
-          plan={step.payload.launch}
-          value={{ timing: context.launchTiming, channels: context.launchChannels ?? [] }}
-          submit={send}
-        />
-      );
-    case "kit":
-      if (step.payload.kind !== "kit") return null;
-      return (
-        <KitWidget
-          kit={step.payload.kit}
-          name={context.name ?? "Your brand"}
-          tagline={context.tagline}
-          voiceSample={context.voiceSample}
-          logo={context.logo}
-        />
-      );
-    default:
-      return null;
-  }
-}
-
-// ---- shell -----------------------------------------------------------
+// ---- shell (unchanged from the old chat) ----------------------------------
 
 function Header({ breadcrumb, tokens }: { breadcrumb: string; tokens: number | null }) {
   const pill: CSSProperties = {
@@ -911,9 +484,9 @@ function Sidebar() {
       width: 60, flex: "0 0 60px", borderRight: `1px solid ${HAIRLINE}`,
       background: PAPER, display: "flex", flexDirection: "column",
     }}>
-      {items.map(({ name, href, Icon, active }) => (
+      {items.map(({ name: itemName, href, Icon, active }) => (
         <a
-          key={name}
+          key={itemName}
           href={href}
           style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
@@ -924,7 +497,7 @@ function Sidebar() {
             <div style={{ position: "absolute", left: 0, top: 18, bottom: 18, width: 2, background: INK, borderRadius: 2 }} />
           ) : null}
           <Icon size={20} />
-          <span style={{ fontSize: 9.5, fontWeight: 600, color: active ? "rgba(0,0,0,.72)" : FAINT }}>{name}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 600, color: active ? "rgba(0,0,0,.72)" : FAINT }}>{itemName}</span>
         </a>
       ))}
       <div style={{ flex: 1 }} />
@@ -935,3 +508,16 @@ function Sidebar() {
     </aside>
   );
 }
+
+// ---- shared styles ----------------------------------------------------
+
+const fieldGroup: CSSProperties = { display: "flex", flexDirection: "column", gap: 8 };
+const chipRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8 };
+const inputStyle: CSSProperties = {
+  width: "100%", border: 0, outline: "none", background: "#F5F5F6",
+  borderRadius: 10, padding: "11px 13px", fontSize: 14, color: INK,
+};
+const ghostLink: CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5,
+  fontWeight: 600, color: MUTED, background: "transparent",
+};
