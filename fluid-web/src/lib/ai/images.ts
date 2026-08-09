@@ -104,6 +104,9 @@ const DEFAULT_RENDER_TIMEOUT_MS = 120_000;
 const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
 const RETRY_DELAY_MS = 4_000;
 type ImageBackground = "opaque" | "transparent";
+/** Every size gpt-image-2 / gpt-image-1.5 accept. Square is the default everywhere else in the app. */
+export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+const DEFAULT_SIZE: ImageSize = "1024x1024";
 
 function imageModel(background: ImageBackground): string {
   return background === "transparent" ? TRANSPARENT_IMAGE_MODEL : MODEL;
@@ -119,12 +122,13 @@ async function requestPng(
   background: ImageBackground,
   timeoutMs: number,
   referenceImage?: Buffer,
+  size: ImageSize = DEFAULT_SIZE,
 ): Promise<Response> {
   if (referenceImage) {
     const form = new FormData();
     form.set("model", imageModel(background));
     form.set("prompt", prompt);
-    form.set("size", "1024x1024");
+    form.set("size", size);
     form.set("quality", quality);
     form.set("n", "1");
     form.set("background", background);
@@ -152,7 +156,7 @@ async function requestPng(
     body: JSON.stringify({
       model: imageModel(background),
       prompt,
-      size: "1024x1024",
+      size,
       quality,
       n: 1,
       background,
@@ -168,6 +172,7 @@ async function generatePng(
   background: ImageBackground,
   timeoutMs: number,
   referenceImage?: Buffer,
+  size: ImageSize = DEFAULT_SIZE,
 ): Promise<Buffer> {
   const deadline = Date.now() + timeoutMs;
   const request = () => requestPng(
@@ -176,6 +181,7 @@ async function generatePng(
     background,
     Math.max(1, deadline - Date.now()),
     referenceImage,
+    size,
   );
   let res = await request();
   if (!res.ok && RETRY_STATUSES.has(res.status)) {
@@ -241,6 +247,8 @@ export async function renderLogoImage(opts: {
   referenceImage?: Buffer;
   render?: "vector" | "pencil";
   background?: ImageBackground;
+  /** Canvas size. Defaults to square; pass a landscape/portrait size for a composite board. */
+  size?: ImageSize;
   // Reports the exact text this function is about to send. The wrapper below
   // is as much a part of what gets drawn as the art direction is, so a caller
   // reconstructing the prompt to show it would eventually show a lie — the
@@ -259,6 +267,7 @@ export async function renderLogoImage(opts: {
     opts.background ?? "opaque",
     opts.timeoutMs ?? DEFAULT_RENDER_TIMEOUT_MS,
     opts.referenceImage,
+    opts.size ?? DEFAULT_SIZE,
   );
   return storeImage(bytes, `${opts.brandId}/${opts.phase}/${opts.slot}.png`);
 }

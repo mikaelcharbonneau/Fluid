@@ -1,39 +1,34 @@
-// Talking to the brand-chat routes.
+// Talking to the brand-kit route.
 //
-// A turn is either a plain JSON reply (the step had nothing to generate) or an
-// SSE stream (it did). The caller should not care which, so both come back as
-// the same shape and the streamed activity is handed to a callback for the
-// thinking line to display.
+// One call: brief in, activity stream while it works, one board image out.
+// The SSE frame parsing is unchanged from the old brand-chat client — still
+// exactly one terminal `result` or `error` message per run.
 
-import type { RenderedStep } from "@/lib/brand-chat/step";
-import type { BrandContext } from "@/lib/brand-chat/context";
 import type { ActivityEvent } from "@/lib/ai/activity";
+import type { BrandKitBrief, BrandKitResult } from "@/lib/brand-kit/types";
 
-export interface TurnResult {
+export interface GenerateResult {
   done?: boolean;
-  step?: RenderedStep | null;
-  /** Everything answered so far, so a resumed thread can repopulate widgets. */
-  context?: BrandContext;
+  brandId?: string;
+  brandkit?: BrandKitResult;
   error?: string;
   code?: string;
 }
 
 const NETWORK_ERROR =
-  "Couldn't reach the studio. Check your connection and try again — nothing you answered is lost.";
+  "Couldn't reach the studio. Check your connection and try again.";
 
 const DROPPED =
-  "The connection closed before that finished. Your answers are saved — try again and it picks up where it left off.";
+  "The connection closed before that finished. Try again — nothing was charged.";
 
 async function readStream(
   response: Response,
   onActivity?: (event: ActivityEvent) => void,
-): Promise<TurnResult> {
+): Promise<GenerateResult> {
   const type = response.headers.get("content-type") ?? "";
 
-  // A refusal that never opened a stream — auth, credits, a bad answer. These
-  // still carry a real status code, which is the better error to show.
   if (!type.includes("text/event-stream")) {
-    const body = (await response.json().catch(() => ({}))) as TurnResult;
+    const body = (await response.json().catch(() => ({}))) as GenerateResult;
     if (!response.ok) {
       return { error: body.error ?? `That request failed (${response.status}).`, code: body.code };
     }
@@ -44,10 +39,8 @@ async function readStream(
   if (!reader) return { error: DROPPED };
   const decoder = new TextDecoder();
   let buffer = "";
-  let outcome: TurnResult | null = null;
+  let outcome: GenerateResult | null = null;
 
-  // Frames are separated by a blank line, and a chunk can split one anywhere,
-  // so the tail stays buffered until its terminator arrives.
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -56,10 +49,9 @@ async function readStream(
     while ((cut = buffer.indexOf("\n\n")) !== -1) {
       const frame = buffer.slice(0, cut);
       buffer = buffer.slice(cut + 2);
-      // Keepalive comment lines start with ":" and are skipped here.
       const line = frame.split("\n").find((l) => l.startsWith("data:"));
       if (!line) continue;
-      let msg: { type?: string; event?: ActivityEvent; data?: TurnResult; error?: string; code?: string };
+      let msg: { type?: string; event?: ActivityEvent; data?: GenerateResult; error?: string; code?: string };
       try {
         msg = JSON.parse(line.slice(5).trim());
       } catch {
@@ -71,21 +63,20 @@ async function readStream(
     }
   }
 
-  // The stream ended without a terminal message: a dropped connection, or the
-  // function was killed mid-run. Say so rather than resolving with nothing.
   return outcome ?? { error: DROPPED };
 }
 
-/** Advance the conversation. Omit `step` to open or resume the thread. */
-export async function postTurn(
-  body: { brandId: string; step?: string; value?: unknown },
+/** Generate (or regenerate) a brand kit. Creates the brand row server-side if `brandId` is omitted. */
+export async function postGenerate(
+  brandId: string | null,
+  brief: BrandKitBrief,
   onActivity?: (event: ActivityEvent) => void,
-): Promise<TurnResult> {
+): Promise<GenerateResult> {
   try {
-    const response = await fetch("/api/brand-chat/turn", {
+    const response = await fetch("/api/brand-kit/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ brandId: brandId ?? undefined, ...brief }),
     });
     return await readStream(response, onActivity);
   } catch {
@@ -93,51 +84,23 @@ export async function postTurn(
   }
 }
 
-export interface AssistResult {
-  audience?: string[];
-  competitors?: string[];
-  names?: Array<{ name: string; why: string; domain: string }>;
-  error?: string;
+export interface BrandRow {
+  id: string;
+  name: string;
+  brief: string | null;
+  audience: string | null;
+  data: { brandkit?: BrandKitResult } & Record<string, unknown>;
 }
 
-/** An in-widget helper. Never advances the thread. */
-export async function postAssist(body: {
-  brandId: string;
-  kind: "audience" | "competitors" | "names";
-  exclude?: string[];
-}): Promise<AssistResult> {
+/** Fetch a brand by id, for resuming `?brand=<id>`. */
+export async function fetchBrand(id: string): Promise<{ brand?: BrandRow; error?: string }> {
   try {
-    const response = await fetch("/api/brand-chat/assist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = (await response.json().catch(() => ({}))) as AssistResult;
+    const response = await fetch(`/api/brands/${id}`);
+    const json = (await response.json().catch(() => ({}))) as { brand?: BrandRow; error?: string };
     if (!response.ok) {
-      return { error: json.error ?? "That suggestion could not be generated." };
+      return { error: json.error ?? "Could not load that brand." };
     }
     return json;
-  } catch {
-    return { error: NETWORK_ERROR };
-  }
-}
-
-/** Create the draft this thread writes into. Called on the first answer. */
-export async function createBrand(): Promise<{ id?: string; error?: string }> {
-  try {
-    const response = await fetch("/api/brands", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Untitled brand" }),
-    });
-    const json = (await response.json().catch(() => ({}))) as {
-      brand?: { id?: string };
-      error?: string;
-    };
-    if (!response.ok || !json.brand?.id) {
-      return { error: json.error ?? "Could not start a new brand." };
-    }
-    return { id: json.brand.id };
   } catch {
     return { error: NETWORK_ERROR };
   }
