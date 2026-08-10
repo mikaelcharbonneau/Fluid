@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     }
     const { error: updateError } = await supabase
       .from("brands")
-      .update({ name, brief, audience: audience ?? null })
+      .update({ name, brief, audience: audience ?? "" })
       .eq("id", id);
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   } else {
     const { data: created, error: createError } = await supabase
       .from("brands")
-      .insert({ name, brief, audience: audience ?? null, status: "draft", user_id: user.id })
+      .insert({ name, brief, audience: audience ?? "", status: "draft", user_id: user.id })
       .select("id")
       .single();
     if (createError || !created) {
