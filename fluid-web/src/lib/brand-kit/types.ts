@@ -81,7 +81,7 @@ export interface BrandKitStrategy {
   emotionalPromise: string;
   culturalPosition: string;
   trustLevel: string;
-  coreMetaphor: string;
+  /** The picked logo concept's own rationale — not separately collected. */
   logoIdea: string;
   /** The picked logo concept's render — used as a reference image for the final board. */
   logoImageUrl: string;

@@ -5,6 +5,29 @@
 // without going back to twenty screens — related bullets share one step with
 // clearly labeled sub-fields (e.g. `personality` asks for both the traits and
 // the emotional promise in one screen).
+//
+// Two exceptions:
+//
+// `culturalPosition`/`trustLevel` (the skill's "cultural position" and
+// "trust level" bullets) are not a chat step at all. They turned out to be
+// the one pairing that didn't earn a dedicated screen — no concrete visual
+// lever the way category/palette/visualMode have, and heavily redundant
+// with `personality`/`emotionalPromise`. Rather than drop them (and the
+// skill's own checklist) entirely, they're inferred silently — see
+// `draft.ts`'s `inferPositioning` and its call site in the turn route —
+// right after `personality` is confirmed, so every step after it still
+// sees them in context exactly as if they'd been asked.
+//
+// `coreMetaphor`/`logoIdea` used to be a step too, asking the user to
+// pre-describe the logo in text before any image existed. Once
+// `logoConcepts` started rendering 6 real options, that pre-commitment
+// stopped helping — the final board no longer even reads a text
+// description of the logo, it's locked to the picked concept's reference
+// image — and pre-fixing one metaphor before the 6-concept step runs only
+// biased that step toward variations on one idea instead of letting it
+// genuinely diverge. There's no field for it in `BrandKitDraft` at all;
+// `BrandKitStrategy.logoIdea` is derived straight from whichever concept
+// gets picked (see `context.ts`'s `finalizeDraft`).
 
 import { LAYOUTS, VISUAL_MODES, type BrandKitLayout, type LogoConcept, type PaletteSwatch, type VisualMode } from "./types";
 import type { BrandKitDraft } from "./context";
@@ -14,8 +37,6 @@ export type StepKey =
   | "category"
   | "audience"
   | "personality"
-  | "positioning"
-  | "concept"
   | "visualMode"
   | "palette"
   | "avoid"
@@ -41,16 +62,6 @@ export const STEPS: StepDef[] = [
     question: "If the brand walked into a room, how would it behave — and what does it promise people will feel?",
     aiDrafted: true,
   },
-  {
-    key: "positioning",
-    question: "Where does it sit culturally, and how much trust does it need to earn?",
-    aiDrafted: true,
-  },
-  {
-    key: "concept",
-    question: "What's the core metaphor, and how does the mark express it?",
-    aiDrafted: true,
-  },
   { key: "visualMode", question: "Which visual world does this belong to?", aiDrafted: true },
   { key: "palette", question: "What's the palette?", aiDrafted: true },
   { key: "avoid", question: "Anything that must never show up?", aiDrafted: false },
@@ -68,8 +79,6 @@ const FIELDS_BY_STEP: Record<StepKey, Array<keyof BrandKitDraft>> = {
   category: ["category"],
   audience: ["audience"],
   personality: ["personality", "emotionalPromise"],
-  positioning: ["culturalPosition", "trustLevel"],
-  concept: ["coreMetaphor", "logoIdea"],
   visualMode: ["visualMode"],
   palette: ["palette"],
   avoid: ["avoid"],
@@ -93,10 +102,6 @@ function isAnswered(draft: BrandKitDraft, key: StepKey): boolean {
       return !!draft.audience;
     case "personality":
       return !!draft.personality && !!draft.emotionalPromise;
-    case "positioning":
-      return !!draft.culturalPosition && !!draft.trustLevel;
-    case "concept":
-      return !!draft.coreMetaphor && !!draft.logoIdea;
     case "visualMode":
       return !!draft.visualMode;
     case "palette":
@@ -121,10 +126,16 @@ export function nextStep(draft: BrandKitDraft): StepDef {
   return STEPS.find((s) => !isAnswered(draft, s.key)) ?? STEPS[STEPS.length - 1];
 }
 
+const PERSONALITY_IDX = ORDER.indexOf("personality");
+
 /**
  * Re-answering a step invalidates anything drafted after it — those drafts
  * were built from context that just changed. Mirrors the old flow's
  * "re-answering truncates what depended on it" rule.
+ *
+ * `culturalPosition`/`trustLevel` aren't tied to a step (see the file
+ * header note) but are inferred from `personality`, so they're cleared
+ * under the same condition as everything else that depends on it.
  */
 export function clearFrom(draft: BrandKitDraft, key: StepKey): BrandKitDraft {
   const idx = ORDER.indexOf(key);
@@ -133,6 +144,10 @@ export function clearFrom(draft: BrandKitDraft, key: StepKey): BrandKitDraft {
     for (const field of FIELDS_BY_STEP[ORDER[i]]) {
       delete next[field];
     }
+  }
+  if (idx <= PERSONALITY_IDX) {
+    delete next.culturalPosition;
+    delete next.trustLevel;
   }
   return next;
 }
@@ -202,10 +217,6 @@ export function applyAnswer(step: StepKey, value: unknown, draft: BrandKitDraft)
       return { ...draft, audience: str(value) };
     case "personality":
       return { ...draft, personality: str(v.personality), emotionalPromise: str(v.emotionalPromise) };
-    case "positioning":
-      return { ...draft, culturalPosition: str(v.culturalPosition), trustLevel: str(v.trustLevel) };
-    case "concept":
-      return { ...draft, coreMetaphor: str(v.coreMetaphor), logoIdea: str(v.logoIdea) };
     case "visualMode": {
       const mode = str(value);
       if (!VISUAL_MODE_IDS.has(mode as VisualMode)) throw new Error("Unknown visual mode.");

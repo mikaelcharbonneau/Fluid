@@ -16,8 +16,6 @@ export interface BrandKitDraft {
   emotionalPromise?: string;
   culturalPosition?: string;
   trustLevel?: string;
-  coreMetaphor?: string;
-  logoIdea?: string;
   visualMode?: VisualMode;
   palette?: PaletteSwatch[];
   /** The rendered pool of 6 — kept once generated, so re-picking is free. */
@@ -50,8 +48,6 @@ export function renderDraft(draft: BrandKitDraft): string {
   if (draft.emotionalPromise) lines.push(`Emotional promise: ${draft.emotionalPromise}`);
   if (draft.culturalPosition) lines.push(`Cultural position: ${draft.culturalPosition}`);
   if (draft.trustLevel) lines.push(`Trust level needed: ${draft.trustLevel}`);
-  if (draft.coreMetaphor) lines.push(`Core metaphor: ${draft.coreMetaphor}`);
-  if (draft.logoIdea) lines.push(`Logo idea: ${draft.logoIdea}`);
   if (draft.visualMode) lines.push(`Visual mode: ${draft.visualMode}`);
   if (draft.palette?.length) {
     lines.push(`Palette so far: ${draft.palette.map((p) => `${p.hex} (${p.role})`).join(", ")}`);
@@ -95,8 +91,10 @@ export function finalizeDraft(draft: BrandKitDraft): { brief: BrandKitBrief; str
       emotionalPromise: need(draft.emotionalPromise, "emotionalPromise"),
       culturalPosition: need(draft.culturalPosition, "culturalPosition"),
       trustLevel: need(draft.trustLevel, "trustLevel"),
-      coreMetaphor: need(draft.coreMetaphor, "coreMetaphor"),
-      logoIdea: need(draft.logoIdea, "logoIdea"),
+      // The logo idea is no longer a separately-collected field — it's
+      // whatever the picked concept's own rationale says, since that's
+      // what actually got drawn.
+      logoIdea: need(chosenLogo?.idea, "logoIdea"),
       logoImageUrl: need(chosenLogo?.imageUrl, "logoImageUrl"),
       visualMode: need(draft.visualMode, "visualMode"),
       palette: need(draft.palette, "palette"),
