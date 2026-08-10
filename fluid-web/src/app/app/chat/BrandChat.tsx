@@ -1,38 +1,45 @@
 "use client";
 
-// The brand-kit thread.
+// The brand-kit conversation.
 //
-// A conversation, not a form wizard: every step the user has already
-// answered stays visible above, scrolled up like chat history, and can be
-// reopened by clicking it. The AI drafts an answer before the user sees most
-// steps — see the server's /api/brand-kit/turn — and the user can accept it
-// as-is, edit it, or ask for another draft before continuing. `avoid` and
-// `layout` are pure user choices with nothing to draft. `review` is a
-// read-only summary that kicks off the actual board render.
+// No wizard chrome — no Back, no Continue. Every step in the script renders
+// as a live widget: clicking a chip submits it immediately, typing and
+// pressing Enter (or the small send button) submits it. Every step already
+// answered stays on screen exactly the same way, still fully interactive —
+// changing what an earlier widget shows re-answers it directly, which the
+// server treats the same as any other answer: clears and re-drafts whatever
+// came after it. There is nothing to "reopen"; it was never closed.
 //
-// Three top-level phases: `loading` (resuming a brand), `thread` (walking
-// the steps), `result` (the finished board) — chosen by whether `?brand=`
-// resolves to a brand that already has `data.brandkit`.
+// The AI drafts an answer before the user sees most steps — see the
+// server's /api/brand-kit/turn — pre-filling the widget rather than leaving
+// it blank. `avoid` and `layout` are pure user choices with nothing to
+// draft. `review` is a read-only summary whose one real button — "Generate
+// the brand kit" — is deliberately still a real button: it is the one
+// costly, irreversible action in the whole flow.
 //
-// There is no separate "answered steps" list in state — everything before
-// the current `step` in `STEPS` order is, by definition, already answered
-// (that's what the server's `nextStep` guarantees), so it's derived on
-// every render instead of tracked alongside it.
+// Three top-level phases: `loading` (resuming a brand), `thread` (the
+// conversation), `result` (the finished board) — chosen by whether
+// `?brand=` resolves to a brand that already has `data.brandkit`.
+//
+// The visible step list is `STEPS` up to and including the current one —
+// there is no separate "answered steps" list in state, since everything
+// before the current step is, by definition, already answered (that's what
+// the server's `nextStep` guarantees).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { fetchBrand, postTurn, type TurnResult } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
 import {
   CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, chip, cta, label, panel,
 } from "./ui";
 import {
-  Assets, Chevron, ChevronLeft, Close, Download, Grid, Guides, Home, Refresh, Search, Settings, Token,
+  Assets, Chevron, Close, Download, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
 } from "./icons";
 import { AVOIDS } from "./data";
 import { CATEGORIES, LAYOUTS, VISUAL_MODES } from "@/lib/brand-kit/types";
 import type { BrandKitResult, PaletteSwatch, VisualMode } from "@/lib/brand-kit/types";
-import { STEPS, getStep, type StepKey } from "@/lib/brand-kit/steps";
+import { STEPS, type StepKey } from "@/lib/brand-kit/steps";
 import type { BrandKitDraft } from "@/lib/brand-kit/context";
 import "./chat.css";
 
@@ -121,7 +128,7 @@ export function BrandChat() {
     });
   }, [resumeId, applyTurnResult]);
 
-  // ---- keep the thread scrolled to the active step ------------------------
+  // ---- keep the thread scrolled to the newest message ---------------------
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -129,17 +136,21 @@ export function BrandChat() {
 
   // ---- turn handlers -------------------------------------------------
 
-  const handleContinue = useCallback(
-    async (value: unknown) => {
+  // Fired by any widget the moment it has a value — a chip click, an Enter
+  // key, a send button. `stepKey` is whichever step's widget fired this, not
+  // necessarily the current frontier: submitting an earlier widget again is
+  // exactly how an answer gets changed.
+  const submitStep = useCallback(
+    async (stepKey: StepKey, value: unknown) => {
       setError(null);
       setBusy(true);
       setStatus(null);
-      const out = await postTurn({ brandId, step, value }, (event) => setStatus(event.label));
+      const out = await postTurn({ brandId, step: stepKey, value }, (event) => setStatus(event.label));
       setBusy(false);
       setStatus(null);
       applyTurnResult(out);
     },
-    [brandId, step, applyTurnResult],
+    [brandId, applyTurnResult],
   );
 
   const handleGenerate = useCallback(async () => {
@@ -167,31 +178,13 @@ export function BrandChat() {
     setDraftVersion((v) => v + 1);
   }, [brandId, step]);
 
-  /** Reopen an earlier — or the immediately preceding — step for editing. */
-  const jumpTo = useCallback((target: StepKey) => {
-    setError(null);
-    setStep(target);
-    setProposed(null);
-    setDraftVersion((v) => v + 1);
-  }, []);
-
   const startOver = useCallback(() => {
     setError(null);
     setPhase("thread");
   }, []);
 
-  const stepDef = getStep(step) ?? STEPS[0];
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  // Everything before the active step, in script order, is by definition
-  // already answered — see the file header note.
-  const answeredSteps = STEPS.slice(0, Math.max(0, stepIndex)).map((s) => s.key);
-  const seed: BrandKitDraft = {
-    ...draft,
-    ...(proposed ?? {}),
-    // A quick-path preset wins as the shown default until the user reaches
-    // this step's own confirmed answer or asks the AI to redraft it.
-    ...(step === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
-  };
+  const visibleSteps = STEPS.slice(0, Math.max(0, stepIndex) + 1);
   const breadcrumb = draft.name?.trim() || "New brand";
 
   return (
@@ -208,28 +201,35 @@ export function BrandChat() {
                 <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
               ) : (
                 <>
-                  {answeredSteps.map((k) => (
-                    <AnsweredEntry key={k} stepKey={k} draft={draft} onEdit={() => jumpTo(k)} />
-                  ))}
-                  {busy ? (
-                    <Busy label={status ?? "Working…"} />
-                  ) : (
-                    <Stepper
-                      key={`${step}-${draftVersion}`}
-                      stepKey={step}
-                      index={stepIndex}
-                      total={STEPS.length}
-                      question={stepDef.question}
-                      seed={seed}
-                      busy={false}
-                      regenerating={regenerating}
-                      error={error}
-                      canGoBack={answeredSteps.length > 0}
-                      onBack={() => jumpTo(answeredSteps[answeredSteps.length - 1])}
-                      onContinue={(value) => (step === "review" ? handleGenerate() : handleContinue(value))}
-                      onRegenerate={stepDef.aiDrafted ? handleRegenerate : undefined}
-                    />
-                  )}
+                  {visibleSteps.map((s) => {
+                    const isCurrent = s.key === step;
+                    const seed: BrandKitDraft = {
+                      ...draft,
+                      ...(isCurrent ? (proposed ?? {}) : {}),
+                      // A quick-path preset wins as the shown default until the
+                      // user reaches this step's own confirmed answer or asks
+                      // the AI to redraft it.
+                      ...(s.key === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
+                    };
+                    return (
+                      <ThreadMessage key={`${s.key}-${draftVersion}`} question={s.question} dimmed={!isCurrent}>
+                        <Widget
+                          stepKey={s.key}
+                          seed={seed}
+                          busy={busy}
+                          regenerating={isCurrent && regenerating}
+                          onSubmit={(value) => (s.key === "review" ? handleGenerate() : submitStep(s.key, value))}
+                          onRegenerate={isCurrent && s.aiDrafted ? handleRegenerate : undefined}
+                        />
+                      </ThreadMessage>
+                    );
+                  })}
+                  {error ? (
+                    <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5, marginLeft: 42 }}>
+                      {error}
+                    </div>
+                  ) : null}
+                  {busy ? <Busy label={status ?? "Working…"} /> : null}
                 </>
               )}
               <div style={{ height: 8 }} />
@@ -241,38 +241,49 @@ export function BrandChat() {
   );
 }
 
-// ---- the stepper dispatcher ---------------------------------------------
+// ---- one message: the question, plus its always-live widget -------------
 
-interface StepBodyProps {
-  index: number;
-  total: number;
-  question: string;
+function ThreadMessage({ question, dimmed, children }: { question: string; dimmed: boolean; children: ReactNode }) {
+  return (
+    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", opacity: dimmed ? 0.4 : 1 }}>
+        <ThinkingOrb size={dimmed ? 18 : 22} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{
+          fontFamily: DISPLAY, fontSize: dimmed ? 15 : 18, fontWeight: dimmed ? 600 : 700,
+          letterSpacing: "-0.015em", color: dimmed ? "rgba(0,0,0,.4)" : INK, lineHeight: 1.4,
+        }}>
+          {question}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ---- the widget dispatcher ----------------------------------------------
+
+interface WidgetProps {
   seed: BrandKitDraft;
   busy: boolean;
   regenerating: boolean;
-  error: string | null;
-  canGoBack: boolean;
-  onBack: () => void;
-  onContinue: (value: unknown) => void;
+  onSubmit: (value: unknown) => void;
   onRegenerate?: () => void;
 }
 
-function Stepper(props: StepBodyProps & { stepKey: StepKey }) {
-  const { stepKey, ...rest } = props;
-  // Fields lock while a redraft is in flight too, not just while the whole
-  // stepper is busy — a fresh `proposed` value is about to replace whatever
-  // is on screen.
-  const common = { ...rest, busy: rest.busy || rest.regenerating };
+function Widget(props: WidgetProps & { stepKey: StepKey }) {
+  const { stepKey, ...common } = props;
   switch (stepKey) {
     case "brief":
-      return <BriefStepBody {...common} />;
+      return <BriefWidget {...common} />;
     case "category":
-      return <ChoiceStepBody {...common} field="category" options={CATEGORIES.map((c) => ({ id: c, name: c }))} />;
+      return <ChoiceWidget {...common} field="category" options={CATEGORIES.map((c) => ({ id: c, name: c }))} />;
     case "audience":
-      return <TextStepBody {...common} field="audience" placeholder="Who is this for?" />;
+      return <TextWidget {...common} field="audience" placeholder="Who is this for?" />;
     case "personality":
       return (
-        <PairStepBody
+        <PairWidget
           {...common}
           fieldA={{ key: "personality", label: "Personality", placeholder: "3-5 traits — how it behaves in a room" }}
           fieldB={{ key: "emotionalPromise", label: "Emotional promise", placeholder: "The feeling this brand promises" }}
@@ -280,7 +291,7 @@ function Stepper(props: StepBodyProps & { stepKey: StepKey }) {
       );
     case "positioning":
       return (
-        <PairStepBody
+        <PairWidget
           {...common}
           fieldA={{ key: "culturalPosition", label: "Cultural position", placeholder: "Where this sits culturally" }}
           fieldB={{ key: "trustLevel", label: "Trust level", placeholder: "How much trust it needs to earn" }}
@@ -288,133 +299,140 @@ function Stepper(props: StepBodyProps & { stepKey: StepKey }) {
       );
     case "concept":
       return (
-        <PairStepBody
+        <PairWidget
           {...common}
           fieldA={{ key: "coreMetaphor", label: "Core metaphor", placeholder: "The one symbolic idea" }}
           fieldB={{ key: "logoIdea", label: "Logo idea", placeholder: "How the mark expresses it" }}
         />
       );
     case "visualMode":
-      return <ChoiceStepBody {...common} field="visualMode" options={VISUAL_MODES} />;
+      return <ChoiceWidget {...common} field="visualMode" options={VISUAL_MODES} />;
     case "palette":
-      return <PaletteStepBody {...common} />;
+      return <PaletteWidget {...common} />;
     case "tagline":
-      return <TextStepBody {...common} field="tagline" placeholder="One short line" />;
+      return <TextWidget {...common} field="tagline" placeholder="One short line" />;
     case "avoid":
-      return <AvoidStepBody {...common} />;
+      return <AvoidWidget {...common} />;
     case "layout":
-      return <ChoiceStepBody {...common} field="layout" options={LAYOUTS} />;
+      return <ChoiceWidget {...common} field="layout" options={LAYOUTS} />;
     case "review":
-      return <ReviewStepBody {...common} />;
+      return <ReviewWidget {...common} />;
   }
 }
 
-// ---- step bodies ----------------------------------------------------
+// ---- shared small controls -----------------------------------------------
 
-function BriefStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
-  const [name, setName] = useState(seed.name ?? "");
-  const [brief, setBrief] = useState(seed.brief ?? "");
-  const canContinue = !!name.trim() && !!brief.trim() && !busy;
-
+function SendButton({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={canContinue}
-          onContinue={() => onContinue({ name: name.trim(), brief: brief.trim() })}
-        />
-      }
+    <button
+      type="button"
+      disabled={!enabled}
+      onClick={onClick}
+      aria-label="Send"
+      style={{
+        width: 34, height: 34, borderRadius: 10, flex: "0 0 34px",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        background: enabled ? INK : "#EDEDEF", color: enabled ? "#fff" : "rgba(0,0,0,.3)",
+      }}
     >
-      <div style={panel()}>
-        <div style={fieldGroup}>
-          <span style={label}>Brand name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Northwind" disabled={busy} style={inputStyle} />
-        </div>
-        <div style={fieldGroup}>
-          <span style={label}>Brief</span>
-          <textarea
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            placeholder="What is this, who is it for, what does it do?"
-            disabled={busy}
-            rows={4}
-            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
-          />
-        </div>
-      </div>
-    </StepChrome>
+      <Send size={14} />
+    </button>
   );
 }
 
-function ChoiceStepBody(
-  props: StepBodyProps & { field: "category" | "visualMode" | "layout"; options: Array<{ id: string; name: string; note?: string }> },
-) {
-  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, field, options } = props;
-  const [value, setValue] = useState<string>((seed[field] as string | undefined) ?? (field === "layout" ? "3x3" : ""));
-  const canContinue = !!value && !busy;
+function AskAgain({ onClick, busy }: { onClick: () => void; busy: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={busy} style={{ ...ghostLink, alignSelf: "flex-start" }}>
+      <Refresh size={12} /> {busy ? "Asking again…" : "Ask again"}
+    </button>
+  );
+}
+
+// ---- widgets --------------------------------------------------------
+
+function BriefWidget({ seed, busy, onSubmit }: WidgetProps) {
+  const [name, setName] = useState(seed.name ?? "");
+  const [brief, setBrief] = useState(seed.brief ?? "");
+  const canSubmit = !!name.trim() && !!brief.trim() && !busy;
+  const submit = () => canSubmit && onSubmit({ name: name.trim(), brief: brief.trim() });
 
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={canContinue}
-          onContinue={() => onContinue(value)}
-          onRegenerate={onRegenerate}
-          regenerating={regenerating}
+    <div style={panel()}>
+      <div style={fieldGroup}>
+        <span style={label}>Brand name</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Northwind" disabled={busy} style={inputStyle} />
+      </div>
+      <div style={fieldGroup}>
+        <span style={label}>Brief</span>
+        <textarea
+          value={brief}
+          onChange={(e) => setBrief(e.target.value)}
+          placeholder="What is this, who is it for, what does it do?"
+          disabled={busy}
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
         />
-      }
-    >
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <SendButton enabled={canSubmit} onClick={submit} />
+      </div>
+    </div>
+  );
+}
+
+function ChoiceWidget(
+  props: WidgetProps & { field: "category" | "visualMode" | "layout"; options: Array<{ id: string; name: string; note?: string }> },
+) {
+  const { seed, busy, regenerating, onSubmit, onRegenerate, field, options } = props;
+  const current = (seed[field] as string | undefined) ?? "";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={chipRow}>
         {options.map((o) => (
-          <button key={o.id} type="button" disabled={busy} onClick={() => setValue(o.id)} style={chip(value === o.id)} title={o.note}>
+          <button
+            key={o.id}
+            type="button"
+            disabled={busy}
+            onClick={() => o.id !== current && onSubmit(o.id)}
+            style={chip(o.id === current)}
+            title={o.note}
+          >
             {o.name}
           </button>
         ))}
       </div>
-    </StepChrome>
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
+    </div>
   );
 }
 
-function TextStepBody(
-  props: StepBodyProps & { field: "audience" | "tagline"; placeholder: string },
-) {
-  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, field, placeholder } = props;
+function TextWidget(props: WidgetProps & { field: "audience" | "tagline"; placeholder: string }) {
+  const { seed, busy, regenerating, onSubmit, onRegenerate, field, placeholder } = props;
   const [value, setValue] = useState((seed[field] as string | undefined) ?? "");
-  const canContinue = !!value.trim() && !busy;
+  const canSubmit = !!value.trim() && !busy;
+  const submit = () => canSubmit && onSubmit(value.trim());
 
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={canContinue}
-          onContinue={() => onContinue(value.trim())}
-          onRegenerate={onRegenerate}
-          regenerating={regenerating}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 6, paddingLeft: 14, borderRadius: 14, background: CARD, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }}>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder={placeholder}
+          disabled={busy}
+          style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", fontSize: 14, color: INK, padding: "8px 0" }}
         />
-      }
-    >
-      <div style={panel()}>
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} disabled={busy} style={inputStyle} />
+        <SendButton enabled={canSubmit} onClick={submit} />
       </div>
-    </StepChrome>
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
+    </div>
   );
 }
 
@@ -424,29 +442,15 @@ interface PairField {
   placeholder: string;
 }
 
-function PairStepBody(props: StepBodyProps & { fieldA: PairField; fieldB: PairField }) {
-  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, fieldA, fieldB } = props;
+function PairWidget(props: WidgetProps & { fieldA: PairField; fieldB: PairField }) {
+  const { seed, busy, regenerating, onSubmit, onRegenerate, fieldA, fieldB } = props;
   const [a, setA] = useState((seed[fieldA.key] as string | undefined) ?? "");
   const [b, setB] = useState((seed[fieldB.key] as string | undefined) ?? "");
-  const canContinue = !!a.trim() && !!b.trim() && !busy;
+  const canSubmit = !!a.trim() && !!b.trim() && !busy;
+  const submit = () => canSubmit && onSubmit({ [fieldA.key]: a.trim(), [fieldB.key]: b.trim() });
 
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={canContinue}
-          onContinue={() => onContinue({ [fieldA.key]: a.trim(), [fieldB.key]: b.trim() })}
-          onRegenerate={onRegenerate}
-          regenerating={regenerating}
-        />
-      }
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ ...panel(), gap: 16 }}>
         <div style={fieldGroup}>
           <span style={label}>{fieldA.label}</span>
@@ -456,16 +460,21 @@ function PairStepBody(props: StepBodyProps & { fieldA: PairField; fieldB: PairFi
           <span style={label}>{fieldB.label}</span>
           <textarea value={b} onChange={(e) => setB(e.target.value)} placeholder={fieldB.placeholder} disabled={busy} rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
         </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <SendButton enabled={canSubmit} onClick={submit} />
+        </div>
       </div>
-    </StepChrome>
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
+    </div>
   );
 }
 
-function PaletteStepBody({ index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate }: StepBodyProps) {
+function PaletteWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: WidgetProps) {
   const [swatches, setSwatches] = useState<PaletteSwatch[]>(
     seed.palette?.length ? seed.palette : [{ hex: "#14161A", role: "Primary" }],
   );
-  const canContinue = swatches.length > 0 && swatches.every((s) => /^#[0-9A-Fa-f]{6}$/.test(s.hex) && !!s.role.trim()) && !busy;
+  const canSubmit = swatches.length > 0 && swatches.every((s) => /^#[0-9A-Fa-f]{6}$/.test(s.hex) && !!s.role.trim()) && !busy;
+  const submit = () => canSubmit && onSubmit(swatches.map((s) => ({ hex: s.hex.toUpperCase(), role: s.role.trim() })));
 
   const update = (i: number, patch: Partial<PaletteSwatch>) =>
     setSwatches((cur) => cur.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
@@ -473,22 +482,7 @@ function PaletteStepBody({ index, total, question, seed, busy, regenerating, err
   const add = () => setSwatches((cur) => (cur.length >= 6 ? cur : [...cur, { hex: "#000000", role: "" }]));
 
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={canContinue}
-          onContinue={() => onContinue(swatches.map((s) => ({ hex: s.hex.toUpperCase(), role: s.role.trim() })))}
-          onRegenerate={onRegenerate}
-          regenerating={regenerating}
-        />
-      }
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ ...panel(), gap: 10 }}>
         {swatches.map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -523,34 +517,24 @@ function PaletteStepBody({ index, total, question, seed, busy, regenerating, err
             </button>
           </div>
         ))}
-        <button type="button" disabled={busy || swatches.length >= 6} onClick={add} style={{ ...ghostLink, alignSelf: "flex-start" }}>
-          + Add colour
-        </button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button type="button" disabled={busy || swatches.length >= 6} onClick={add} style={{ ...ghostLink }}>
+            + Add colour
+          </button>
+          <SendButton enabled={canSubmit} onClick={submit} />
+        </div>
       </div>
-    </StepChrome>
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
+    </div>
   );
 }
 
-function AvoidStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
+function AvoidWidget({ seed, busy, onSubmit }: WidgetProps) {
   const [selected, setSelected] = useState<string[]>(seed.avoid ?? []);
   const toggle = (item: string) => setSelected((cur) => (cur.includes(item) ? cur.filter((a) => a !== item) : [...cur, item]));
 
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={
-        <StepFooter
-          canGoBack={canGoBack}
-          onBack={onBack}
-          canContinue={!busy}
-          onContinue={() => onContinue(selected)}
-          continueLabel={selected.length ? "Continue" : "Nothing to avoid — continue"}
-        />
-      }
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={chipRow}>
         {AVOIDS.map((a) => (
           <button key={a} type="button" disabled={busy} onClick={() => toggle(a)} style={chip(selected.includes(a))}>
@@ -558,19 +542,16 @@ function AvoidStepBody({ index, total, question, seed, busy, error, canGoBack, o
           </button>
         ))}
       </div>
-    </StepChrome>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <SendButton enabled={!busy} onClick={() => onSubmit(selected)} />
+      </div>
+    </div>
   );
 }
 
-function ReviewStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
+function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
   return (
-    <StepChrome
-      index={index}
-      total={total}
-      question={question}
-      error={error}
-      footer={<StepFooter canGoBack={canGoBack} onBack={onBack} canContinue={!busy} onContinue={() => onContinue(true)} continueLabel="Generate the brand kit" />}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ ...panel(), gap: 10 }}>
         <Row k="Name" v={seed.name ?? ""} />
         <Row k="Category" v={seed.category ?? ""} />
@@ -593,148 +574,8 @@ function ReviewStepBody({ index, total, question, seed, busy, error, canGoBack, 
           ))}
         </div>
       ) : null}
-    </StepChrome>
-  );
-}
-
-// ---- shared step chrome ------------------------------------------------
-
-// The currently active step, styled as an AI message: an orb "avatar", the
-// question, then whatever this step needs answered under it. Always the
-// live/editable one — answered history renders through AnsweredEntry below
-// instead of this.
-function StepChrome({
-  question, error, children, footer,
-}: {
-  index: number;
-  total: number;
-  question: string;
-  error: string | null;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-}) {
-  return (
-    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <ThinkingOrb />
-      </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 700, letterSpacing: "-0.015em", color: INK, lineHeight: 1.4 }}>
-          {question}
-        </div>
-        {children}
-        {error ? (
-          <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5 }}>
-            {error}
-          </div>
-        ) : null}
-        {footer}
-      </div>
-    </div>
-  );
-}
-
-// ---- answered history ---------------------------------------------------
-
-// A step already confirmed, shown the way it stays visible above the active
-// one — question, the answer given, and a click to reopen it. Reopening
-// jumps straight there rather than stepping back one at a time; continuing
-// from it re-clears and re-drafts whatever came after, same as always.
-function AnsweredEntry({ stepKey, draft, onEdit }: { stepKey: StepKey; draft: BrandKitDraft; onEdit: () => void }) {
-  const stepDef = getStep(stepKey);
-  if (!stepDef) return null;
-  return (
-    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.38 }}>
-        <ThinkingOrb size={18} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontFamily: DISPLAY, fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "rgba(0,0,0,.4)", lineHeight: 1.4 }}>
-          {stepDef.question}
-        </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="bchat-outline"
-          style={{
-            textAlign: "left", padding: "12px 14px", borderRadius: 14, background: CARD,
-            boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, display: "flex", flexDirection: "column", gap: 6,
-          }}
-        >
-          <div style={{ fontSize: 13.5, color: "rgba(0,0,0,.82)", lineHeight: 1.5 }}>
-            <AnsweredValue stepKey={stepKey} draft={draft} />
-          </div>
-          <span style={{ ...label, color: FAINT }}>Click to edit</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AnsweredValue({ stepKey, draft }: { stepKey: StepKey; draft: BrandKitDraft }) {
-  switch (stepKey) {
-    case "brief":
-      return <>&ldquo;{draft.brief}&rdquo;</>;
-    case "category":
-      return <>{draft.category}</>;
-    case "audience":
-      return <>{draft.audience}</>;
-    case "personality":
-      return <>{draft.personality} — promises &ldquo;{draft.emotionalPromise}&rdquo;</>;
-    case "positioning":
-      return <>{draft.culturalPosition} · {draft.trustLevel}</>;
-    case "concept":
-      return <>{draft.coreMetaphor} → {draft.logoIdea}</>;
-    case "visualMode":
-      return <>{VISUAL_MODES.find((m) => m.id === draft.visualMode)?.name ?? ""}</>;
-    case "palette":
-      return (
-        <div style={{ display: "flex", gap: 6 }}>
-          {(draft.palette ?? []).map((p) => (
-            <div key={p.hex} title={`${p.role} — ${p.hex}`} style={{ width: 22, height: 22, borderRadius: 6, background: p.hex, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }} />
-          ))}
-        </div>
-      );
-    case "tagline":
-      return <>&ldquo;{draft.tagline}&rdquo;</>;
-    case "avoid":
-      return <>{draft.avoid?.length ? draft.avoid.join(", ") : "Nothing specified"}</>;
-    case "layout":
-      return <>{LAYOUTS.find((l) => l.id === draft.layout)?.name ?? ""}</>;
-    case "review":
-      return null;
-  }
-}
-
-function StepFooter({
-  canGoBack, onBack, canContinue, onContinue, continueLabel = "Continue", onRegenerate, regenerating,
-}: {
-  canGoBack: boolean;
-  onBack: () => void;
-  canContinue: boolean;
-  onContinue: () => void;
-  continueLabel?: string;
-  onRegenerate?: () => void;
-  regenerating?: boolean;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <button
-        type="button"
-        disabled={!canGoBack}
-        onClick={onBack}
-        style={{ ...ghostLink, opacity: canGoBack ? 1 : 0.35, cursor: canGoBack ? "pointer" : "default" }}
-      >
-        <ChevronLeft size={11} /> Back
-      </button>
-      <div style={{ flex: 1 }} />
-      {onRegenerate ? (
-        <button type="button" onClick={onRegenerate} disabled={regenerating} style={ghostLink}>
-          <Refresh size={12} /> {regenerating ? "Asking again…" : "Ask again"}
-        </button>
-      ) : null}
-      <button type="button" disabled={!canContinue} onClick={onContinue} style={{ ...cta(canContinue), padding: "12px 20px", fontSize: 13.5 }}>
-        {continueLabel}
+      <button type="button" disabled={busy} onClick={() => onSubmit(true)} style={{ ...cta(!busy), alignSelf: "flex-start", padding: "13px 22px", fontSize: 14 }}>
+        Generate the brand kit
       </button>
     </div>
   );
