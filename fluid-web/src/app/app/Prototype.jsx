@@ -6226,6 +6226,14 @@ function brandDisplayName(b) {
   return resolveBrandName(b) || 'Untitled';
 }
 
+// True for any brand built with the brand-kit conversation (src/app/app/chat),
+// whether it's still mid-conversation (`brandkitDraft`) or finished
+// (`brandkit`) — both belong at the chat URL, never the legacy hash-router
+// wizard below, which doesn't know how to resume that flow's steps.
+function isBrandKitBrand(b) {
+  return !!(b.data && (b.data.brandkit || b.data.brandkitDraft));
+}
+
 // #rrggbb / #rgb → "rgba(r,g,b,a)". Falls back to a neutral ink tint.
 function hexToRgba(hex, a) {
   let h = String(hex || '').trim().replace('#', '');
@@ -6435,10 +6443,10 @@ const DirA_BrandsActive = () => {
                   key={b.id}
                   brand={b}
                   onOpen={() => {
-                    // A one-shot brand-kit board lives at its own URL, not in
-                    // this hash router — open its result view directly rather
-                    // than dropping it into the legacy step wizard below.
-                    if (b.data && b.data.brandkit) {
+                    // A brand-kit conversation lives at its own URL, not in
+                    // this hash router — resume it there (finished or not)
+                    // rather than dropping it into the legacy step wizard below.
+                    if (isBrandKitBrand(b)) {
                       location.assign(CHAT + '?brand=' + b.id);
                       return;
                     }
@@ -6869,6 +6877,12 @@ const DirA_Home = () => {
           {drafts.slice(0, 4).map((b) => (
             <div key={b.id}
               onClick={() => {
+                // Same distinction as the Brands page: a brand-kit
+                // conversation resumes at its own URL, not the legacy wizard.
+                if (isBrandKitBrand(b)) {
+                  location.assign(CHAT + '?brand=' + b.id);
+                  return;
+                }
                 loadBrand(b.id);
                 navigate(b.data && b.data.workflow === 'logo' ? 'logo-brief' : 'step' + (b.step || 1));
               }}
@@ -6877,7 +6891,7 @@ const DirA_Home = () => {
               <div style={{ padding: '13px 15px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brandDisplayName(b)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>
-                  {b.data && b.data.workflow === 'logo' ? 'Logo · Brief' : `Step ${b.step || 1} of 5`}
+                  {isBrandKitBrand(b) ? 'Brand kit · In progress' : (b.data && b.data.workflow === 'logo' ? 'Logo · Brief' : `Step ${b.step || 1} of 5`)}
                 </span>
               </div>
             </div>
