@@ -131,7 +131,6 @@ export function buildBrandKitPrompt(brief: BrandKitBrief, strategy: BrandKitStra
     `- Emotional promise: ${strategy.emotionalPromise}`,
     `- Cultural position: ${strategy.culturalPosition}`,
     `- Trust level: ${strategy.trustLevel}`,
-    `- Core metaphor: ${strategy.coreMetaphor}`,
     `- Logo idea: ${strategy.logoIdea}`,
     `- Tagline: "${strategy.tagline}"`,
     ``,

@@ -90,31 +90,6 @@ emotional promise. Return JSON:
       };
     },
   },
-  positioning: {
-    contract: `Work through the skill's brand-strategy thinking on cultural position and
-trust level. Return JSON:
-{ "culturalPosition": string, // one sentence: where this sits culturally relative to its category
-  "trustLevel": string }      // one sentence: how much trust this needs to earn, and from whom`,
-    parse: (j) => {
-      const v = j as Record<string, unknown>;
-      return {
-        culturalPosition: str(v.culturalPosition, "culturalPosition"),
-        trustLevel: str(v.trustLevel, "trustLevel"),
-      };
-    },
-  },
-  concept: {
-    contract: `Propose the core symbolic idea and how the logo expresses it. Honour the
-skill's ANTI-GENERIC RULES and LOGO CONCEPT METHODS — no generic swooshes,
-globes, lightbulbs, or rounded-monogram-in-a-pill marks. Return JSON:
-{ "coreMetaphor": string, // the one symbolic idea the mark should express
-  "logoIdea": string }    // one sentence: how the mark combines symbol + name + category meaning`,
-    effort: "medium",
-    parse: (j) => {
-      const v = j as Record<string, unknown>;
-      return { coreMetaphor: str(v.coreMetaphor, "coreMetaphor"), logoIdea: str(v.logoIdea, "logoIdea") };
-    },
-  },
   visualMode: {
     contract: `Recommend one visual mode from the skill's VISUAL MODES section. Return
 JSON: { "visualMode": string } — exactly one of: ${VISUAL_MODES.map((m) => m.id).join(", ")}.`,
@@ -152,6 +127,42 @@ export async function generateStepDraft(
     activity,
     effort: spec.effort ?? "low",
     maxTokens: spec.maxTokens ?? 1_200,
+    timeoutMs: 45_000,
+  });
+}
+
+const POSITIONING_CONTRACT = `Work through the skill's brand-strategy thinking on cultural position and
+trust level. Return JSON:
+{ "culturalPosition": string, // one sentence: where this sits culturally relative to its category
+  "trustLevel": string }      // one sentence: how much trust this needs to earn, and from whom`;
+
+function parsePositioning(json: unknown): { culturalPosition: string; trustLevel: string } {
+  const v = (json ?? {}) as Record<string, unknown>;
+  return {
+    culturalPosition: str(v.culturalPosition, "culturalPosition"),
+    trustLevel: str(v.trustLevel, "trustLevel"),
+  };
+}
+
+/**
+ * Not a chat step (see steps.ts's file header) — inferred silently from
+ * whatever's confirmed so far, called once right after `personality` is
+ * answered so everything drafted after it still has cultural position and
+ * trust level in context, same as if it had been asked.
+ */
+export async function inferPositioning(
+  draft: BrandKitDraft,
+  activity: Activity,
+): Promise<{ culturalPosition: string; trustLevel: string }> {
+  activity.emit("note", "Inferring cultural position and trust level");
+  return runBrandKitSkill({
+    skill: "brandkit",
+    contextText: renderDraft(draft),
+    contract: POSITIONING_CONTRACT,
+    parse: parsePositioning,
+    activity,
+    effort: "low",
+    maxTokens: 1_200,
     timeoutMs: 45_000,
   });
 }

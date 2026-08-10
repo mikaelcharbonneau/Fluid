@@ -289,22 +289,6 @@ function Widget(props: WidgetProps & { stepKey: StepKey }) {
           fieldB={{ key: "emotionalPromise", label: "Emotional promise", placeholder: "The feeling this brand promises" }}
         />
       );
-    case "positioning":
-      return (
-        <PairWidget
-          {...common}
-          fieldA={{ key: "culturalPosition", label: "Cultural position", placeholder: "Where this sits culturally" }}
-          fieldB={{ key: "trustLevel", label: "Trust level", placeholder: "How much trust it needs to earn" }}
-        />
-      );
-    case "concept":
-      return (
-        <PairWidget
-          {...common}
-          fieldA={{ key: "coreMetaphor", label: "Core metaphor", placeholder: "The one symbolic idea" }}
-          fieldB={{ key: "logoIdea", label: "Logo idea", placeholder: "How the mark expresses it" }}
-        />
-      );
     case "visualMode":
       return <ChoiceWidget {...common} field="visualMode" options={VISUAL_MODES} />;
     case "palette":
@@ -607,21 +591,20 @@ function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
         <Row k="Audience" v={seed.audience ?? ""} />
         <Row k="Personality" v={seed.personality ?? ""} />
         <Row k="Emotional promise" v={seed.emotionalPromise ?? ""} />
-        <Row k="Cultural position" v={seed.culturalPosition ?? ""} />
-        <Row k="Trust level" v={seed.trustLevel ?? ""} />
-        <Row k="Core metaphor" v={seed.coreMetaphor ?? ""} />
-        <Row k="Logo idea" v={seed.logoIdea ?? ""} />
         {chosenLogo ? (
-          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-            <span style={{ ...label, flex: "0 0 150px" }}>Logo</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={chosenLogo.imageUrl} alt={chosenLogo.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <>
+            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+              <span style={{ ...label, flex: "0 0 150px" }}>Logo</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={chosenLogo.imageUrl} alt={chosenLogo.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                </div>
+                <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{chosenLogo.label}</span>
               </div>
-              <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{chosenLogo.label}</span>
             </div>
-          </div>
+            <Row k="Logo idea" v={chosenLogo.idea} />
+          </>
         ) : null}
         <Row k="Visual mode" v={VISUAL_MODES.find((m) => m.id === seed.visualMode)?.name ?? ""} />
         <Row k="Tagline" v={seed.tagline ?? ""} />
@@ -682,7 +665,6 @@ function ResultView({
         <Row k="Emotional promise" v={strategy.emotionalPromise} />
         <Row k="Cultural position" v={strategy.culturalPosition} />
         <Row k="Trust level" v={strategy.trustLevel} />
-        <Row k="Core metaphor" v={strategy.coreMetaphor} />
         <Row k="Logo idea" v={strategy.logoIdea} />
       </div>
 

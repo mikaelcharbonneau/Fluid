@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { streamActivity } from "@/lib/sse";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
-import { generateStepDraft } from "@/lib/brand-kit/draft";
+import { generateStepDraft, inferPositioning } from "@/lib/brand-kit/draft";
 import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
 import { draftPatch, finalizeDraft, readDraft, type BrandKitDraft } from "@/lib/brand-kit/context";
 import { applyAnswer, clearFrom, getStep, nextStep } from "@/lib/brand-kit/steps";
@@ -140,19 +140,26 @@ export async function POST(request: Request) {
 
   const finalBrandId = brandId;
 
+  // culturalPosition/trustLevel aren't a chat step (see steps.ts) — inferred
+  // silently, once, right after personality is confirmed. A no-op once
+  // they're already set. Called at every point that needs a complete draft
+  // so it's never possible to reach `review` without them regardless of
+  // exactly which turn first crossed that threshold.
+  const ensurePositioning = async (current: BrandKitDraft, activity: Activity): Promise<BrandKitDraft> => {
+    if (!current.personality || current.culturalPosition) return current;
+    const positioning = await inferPositioning(current, activity);
+    const next = { ...current, ...positioning };
+    const { error } = await supabase.rpc("brands_merge_data", {
+      p_id: finalBrandId,
+      p_patch: draftPatch(next),
+    });
+    if (error) activity.emit("warn", "Inferred positioning could not be saved for next time.", error.message);
+    return next;
+  };
+
   // ---- confirm at review: render the board ------------------------------
 
   if (step?.key === "review" && !regenerate) {
-    let finalized: ReturnType<typeof finalizeDraft>;
-    try {
-      finalized = finalizeDraft(draft);
-    } catch (err) {
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "The brand isn't fully answered yet." },
-        { status: 400 },
-      );
-    }
-
     let affordable: boolean;
     try {
       affordable = await hasTokens(user.id, TOKEN_COST.asset);
@@ -171,6 +178,13 @@ export async function POST(request: Request) {
 
     return streamActivity(
       async (activity: Activity) => {
+        const enrichedDraft = await ensurePositioning(draft, activity);
+        let finalized: ReturnType<typeof finalizeDraft>;
+        try {
+          finalized = finalizeDraft(enrichedDraft);
+        } catch (err) {
+          throw err instanceof Error ? err : new Error("The brand isn't fully answered yet.");
+        }
         const result = await generateBrandKit({
           brandId: finalBrandId,
           brief: finalized.brief,
@@ -221,12 +235,13 @@ export async function POST(request: Request) {
     }
     return streamActivity(
       async (activity: Activity) => {
+        const enrichedDraft = await ensurePositioning(draft, activity);
         const proposed =
           step.key === "logoConcepts"
-            ? { logoConcepts: await generateLogoConcepts(draft, finalBrandId, activity) }
-            : await generateStepDraft(step.key, draft, activity);
+            ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
+            : await generateStepDraft(step.key, enrichedDraft, activity);
         await spendTokens(user.id, cost);
-        return { done: false, brandId: finalBrandId, step: step.key, draft, proposed };
+        return { done: false, brandId: finalBrandId, step: step.key, draft: enrichedDraft, proposed };
       },
       { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be redrafted." }) },
     );
@@ -266,12 +281,13 @@ export async function POST(request: Request) {
 
   return streamActivity(
     async (activity: Activity) => {
+      const enrichedDraft = await ensurePositioning(draft, activity);
       const proposed =
         target.key === "logoConcepts"
-          ? { logoConcepts: await generateLogoConcepts(draft, finalBrandId, activity) }
-          : await generateStepDraft(target.key, draft, activity);
+          ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
+          : await generateStepDraft(target.key, enrichedDraft, activity);
       await spendTokens(user.id, cost);
-      return { done: false, brandId: finalBrandId, step: target.key, draft, proposed };
+      return { done: false, brandId: finalBrandId, step: target.key, draft: enrichedDraft, proposed };
     },
     { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be generated." }) },
   );
