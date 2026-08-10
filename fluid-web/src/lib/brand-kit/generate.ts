@@ -1,4 +1,9 @@
-// Orchestrates one brand-kit run: strategy read -> prompt -> one render.
+// Renders the board from an already-confirmed strategy.
+//
+// The strategy itself is no longer generated here — it's built one field at
+// a time during the stepper (see draft.ts), with the user confirming or
+// editing each field along the way. By the time this runs, `strategy` is
+// exactly what the user signed off on at the `review` step.
 //
 // Deliberately no quality-critique redraw loop (unlike the old single-logo
 // pipeline) — this skill is a single-shot deliverable by design. The
@@ -6,9 +11,8 @@
 
 import { renderLogoImage, IMAGE_MODEL, type ImageSize } from "@/lib/ai/images";
 import type { Activity } from "@/lib/ai/activity";
-import { generateBrandKitStrategy } from "./strategy";
 import { buildBrandKitPrompt } from "./prompt";
-import type { BrandKitBrief, BrandKitLayout, BrandKitResult } from "./types";
+import type { BrandKitBrief, BrandKitLayout, BrandKitResult, BrandKitStrategy } from "./types";
 
 const RENDER_QUALITY = "high" as const;
 const RENDER_TIMEOUT_MS = 150_000;
@@ -20,13 +24,11 @@ function sizeForLayout(layout: BrandKitLayout): ImageSize {
 export async function generateBrandKit(opts: {
   brandId: string;
   brief: BrandKitBrief;
+  strategy: BrandKitStrategy;
   activity: Activity;
 }): Promise<BrandKitResult> {
-  const { brandId, brief, activity } = opts;
+  const { brandId, brief, strategy, activity } = opts;
   const layout = brief.layout ?? "3x3";
-
-  const strategy = await generateBrandKitStrategy(brief, activity);
-  activity.emit("thinking", `Strategy: ${strategy.logoIdea}`, JSON.stringify(strategy, null, 2));
 
   const prompt = buildBrandKitPrompt(brief, strategy);
   activity.emit("note", `Drawing the board with ${IMAGE_MODEL} (high quality)`);

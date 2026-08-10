@@ -1,15 +1,10 @@
 // The fixed option lists for the brand-kit form.
 //
-// Visual modes and layouts are the brandkit skill's own taxonomy and live
-// next to the generator (`@/lib/brand-kit/types`), not here — importing them
-// keeps the form and the generator from drifting apart.
-
-export const CATEGORIES = [
-  "SaaS / tools", "Consumer app", "D2C product", "Marketplace", "Studio / agency", "Fintech",
-  "Health & wellness", "Food & drink", "Fashion", "Education", "Media & publishing", "Real estate",
-  "Travel & hospitality", "B2B services", "Non-profit", "Hardware", "Gaming", "Beauty & personal care",
-  "Something else",
-];
+// Categories, visual modes, and layouts are read straight from
+// `@/lib/brand-kit/types` — the same list the server's draft contracts are
+// constrained to, so a drafted answer always matches a real chip. `AVOIDS`
+// has no server-side counterpart (the `avoid` step is never AI-drafted), so
+// it stays here.
 
 export const AVOIDS = [
   "Gradients", "Mascots", "Neon", "Serif type", "Stock photography", "Rounded blobs", "Emoji",

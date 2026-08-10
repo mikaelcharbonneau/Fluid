@@ -4,6 +4,17 @@
 // much smaller: a brief in, one strategy read, one composite board image
 // out. See skills/brandkit/SKILL.md for what the strategy fields feed.
 
+// The fixed category vocabulary — both the UI chips and the category-step
+// draft contract read this same list, so a drafted answer is guaranteed to
+// match a real chip instead of drifting to the skill's own illustrative
+// category table (e.g. "Drone / robotics"), which isn't this app's list.
+export const CATEGORIES = [
+  "SaaS / tools", "Consumer app", "D2C product", "Marketplace", "Studio / agency", "Fintech",
+  "Health & wellness", "Food & drink", "Fashion", "Education", "Media & publishing", "Real estate",
+  "Travel & hospitality", "B2B services", "Non-profit", "Hardware", "Gaming", "Beauty & personal care",
+  "Something else",
+];
+
 export type BrandKitLayout = "3x3" | "2x3" | "2x2" | "1x3" | "4x2";
 
 export const LAYOUTS: Array<{ id: BrandKitLayout; name: string; note: string }> = [
@@ -57,6 +68,9 @@ export interface BrandKitStrategy {
   category: string;
   audience: string;
   personality: string;
+  emotionalPromise: string;
+  culturalPosition: string;
+  trustLevel: string;
   coreMetaphor: string;
   logoIdea: string;
   visualMode: VisualMode;

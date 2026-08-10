@@ -1,15 +1,22 @@
-// Talking to the brand-kit route.
+// Talking to the brand-kit stepper.
 //
-// One call: brief in, activity stream while it works, one board image out.
-// The SSE frame parsing is unchanged from the old brand-chat client — still
-// exactly one terminal `result` or `error` message per run.
+// One call per step: submit an answer (or resume, or ask the AI to redraft
+// the current step), get back the next step and — if it's AI-drafted — its
+// proposed value already filled in. The SSE frame parsing is unchanged from
+// the old brand-chat client — still exactly one terminal `result` or `error`
+// message per run.
 
 import type { ActivityEvent } from "@/lib/ai/activity";
-import type { BrandKitBrief, BrandKitResult } from "@/lib/brand-kit/types";
+import type { BrandKitDraft } from "@/lib/brand-kit/context";
+import type { StepKey } from "@/lib/brand-kit/steps";
+import type { BrandKitResult } from "@/lib/brand-kit/types";
 
-export interface GenerateResult {
+export interface TurnResult {
   done?: boolean;
   brandId?: string;
+  step?: StepKey;
+  draft?: BrandKitDraft;
+  proposed?: Partial<BrandKitDraft> | null;
   brandkit?: BrandKitResult;
   error?: string;
   code?: string;
@@ -24,11 +31,11 @@ const DROPPED =
 async function readStream(
   response: Response,
   onActivity?: (event: ActivityEvent) => void,
-): Promise<GenerateResult> {
+): Promise<TurnResult> {
   const type = response.headers.get("content-type") ?? "";
 
   if (!type.includes("text/event-stream")) {
-    const body = (await response.json().catch(() => ({}))) as GenerateResult;
+    const body = (await response.json().catch(() => ({}))) as TurnResult;
     if (!response.ok) {
       return { error: body.error ?? `That request failed (${response.status}).`, code: body.code };
     }
@@ -39,7 +46,7 @@ async function readStream(
   if (!reader) return { error: DROPPED };
   const decoder = new TextDecoder();
   let buffer = "";
-  let outcome: GenerateResult | null = null;
+  let outcome: TurnResult | null = null;
 
   for (;;) {
     const { value, done } = await reader.read();
@@ -51,7 +58,7 @@ async function readStream(
       buffer = buffer.slice(cut + 2);
       const line = frame.split("\n").find((l) => l.startsWith("data:"));
       if (!line) continue;
-      let msg: { type?: string; event?: ActivityEvent; data?: GenerateResult; error?: string; code?: string };
+      let msg: { type?: string; event?: ActivityEvent; data?: TurnResult; error?: string; code?: string };
       try {
         msg = JSON.parse(line.slice(5).trim());
       } catch {
@@ -66,17 +73,16 @@ async function readStream(
   return outcome ?? { error: DROPPED };
 }
 
-/** Generate (or regenerate) a brand kit. Creates the brand row server-side if `brandId` is omitted. */
-export async function postGenerate(
-  brandId: string | null,
-  brief: BrandKitBrief,
+/** Advance, resume, or redraft one step of the stepper. */
+export async function postTurn(
+  body: { brandId?: string | null; step?: StepKey; value?: unknown; regenerate?: boolean },
   onActivity?: (event: ActivityEvent) => void,
-): Promise<GenerateResult> {
+): Promise<TurnResult> {
   try {
-    const response = await fetch("/api/brand-kit/generate", {
+    const response = await fetch("/api/brand-kit/turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandId: brandId ?? undefined, ...brief }),
+      body: JSON.stringify({ ...body, brandId: body.brandId ?? undefined }),
     });
     return await readStream(response, onActivity);
   } catch {
