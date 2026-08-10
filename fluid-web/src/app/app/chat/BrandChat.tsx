@@ -1,19 +1,25 @@
 "use client";
 
-// The brand-kit stepper.
+// The brand-kit thread.
 //
-// One field (or a couple of closely related fields) per screen. The AI
-// drafts an answer before the user sees most steps — see the server's
-// /api/brand-kit/turn — and the user can accept it as-is, edit it, or ask
-// for another draft before continuing. `avoid` and `layout` are pure user
-// choices with nothing to draft. `review` is a read-only summary that kicks
-// off the actual board render.
+// A conversation, not a form wizard: every step the user has already
+// answered stays visible above, scrolled up like chat history, and can be
+// reopened by clicking it. The AI drafts an answer before the user sees most
+// steps — see the server's /api/brand-kit/turn — and the user can accept it
+// as-is, edit it, or ask for another draft before continuing. `avoid` and
+// `layout` are pure user choices with nothing to draft. `review` is a
+// read-only summary that kicks off the actual board render.
 //
-// Three top-level phases: `loading` (resuming a brand), `stepper` (walking
+// Three top-level phases: `loading` (resuming a brand), `thread` (walking
 // the steps), `result` (the finished board) — chosen by whether `?brand=`
 // resolves to a brand that already has `data.brandkit`.
+//
+// There is no separate "answered steps" list in state — everything before
+// the current `step` in `STEPS` order is, by definition, already answered
+// (that's what the server's `nextStep` guarantees), so it's derived on
+// every render instead of tracked alongside it.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { fetchBrand, postTurn, type TurnResult } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
@@ -30,7 +36,7 @@ import { STEPS, getStep, type StepKey } from "@/lib/brand-kit/steps";
 import type { BrandKitDraft } from "@/lib/brand-kit/context";
 import "./chat.css";
 
-type Phase = "loading" | "stepper" | "result";
+type Phase = "loading" | "thread" | "result";
 
 export function BrandChat() {
   const [resumeId] = useState(() => new URLSearchParams(window.location.search).get("brand"));
@@ -39,7 +45,7 @@ export function BrandChat() {
     return m && VISUAL_MODES.some((v) => v.id === m) ? (m as VisualMode) : null;
   });
 
-  const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "stepper");
+  const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "thread");
   const [brandId, setBrandId] = useState<string | null>(resumeId);
   const [result, setResult] = useState<BrandKitResult | null>(null);
   const [tokens, setTokens] = useState<number | null>(null);
@@ -48,12 +54,13 @@ export function BrandChat() {
   const [draft, setDraft] = useState<BrandKitDraft>({});
   const [proposed, setProposed] = useState<Partial<BrandKitDraft> | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
-  const [history, setHistory] = useState<StepKey[]>([]);
 
   const [busy, setBusy] = useState(!!resumeId);
   const [regenerating, setRegenerating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const threadRef = useRef<HTMLDivElement>(null);
 
   // ---- token balance ---------------------------------------------------
   useEffect(() => {
@@ -94,7 +101,7 @@ export function BrandChat() {
     fetchBrand(resumeId).then(({ brand, error: err }) => {
       if (err || !brand) {
         setError(err ?? "That brand could not be found.");
-        setPhase("stepper");
+        setPhase("thread");
         setBusy(false);
         return;
       }
@@ -108,11 +115,17 @@ export function BrandChat() {
       postTurn({ brandId: brand.id }, (event) => setStatus(event.label)).then((out) => {
         setBusy(false);
         setStatus(null);
-        setPhase("stepper");
+        setPhase("thread");
         applyTurnResult(out);
       });
     });
   }, [resumeId, applyTurnResult]);
+
+  // ---- keep the thread scrolled to the active step ------------------------
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [step, busy]);
 
   // ---- turn handlers -------------------------------------------------
 
@@ -121,7 +134,6 @@ export function BrandChat() {
       setError(null);
       setBusy(true);
       setStatus(null);
-      setHistory((h) => [...h, step]);
       const out = await postTurn({ brandId, step, value }, (event) => setStatus(event.label));
       setBusy(false);
       setStatus(null);
@@ -155,25 +167,24 @@ export function BrandChat() {
     setDraftVersion((v) => v + 1);
   }, [brandId, step]);
 
-  const handleBack = useCallback(() => {
-    setHistory((h) => {
-      if (h.length === 0) return h;
-      const prev = h[h.length - 1];
-      setStep(prev);
-      setProposed(null);
-      setDraftVersion((v) => v + 1);
-      setError(null);
-      return h.slice(0, -1);
-    });
+  /** Reopen an earlier — or the immediately preceding — step for editing. */
+  const jumpTo = useCallback((target: StepKey) => {
+    setError(null);
+    setStep(target);
+    setProposed(null);
+    setDraftVersion((v) => v + 1);
   }, []);
 
   const startOver = useCallback(() => {
     setError(null);
-    setPhase("stepper");
+    setPhase("thread");
   }, []);
 
   const stepDef = getStep(step) ?? STEPS[0];
   const stepIndex = STEPS.findIndex((s) => s.key === step);
+  // Everything before the active step, in script order, is by definition
+  // already answered — see the file header note.
+  const answeredSteps = STEPS.slice(0, Math.max(0, stepIndex)).map((s) => s.key);
   const seed: BrandKitDraft = {
     ...draft,
     ...(proposed ?? {}),
@@ -188,29 +199,41 @@ export function BrandChat() {
       <Header breadcrumb={breadcrumb} tokens={tokens} />
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <Sidebar />
-        <main style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "40px 24px 60px" }}>
-          <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-            {phase === "loading" || busy ? (
-              <Busy label={status ?? (phase === "loading" ? "Loading…" : "Working…")} />
-            ) : phase === "result" && result ? (
-              <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
-            ) : (
-              <Stepper
-                key={`${step}-${draftVersion}`}
-                stepKey={step}
-                index={stepIndex}
-                total={STEPS.length}
-                question={stepDef.question}
-                seed={seed}
-                busy={false}
-                regenerating={regenerating}
-                error={error}
-                canGoBack={history.length > 0}
-                onBack={handleBack}
-                onContinue={(value) => (step === "review" ? handleGenerate() : handleContinue(value))}
-                onRegenerate={stepDef.aiDrafted ? handleRegenerate : undefined}
-              />
-            )}
+        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+          <div ref={threadRef} className="bchat-thread" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "36px 24px 40px" }}>
+            <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 26 }}>
+              {phase === "loading" ? (
+                <Busy label={status ?? "Loading…"} />
+              ) : phase === "result" && result ? (
+                <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
+              ) : (
+                <>
+                  {answeredSteps.map((k) => (
+                    <AnsweredEntry key={k} stepKey={k} draft={draft} onEdit={() => jumpTo(k)} />
+                  ))}
+                  {busy ? (
+                    <Busy label={status ?? "Working…"} />
+                  ) : (
+                    <Stepper
+                      key={`${step}-${draftVersion}`}
+                      stepKey={step}
+                      index={stepIndex}
+                      total={STEPS.length}
+                      question={stepDef.question}
+                      seed={seed}
+                      busy={false}
+                      regenerating={regenerating}
+                      error={error}
+                      canGoBack={answeredSteps.length > 0}
+                      onBack={() => jumpTo(answeredSteps[answeredSteps.length - 1])}
+                      onContinue={(value) => (step === "review" ? handleGenerate() : handleContinue(value))}
+                      onRegenerate={stepDef.aiDrafted ? handleRegenerate : undefined}
+                    />
+                  )}
+                </>
+              )}
+              <div style={{ height: 8 }} />
+            </div>
           </div>
         </main>
       </div>
@@ -576,8 +599,12 @@ function ReviewStepBody({ index, total, question, seed, busy, error, canGoBack, 
 
 // ---- shared step chrome ------------------------------------------------
 
+// The currently active step, styled as an AI message: an orb "avatar", the
+// question, then whatever this step needs answered under it. Always the
+// live/editable one — answered history renders through AnsweredEntry below
+// instead of this.
 function StepChrome({
-  index, total, question, error, children, footer,
+  question, error, children, footer,
 }: {
   index: number;
   total: number;
@@ -586,29 +613,97 @@ function StepChrome({
   children: React.ReactNode;
   footer: React.ReactNode;
 }) {
-  const pct = total > 0 ? ((Math.max(0, index) + 1) / total) * 100 : 0;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 8 }}>
-      <div>
-        <div style={{ ...label, marginBottom: 10 }}>
-          Step {Math.max(0, index) + 1} of {total}
-        </div>
-        <div style={{ height: 3, background: "#EDEDEF", borderRadius: 99, overflow: "hidden", marginBottom: 22 }}>
-          <div style={{ height: "100%", width: `${pct}%`, background: INK, borderRadius: 99, transition: "width 200ms" }} />
-        </div>
-        <h1 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em", margin: 0, color: INK, lineHeight: 1.35 }}>
-          {question}
-        </h1>
+    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <ThinkingOrb />
       </div>
-      {children}
-      {error ? (
-        <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5 }}>
-          {error}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 700, letterSpacing: "-0.015em", color: INK, lineHeight: 1.4 }}>
+          {question}
         </div>
-      ) : null}
-      {footer}
+        {children}
+        {error ? (
+          <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5 }}>
+            {error}
+          </div>
+        ) : null}
+        {footer}
+      </div>
     </div>
   );
+}
+
+// ---- answered history ---------------------------------------------------
+
+// A step already confirmed, shown the way it stays visible above the active
+// one — question, the answer given, and a click to reopen it. Reopening
+// jumps straight there rather than stepping back one at a time; continuing
+// from it re-clears and re-drafts whatever came after, same as always.
+function AnsweredEntry({ stepKey, draft, onEdit }: { stepKey: StepKey; draft: BrandKitDraft; onEdit: () => void }) {
+  const stepDef = getStep(stepKey);
+  if (!stepDef) return null;
+  return (
+    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+      <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.38 }}>
+        <ThinkingOrb size={18} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ fontFamily: DISPLAY, fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "rgba(0,0,0,.4)", lineHeight: 1.4 }}>
+          {stepDef.question}
+        </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="bchat-outline"
+          style={{
+            textAlign: "left", padding: "12px 14px", borderRadius: 14, background: CARD,
+            boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, display: "flex", flexDirection: "column", gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 13.5, color: "rgba(0,0,0,.82)", lineHeight: 1.5 }}>
+            <AnsweredValue stepKey={stepKey} draft={draft} />
+          </div>
+          <span style={{ ...label, color: FAINT }}>Click to edit</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AnsweredValue({ stepKey, draft }: { stepKey: StepKey; draft: BrandKitDraft }) {
+  switch (stepKey) {
+    case "brief":
+      return <>&ldquo;{draft.brief}&rdquo;</>;
+    case "category":
+      return <>{draft.category}</>;
+    case "audience":
+      return <>{draft.audience}</>;
+    case "personality":
+      return <>{draft.personality} — promises &ldquo;{draft.emotionalPromise}&rdquo;</>;
+    case "positioning":
+      return <>{draft.culturalPosition} · {draft.trustLevel}</>;
+    case "concept":
+      return <>{draft.coreMetaphor} → {draft.logoIdea}</>;
+    case "visualMode":
+      return <>{VISUAL_MODES.find((m) => m.id === draft.visualMode)?.name ?? ""}</>;
+    case "palette":
+      return (
+        <div style={{ display: "flex", gap: 6 }}>
+          {(draft.palette ?? []).map((p) => (
+            <div key={p.hex} title={`${p.role} — ${p.hex}`} style={{ width: 22, height: 22, borderRadius: 6, background: p.hex, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }} />
+          ))}
+        </div>
+      );
+    case "tagline":
+      return <>&ldquo;{draft.tagline}&rdquo;</>;
+    case "avoid":
+      return <>{draft.avoid?.length ? draft.avoid.join(", ") : "Nothing specified"}</>;
+    case "layout":
+      return <>{LAYOUTS.find((l) => l.id === draft.layout)?.name ?? ""}</>;
+    case "review":
+      return null;
+  }
 }
 
 function StepFooter({
