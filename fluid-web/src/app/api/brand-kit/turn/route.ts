@@ -4,6 +4,7 @@ import { streamActivity } from "@/lib/sse";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
 import { generateStepDraft } from "@/lib/brand-kit/draft";
+import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
 import { draftPatch, finalizeDraft, readDraft, type BrandKitDraft } from "@/lib/brand-kit/context";
 import { applyAnswer, clearFrom, getStep, nextStep } from "@/lib/brand-kit/steps";
 import type { Activity } from "@/lib/ai/activity";
@@ -200,9 +201,12 @@ export async function POST(request: Request) {
     if (!step || !step.aiDrafted) {
       return NextResponse.json({ error: "That step has nothing to redraft." }, { status: 400 });
     }
+    // logoConcepts is a full re-roll of all 6 renders, priced like the
+    // initial draw rather than the cheap text-only `small` steps.
+    const cost = step.key === "logoConcepts" ? TOKEN_COST.logoConcepts : TOKEN_COST.small;
     let affordable: boolean;
     try {
-      affordable = await hasTokens(user.id, TOKEN_COST.small);
+      affordable = await hasTokens(user.id, cost);
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Could not check your token balance." },
@@ -217,8 +221,11 @@ export async function POST(request: Request) {
     }
     return streamActivity(
       async (activity: Activity) => {
-        const proposed = await generateStepDraft(step.key, draft, activity);
-        await spendTokens(user.id, TOKEN_COST.small);
+        const proposed =
+          step.key === "logoConcepts"
+            ? { logoConcepts: await generateLogoConcepts(draft, finalBrandId, activity) }
+            : await generateStepDraft(step.key, draft, activity);
+        await spendTokens(user.id, cost);
         return { done: false, brandId: finalBrandId, step: step.key, draft, proposed };
       },
       { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be redrafted." }) },
@@ -237,9 +244,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ done: false, brandId: finalBrandId, step: target.key, draft, proposed: null });
   }
 
+  // logoConcepts renders 6 images (plus a planning call) — priced and
+  // generated differently from the cheap text-only `small` steps.
+  const cost = target.key === "logoConcepts" ? TOKEN_COST.logoConcepts : TOKEN_COST.small;
+
   let affordable: boolean;
   try {
-    affordable = await hasTokens(user.id, TOKEN_COST.small);
+    affordable = await hasTokens(user.id, cost);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not check your token balance." },
@@ -255,8 +266,11 @@ export async function POST(request: Request) {
 
   return streamActivity(
     async (activity: Activity) => {
-      const proposed = await generateStepDraft(target.key, draft, activity);
-      await spendTokens(user.id, TOKEN_COST.small);
+      const proposed =
+        target.key === "logoConcepts"
+          ? { logoConcepts: await generateLogoConcepts(draft, finalBrandId, activity) }
+          : await generateStepDraft(target.key, draft, activity);
+      await spendTokens(user.id, cost);
       return { done: false, brandId: finalBrandId, step: target.key, draft, proposed };
     },
     { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be generated." }) },

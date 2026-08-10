@@ -309,10 +309,12 @@ function Widget(props: WidgetProps & { stepKey: StepKey }) {
       return <ChoiceWidget {...common} field="visualMode" options={VISUAL_MODES} />;
     case "palette":
       return <PaletteWidget {...common} />;
-    case "tagline":
-      return <TextWidget {...common} field="tagline" placeholder="One short line" />;
     case "avoid":
       return <AvoidWidget {...common} />;
+    case "logoConcepts":
+      return <LogoConceptsWidget {...common} />;
+    case "tagline":
+      return <TextWidget {...common} field="tagline" placeholder="One short line" />;
     case "layout":
       return <ChoiceWidget {...common} field="layout" options={LAYOUTS} />;
     case "review":
@@ -394,7 +396,7 @@ function ChoiceWidget(
             key={o.id}
             type="button"
             disabled={busy}
-            onClick={() => o.id !== current && onSubmit(o.id)}
+            onClick={() => onSubmit(o.id)}
             style={chip(o.id === current)}
             title={o.note}
           >
@@ -549,7 +551,54 @@ function AvoidWidget({ seed, busy, onSubmit }: WidgetProps) {
   );
 }
 
+function LogoConceptsWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: WidgetProps) {
+  const concepts = seed.logoConcepts ?? [];
+  const current = seed.logoConceptId ?? "";
+  const pick = (id: string) => {
+    if (busy || id === current) return;
+    onSubmit({ concepts, selectedId: id });
+  };
+
+  if (concepts.length === 0) {
+    return <div style={{ fontSize: 13.5, color: MUTED }}>No concepts drawn yet — try asking again.</div>;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        {concepts.map((c) => {
+          const selected = c.id === current;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={busy}
+              onClick={() => pick(c.id)}
+              title={c.idea}
+              style={{
+                display: "flex", flexDirection: "column", gap: 6, padding: 8, borderRadius: 14,
+                background: CARD, textAlign: "left", cursor: busy ? "default" : "pointer",
+                boxShadow: selected ? `0 0 0 2px ${INK}, 0 6px 18px rgba(0,0,0,.08)` : `inset 0 0 0 1px ${HAIRLINE}`,
+                opacity: current && !selected ? 0.6 : 1,
+                transition: "opacity 140ms, box-shadow 140ms",
+              }}
+            >
+              <div style={{ borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.imageUrl} alt={c.label} style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "contain" }} />
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "rgba(0,0,0,.72)", padding: "0 2px" }}>{c.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
+    </div>
+  );
+}
+
 function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
+  const chosenLogo = seed.logoConcepts?.find((c) => c.id === seed.logoConceptId);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ ...panel(), gap: 10 }}>
@@ -562,6 +611,18 @@ function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
         <Row k="Trust level" v={seed.trustLevel ?? ""} />
         <Row k="Core metaphor" v={seed.coreMetaphor ?? ""} />
         <Row k="Logo idea" v={seed.logoIdea ?? ""} />
+        {chosenLogo ? (
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <span style={{ ...label, flex: "0 0 150px" }}>Logo</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={chosenLogo.imageUrl} alt={chosenLogo.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              </div>
+              <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{chosenLogo.label}</span>
+            </div>
+          </div>
+        ) : null}
         <Row k="Visual mode" v={VISUAL_MODES.find((m) => m.id === seed.visualMode)?.name ?? ""} />
         <Row k="Tagline" v={seed.tagline ?? ""} />
         <Row k="Layout" v={LAYOUTS.find((l) => l.id === seed.layout)?.name ?? ""} />

@@ -6,7 +6,7 @@
 // clearly labeled sub-fields (e.g. `personality` asks for both the traits and
 // the emotional promise in one screen).
 
-import { LAYOUTS, VISUAL_MODES, type BrandKitLayout, type PaletteSwatch, type VisualMode } from "./types";
+import { LAYOUTS, VISUAL_MODES, type BrandKitLayout, type LogoConcept, type PaletteSwatch, type VisualMode } from "./types";
 import type { BrandKitDraft } from "./context";
 
 export type StepKey =
@@ -18,8 +18,9 @@ export type StepKey =
   | "concept"
   | "visualMode"
   | "palette"
-  | "tagline"
   | "avoid"
+  | "logoConcepts"
+  | "tagline"
   | "layout"
   | "review";
 
@@ -52,8 +53,9 @@ export const STEPS: StepDef[] = [
   },
   { key: "visualMode", question: "Which visual world does this belong to?", aiDrafted: true },
   { key: "palette", question: "What's the palette?", aiDrafted: true },
-  { key: "tagline", question: "What's the one line?", aiDrafted: true },
   { key: "avoid", question: "Anything that must never show up?", aiDrafted: false },
+  { key: "logoConcepts", question: "Six directions for the mark. Pick one.", aiDrafted: true },
+  { key: "tagline", question: "What's the one line?", aiDrafted: true },
   { key: "layout", question: "How should the board be laid out?", aiDrafted: false },
   { key: "review", question: "Here's the whole brand. Ready to draw it?", aiDrafted: false },
 ];
@@ -70,8 +72,9 @@ const FIELDS_BY_STEP: Record<StepKey, Array<keyof BrandKitDraft>> = {
   concept: ["coreMetaphor", "logoIdea"],
   visualMode: ["visualMode"],
   palette: ["palette"],
-  tagline: ["tagline"],
   avoid: ["avoid"],
+  logoConcepts: ["logoConcepts", "logoConceptId"],
+  tagline: ["tagline"],
   layout: ["layout"],
   review: [],
 };
@@ -98,10 +101,14 @@ function isAnswered(draft: BrandKitDraft, key: StepKey): boolean {
       return !!draft.visualMode;
     case "palette":
       return !!draft.palette?.length;
-    case "tagline":
-      return !!draft.tagline;
     case "avoid":
       return draft.avoid !== undefined;
+    case "logoConcepts":
+      // Generating the pool isn't enough — the step needs a real decision,
+      // same as `review` never auto-answering itself.
+      return !!draft.logoConceptId;
+    case "tagline":
+      return !!draft.tagline;
     case "layout":
       return !!draft.layout;
     case "review":
@@ -154,6 +161,34 @@ function parsePalette(value: unknown): PaletteSwatch[] {
   return palette;
 }
 
+/**
+ * `{concepts, selectedId}` — the client sends back the whole pool it was
+ * shown plus which one was clicked, same convention `palette` already uses.
+ * The server never needs to remember what it last proposed.
+ */
+function parseLogoConceptPick(value: unknown): { logoConcepts: LogoConcept[]; logoConceptId: string } {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const raw = v.concepts;
+  if (!Array.isArray(raw) || raw.length === 0) throw new Error("No logo concepts to pick from.");
+  const concepts = raw
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const e = entry as Record<string, unknown>;
+      const id = typeof e.id === "string" ? e.id.trim() : "";
+      const label = typeof e.label === "string" ? e.label.trim() : "";
+      const idea = typeof e.idea === "string" ? e.idea.trim() : "";
+      const imageUrl = typeof e.imageUrl === "string" ? e.imageUrl.trim() : "";
+      if (!id || !label || !imageUrl) return null;
+      return { id, label, idea, imageUrl };
+    })
+    .filter((c): c is LogoConcept => c !== null);
+  if (concepts.length === 0) throw new Error("The logo concepts were malformed.");
+
+  const selectedId = str(v.selectedId);
+  if (!concepts.some((c) => c.id === selectedId)) throw new Error("Pick one of the generated concepts.");
+  return { logoConcepts: concepts, logoConceptId: selectedId };
+}
+
 /** Validate and merge one step's answer into the draft. Throws on a malformed value. */
 export function applyAnswer(step: StepKey, value: unknown, draft: BrandKitDraft): BrandKitDraft {
   const v = (value ?? {}) as Record<string, unknown>;
@@ -178,10 +213,12 @@ export function applyAnswer(step: StepKey, value: unknown, draft: BrandKitDraft)
     }
     case "palette":
       return { ...draft, palette: parsePalette(value) };
-    case "tagline":
-      return { ...draft, tagline: str(value) };
     case "avoid":
       return { ...draft, avoid: Array.isArray(value) ? value.filter((a): a is string => typeof a === "string") : [] };
+    case "logoConcepts":
+      return { ...draft, ...parseLogoConceptPick(value) };
+    case "tagline":
+      return { ...draft, tagline: str(value) };
     case "layout": {
       const layout = str(value);
       if (!LAYOUT_IDS.has(layout as BrandKitLayout)) throw new Error("Unknown layout.");

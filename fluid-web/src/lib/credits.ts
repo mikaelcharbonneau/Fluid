@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const TOKEN_COST = {
   small: 1, // inline "AI suggest" / "Let AI choose" helpers
   asset: 3, // a full asset generation (names, palette, type, logo, guidelines)
+  logoConcepts: 6, // one planning call + 6 concurrent medium-quality logo renders
 } as const;
 
 // Does the user have at least `cost` tokens?
