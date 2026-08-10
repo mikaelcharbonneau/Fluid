@@ -63,6 +63,16 @@ export interface PaletteSwatch {
   role: string;
 }
 
+/** One rendered logo option from the logoConcepts step. */
+export interface LogoConcept {
+  id: string;
+  /** The construction method used (e.g. "Monogram + Meaning"). */
+  label: string;
+  /** One-sentence rationale for the construction. */
+  idea: string;
+  imageUrl: string;
+}
+
 /** The model's strategy read, before any image gets drawn. */
 export interface BrandKitStrategy {
   category: string;
@@ -73,6 +83,8 @@ export interface BrandKitStrategy {
   trustLevel: string;
   coreMetaphor: string;
   logoIdea: string;
+  /** The picked logo concept's render — used as a reference image for the final board. */
+  logoImageUrl: string;
   visualMode: VisualMode;
   palette: PaletteSwatch[];
   tagline: string;

@@ -5,7 +5,7 @@
 // field here eventually gets an AI-drafted default before the user edits it
 // — see draft.ts.
 
-import type { BrandKitBrief, BrandKitLayout, BrandKitStrategy, PaletteSwatch, VisualMode } from "./types";
+import type { BrandKitBrief, BrandKitLayout, BrandKitStrategy, LogoConcept, PaletteSwatch, VisualMode } from "./types";
 
 export interface BrandKitDraft {
   name?: string;
@@ -20,6 +20,10 @@ export interface BrandKitDraft {
   logoIdea?: string;
   visualMode?: VisualMode;
   palette?: PaletteSwatch[];
+  /** The rendered pool of 6 — kept once generated, so re-picking is free. */
+  logoConcepts?: LogoConcept[];
+  /** Which concept in `logoConcepts` is picked. The step isn't answered until this is set. */
+  logoConceptId?: string;
   tagline?: string;
   avoid?: string[];
   layout?: BrandKitLayout;
@@ -52,8 +56,12 @@ export function renderDraft(draft: BrandKitDraft): string {
   if (draft.palette?.length) {
     lines.push(`Palette so far: ${draft.palette.map((p) => `${p.hex} (${p.role})`).join(", ")}`);
   }
-  if (draft.tagline) lines.push(`Tagline: ${draft.tagline}`);
   if (draft.avoid?.length) lines.push(`Must never appear: ${draft.avoid.join(", ")}`);
+  if (draft.logoConceptId) {
+    const chosen = draft.logoConcepts?.find((c) => c.id === draft.logoConceptId);
+    if (chosen) lines.push(`Logo chosen: ${chosen.label} — ${chosen.idea}`);
+  }
+  if (draft.tagline) lines.push(`Tagline: ${draft.tagline}`);
   if (draft.layout) lines.push(`Layout: ${draft.layout}`);
   return lines.join("\n");
 }
@@ -71,6 +79,8 @@ export function finalizeDraft(draft: BrandKitDraft): { brief: BrandKitBrief; str
     return value;
   };
 
+  const chosenLogo = draft.logoConcepts?.find((c) => c.id === draft.logoConceptId);
+
   return {
     brief: {
       name: need(draft.name, "name"),
@@ -87,6 +97,7 @@ export function finalizeDraft(draft: BrandKitDraft): { brief: BrandKitBrief; str
       trustLevel: need(draft.trustLevel, "trustLevel"),
       coreMetaphor: need(draft.coreMetaphor, "coreMetaphor"),
       logoIdea: need(draft.logoIdea, "logoIdea"),
+      logoImageUrl: need(chosenLogo?.imageUrl, "logoImageUrl"),
       visualMode: need(draft.visualMode, "visualMode"),
       palette: need(draft.palette, "palette"),
       tagline: need(draft.tagline, "tagline"),
