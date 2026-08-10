@@ -1,30 +1,36 @@
 "use client";
 
-// One-shot brand-kit generation.
+// The brand-kit stepper.
 //
-// Replaces the old 20-step conversation: a brief in, one composite
-// brand-kit board image out. Three phases live in this one component —
-// `form` (collect the brief), `generating` (stream activity while the
-// studio works), `result` (show the board) — chosen by whether `?brand=`
+// One field (or a couple of closely related fields) per screen. The AI
+// drafts an answer before the user sees most steps — see the server's
+// /api/brand-kit/turn — and the user can accept it as-is, edit it, or ask
+// for another draft before continuing. `avoid` and `layout` are pure user
+// choices with nothing to draft. `review` is a read-only summary that kicks
+// off the actual board render.
+//
+// Three top-level phases: `loading` (resuming a brand), `stepper` (walking
+// the steps), `result` (the finished board) — chosen by whether `?brand=`
 // resolves to a brand that already has `data.brandkit`.
 
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import type { ActivityEvent } from "@/lib/ai/activity";
-import { fetchBrand, postGenerate } from "./api";
+import { fetchBrand, postTurn, type TurnResult } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
 import {
   CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, chip, cta, label, panel,
 } from "./ui";
 import {
-  Assets, Chevron, ChevronLeft, Download, Grid, Guides, Home, Refresh, Search, Settings, Token,
+  Assets, Chevron, ChevronLeft, Close, Download, Grid, Guides, Home, Refresh, Search, Settings, Token,
 } from "./icons";
-import { AVOIDS, CATEGORIES } from "./data";
-import { LAYOUTS, VISUAL_MODES } from "@/lib/brand-kit/types";
-import type { BrandKitBrief, BrandKitLayout, BrandKitResult, VisualMode } from "@/lib/brand-kit/types";
+import { AVOIDS } from "./data";
+import { CATEGORIES, LAYOUTS, VISUAL_MODES } from "@/lib/brand-kit/types";
+import type { BrandKitResult, PaletteSwatch, VisualMode } from "@/lib/brand-kit/types";
+import { STEPS, getStep, type StepKey } from "@/lib/brand-kit/steps";
+import type { BrandKitDraft } from "@/lib/brand-kit/context";
 import "./chat.css";
 
-type Phase = "loading" | "form" | "generating" | "result";
+type Phase = "loading" | "stepper" | "result";
 
 export function BrandChat() {
   const [resumeId] = useState(() => new URLSearchParams(window.location.search).get("brand"));
@@ -33,21 +39,21 @@ export function BrandChat() {
     return m && VISUAL_MODES.some((v) => v.id === m) ? (m as VisualMode) : null;
   });
 
-  const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "form");
+  const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "stepper");
   const [brandId, setBrandId] = useState<string | null>(resumeId);
   const [result, setResult] = useState<BrandKitResult | null>(null);
   const [tokens, setTokens] = useState<number | null>(null);
+
+  const [step, setStep] = useState<StepKey>("brief");
+  const [draft, setDraft] = useState<BrandKitDraft>({});
+  const [proposed, setProposed] = useState<Partial<BrandKitDraft> | null>(null);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const [history, setHistory] = useState<StepKey[]>([]);
+
+  const [busy, setBusy] = useState(!!resumeId);
+  const [regenerating, setRegenerating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [name, setName] = useState("");
-  const [brief, setBrief] = useState("");
-  const [category, setCategory] = useState("");
-  const [audience, setAudience] = useState("");
-  const [visualMode, setVisualMode] = useState<VisualMode | null>(presetMode);
-  const [layout, setLayout] = useState<BrandKitLayout>("3x3");
-  const [avoid, setAvoid] = useState<string[]>([]);
-  const [refineOpen, setRefineOpen] = useState(!!presetMode);
 
   // ---- token balance ---------------------------------------------------
   useEffect(() => {
@@ -63,76 +69,119 @@ export function BrandChat() {
     };
   }, [phase]);
 
+  const applyTurnResult = useCallback((out: TurnResult) => {
+    if (out.brandId) setBrandId(out.brandId);
+    if (out.error) {
+      setError(out.error);
+      return;
+    }
+    if (out.done && out.brandkit) {
+      setResult(out.brandkit);
+      setPhase("result");
+      return;
+    }
+    if (out.step) {
+      setStep(out.step);
+      setDraft(out.draft ?? {});
+      setProposed(out.proposed ?? null);
+      setDraftVersion((v) => v + 1);
+    }
+  }, []);
+
   // ---- resume ------------------------------------------------------------
   useEffect(() => {
     if (!resumeId) return;
     fetchBrand(resumeId).then(({ brand, error: err }) => {
       if (err || !brand) {
         setError(err ?? "That brand could not be found.");
-        setPhase("form");
+        setPhase("stepper");
+        setBusy(false);
         return;
       }
-      setName(brand.name ?? "");
-      setBrief(brand.brief ?? "");
-      setAudience(brand.audience ?? "");
-      const brandkit = brand.data?.brandkit;
-      if (brandkit) {
-        setResult(brandkit);
+      if (brand.data?.brandkit) {
+        setResult(brand.data.brandkit);
         setPhase("result");
-      } else {
-        setPhase("form");
+        setBusy(false);
+        return;
       }
+      setBrandId(brand.id);
+      postTurn({ brandId: brand.id }, (event) => setStatus(event.label)).then((out) => {
+        setBusy(false);
+        setStatus(null);
+        setPhase("stepper");
+        applyTurnResult(out);
+      });
     });
-  }, [resumeId]);
+  }, [resumeId, applyTurnResult]);
 
-  // ---- generate ------------------------------------------------------------
-  const generate = useCallback(async () => {
-    if (!name.trim() || !brief.trim() || phase === "generating") return;
-    setPhase("generating");
+  // ---- turn handlers -------------------------------------------------
+
+  const handleContinue = useCallback(
+    async (value: unknown) => {
+      setError(null);
+      setBusy(true);
+      setStatus(null);
+      setHistory((h) => [...h, step]);
+      const out = await postTurn({ brandId, step, value }, (event) => setStatus(event.label));
+      setBusy(false);
+      setStatus(null);
+      applyTurnResult(out);
+    },
+    [brandId, step, applyTurnResult],
+  );
+
+  const handleGenerate = useCallback(async () => {
     setError(null);
+    setBusy(true);
     setStatus(null);
-
-    const payload: BrandKitBrief = {
-      name: name.trim(),
-      brief: brief.trim(),
-      category: category || undefined,
-      audience: audience.trim() || undefined,
-      visualMode: visualMode ?? undefined,
-      layout,
-      avoid: avoid.length ? avoid : undefined,
-    };
-
-    const out = await postGenerate(brandId, payload, (event: ActivityEvent) => setStatus(event.label));
+    const out = await postTurn({ brandId, step: "review", value: true }, (event) => setStatus(event.label));
+    setBusy(false);
     setStatus(null);
+    applyTurnResult(out);
+  }, [brandId, applyTurnResult]);
 
-    if (out.brandId && out.brandId !== brandId) {
-      setBrandId(out.brandId);
-      const url = new URL(window.location.href);
-      url.searchParams.set("brand", out.brandId);
-      window.history.replaceState(null, "", url);
-    }
-
+  const handleRegenerate = useCallback(async () => {
+    setError(null);
+    setRegenerating(true);
+    setStatus(null);
+    const out = await postTurn({ brandId, step, regenerate: true }, (event) => setStatus(event.label));
+    setRegenerating(false);
+    setStatus(null);
     if (out.error) {
       setError(out.error);
-      setPhase("form");
       return;
     }
-    if (out.brandkit) {
-      setResult(out.brandkit);
-      setPhase("result");
-      return;
-    }
-    setError("Something went wrong — no board came back.");
-    setPhase("form");
-  }, [name, brief, category, audience, visualMode, layout, avoid, brandId, phase]);
+    setProposed(out.proposed ?? null);
+    setDraftVersion((v) => v + 1);
+  }, [brandId, step]);
+
+  const handleBack = useCallback(() => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setStep(prev);
+      setProposed(null);
+      setDraftVersion((v) => v + 1);
+      setError(null);
+      return h.slice(0, -1);
+    });
+  }, []);
 
   const startOver = useCallback(() => {
     setError(null);
-    setPhase("form");
+    setPhase("stepper");
   }, []);
 
-  const canGenerate = !!name.trim() && !!brief.trim() && phase !== "generating";
-  const breadcrumb = name.trim() || "New brand";
+  const stepDef = getStep(step) ?? STEPS[0];
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  const seed: BrandKitDraft = {
+    ...draft,
+    ...(proposed ?? {}),
+    // A quick-path preset wins as the shown default until the user reaches
+    // this step's own confirmed answer or asks the AI to redraft it.
+    ...(step === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
+  };
+  const breadcrumb = draft.name?.trim() || "New brand";
 
   return (
     <div className="bchat">
@@ -141,35 +190,25 @@ export function BrandChat() {
         <Sidebar />
         <main style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "40px 24px 60px" }}>
           <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-            {phase === "loading" ? (
-              <Busy label="Loading…" />
+            {phase === "loading" || busy ? (
+              <Busy label={status ?? (phase === "loading" ? "Loading…" : "Working…")} />
             ) : phase === "result" && result ? (
               <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
             ) : (
-              <FormView
-                name={name}
-                setName={setName}
-                brief={brief}
-                setBrief={setBrief}
-                category={category}
-                setCategory={setCategory}
-                audience={audience}
-                setAudience={setAudience}
-                visualMode={visualMode}
-                setVisualMode={setVisualMode}
-                layout={layout}
-                setLayout={setLayout}
-                avoid={avoid}
-                setAvoid={setAvoid}
-                refineOpen={refineOpen}
-                setRefineOpen={setRefineOpen}
-                busy={phase === "generating"}
-                status={status}
+              <Stepper
+                key={`${step}-${draftVersion}`}
+                stepKey={step}
+                index={stepIndex}
+                total={STEPS.length}
+                question={stepDef.question}
+                seed={seed}
+                busy={false}
+                regenerating={regenerating}
                 error={error}
-                canGenerate={canGenerate}
-                onGenerate={generate}
-                hasPriorResult={!!result}
-                onBackToResult={() => setPhase("result")}
+                canGoBack={history.length > 0}
+                onBack={handleBack}
+                onContinue={(value) => (step === "review" ? handleGenerate() : handleContinue(value))}
+                onRegenerate={stepDef.aiDrafted ? handleRegenerate : undefined}
               />
             )}
           </div>
@@ -179,74 +218,100 @@ export function BrandChat() {
   );
 }
 
-// ---- form --------------------------------------------------------------
+// ---- the stepper dispatcher ---------------------------------------------
 
-interface FormViewProps {
-  name: string;
-  setName: (v: string) => void;
-  brief: string;
-  setBrief: (v: string) => void;
-  category: string;
-  setCategory: (v: string) => void;
-  audience: string;
-  setAudience: (v: string) => void;
-  visualMode: VisualMode | null;
-  setVisualMode: (v: VisualMode | null) => void;
-  layout: BrandKitLayout;
-  setLayout: (v: BrandKitLayout) => void;
-  avoid: string[];
-  setAvoid: (v: string[]) => void;
-  refineOpen: boolean;
-  setRefineOpen: (v: boolean) => void;
+interface StepBodyProps {
+  index: number;
+  total: number;
+  question: string;
+  seed: BrandKitDraft;
   busy: boolean;
-  status: string | null;
+  regenerating: boolean;
   error: string | null;
-  canGenerate: boolean;
-  onGenerate: () => void;
-  hasPriorResult: boolean;
-  onBackToResult: () => void;
+  canGoBack: boolean;
+  onBack: () => void;
+  onContinue: (value: unknown) => void;
+  onRegenerate?: () => void;
 }
 
-function FormView(props: FormViewProps) {
-  const {
-    name, setName, brief, setBrief, category, setCategory, audience, setAudience,
-    visualMode, setVisualMode, layout, setLayout, avoid, setAvoid,
-    refineOpen, setRefineOpen, busy, status, error, canGenerate, onGenerate,
-    hasPriorResult, onBackToResult,
-  } = props;
+function Stepper(props: StepBodyProps & { stepKey: StepKey }) {
+  const { stepKey, ...rest } = props;
+  // Fields lock while a redraft is in flight too, not just while the whole
+  // stepper is busy — a fresh `proposed` value is about to replace whatever
+  // is on screen.
+  const common = { ...rest, busy: rest.busy || rest.regenerating };
+  switch (stepKey) {
+    case "brief":
+      return <BriefStepBody {...common} />;
+    case "category":
+      return <ChoiceStepBody {...common} field="category" options={CATEGORIES.map((c) => ({ id: c, name: c }))} />;
+    case "audience":
+      return <TextStepBody {...common} field="audience" placeholder="Who is this for?" />;
+    case "personality":
+      return (
+        <PairStepBody
+          {...common}
+          fieldA={{ key: "personality", label: "Personality", placeholder: "3-5 traits — how it behaves in a room" }}
+          fieldB={{ key: "emotionalPromise", label: "Emotional promise", placeholder: "The feeling this brand promises" }}
+        />
+      );
+    case "positioning":
+      return (
+        <PairStepBody
+          {...common}
+          fieldA={{ key: "culturalPosition", label: "Cultural position", placeholder: "Where this sits culturally" }}
+          fieldB={{ key: "trustLevel", label: "Trust level", placeholder: "How much trust it needs to earn" }}
+        />
+      );
+    case "concept":
+      return (
+        <PairStepBody
+          {...common}
+          fieldA={{ key: "coreMetaphor", label: "Core metaphor", placeholder: "The one symbolic idea" }}
+          fieldB={{ key: "logoIdea", label: "Logo idea", placeholder: "How the mark expresses it" }}
+        />
+      );
+    case "visualMode":
+      return <ChoiceStepBody {...common} field="visualMode" options={VISUAL_MODES} />;
+    case "palette":
+      return <PaletteStepBody {...common} />;
+    case "tagline":
+      return <TextStepBody {...common} field="tagline" placeholder="One short line" />;
+    case "avoid":
+      return <AvoidStepBody {...common} />;
+    case "layout":
+      return <ChoiceStepBody {...common} field="layout" options={LAYOUTS} />;
+    case "review":
+      return <ReviewStepBody {...common} />;
+  }
+}
 
-  const toggleAvoid = (item: string) => {
-    setAvoid(avoid.includes(item) ? avoid.filter((a) => a !== item) : [...avoid, item]);
-  };
+// ---- step bodies ----------------------------------------------------
+
+function BriefStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
+  const [name, setName] = useState(seed.name ?? "");
+  const [brief, setBrief] = useState(seed.brief ?? "");
+  const canContinue = !!name.trim() && !!brief.trim() && !busy;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22, paddingTop: 8 }}>
-      {hasPriorResult ? (
-        <button type="button" onClick={onBackToResult} style={{ ...ghostLink, alignSelf: "flex-start" }}>
-          <ChevronLeft size={11} /> Back to the board
-        </button>
-      ) : null}
-
-      <div>
-        <h1 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 32, letterSpacing: "-0.03em", margin: 0, color: INK }}>
-          Let&rsquo;s build the brand.
-        </h1>
-        <p style={{ fontSize: 14.5, color: MUTED, marginTop: 8, lineHeight: 1.5, maxWidth: 560 }}>
-          Tell Fluid what this is. It will draft the strategy, the mark, the palette, the
-          type, and put the whole thing on one premium brand-kit board.
-        </p>
-      </div>
-
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={canContinue}
+          onContinue={() => onContinue({ name: name.trim(), brief: brief.trim() })}
+        />
+      }
+    >
       <div style={panel()}>
         <div style={fieldGroup}>
           <span style={label}>Brand name</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Northwind"
-            disabled={busy}
-            style={inputStyle}
-          />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Northwind" disabled={busy} style={inputStyle} />
         </div>
         <div style={fieldGroup}>
           <span style={label}>Brief</span>
@@ -260,93 +325,322 @@ function FormView(props: FormViewProps) {
           />
         </div>
       </div>
+    </StepChrome>
+  );
+}
 
-      <button
-        type="button"
-        onClick={() => setRefineOpen(!refineOpen)}
-        style={{ ...ghostLink, alignSelf: "flex-start" }}
-      >
-        <span style={{ display: "inline-flex", transform: refineOpen ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 140ms" }}>
-          <Chevron size={11} />
-        </span>
-        {refineOpen ? "Hide refinements" : "Refine (optional)"}
-      </button>
+function ChoiceStepBody(
+  props: StepBodyProps & { field: "category" | "visualMode" | "layout"; options: Array<{ id: string; name: string; note?: string }> },
+) {
+  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, field, options } = props;
+  const [value, setValue] = useState<string>((seed[field] as string | undefined) ?? (field === "layout" ? "3x3" : ""));
+  const canContinue = !!value && !busy;
 
-      {refineOpen ? (
-        <div style={{ ...panel(), gap: 18 }}>
-          <div style={fieldGroup}>
-            <span style={label}>Category</span>
-            <div style={chipRow}>
-              {CATEGORIES.map((c) => (
-                <button key={c} type="button" disabled={busy} onClick={() => setCategory(c === category ? "" : c)} style={chip(c === category)}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={canContinue}
+          onContinue={() => onContinue(value)}
+          onRegenerate={onRegenerate}
+          regenerating={regenerating}
+        />
+      }
+    >
+      <div style={chipRow}>
+        {options.map((o) => (
+          <button key={o.id} type="button" disabled={busy} onClick={() => setValue(o.id)} style={chip(value === o.id)} title={o.note}>
+            {o.name}
+          </button>
+        ))}
+      </div>
+    </StepChrome>
+  );
+}
 
-          <div style={fieldGroup}>
-            <span style={label}>Audience</span>
-            <input
-              value={audience}
-              onChange={(e) => setAudience(e.target.value)}
-              placeholder="Who is this for?"
-              disabled={busy}
-              style={inputStyle}
+function TextStepBody(
+  props: StepBodyProps & { field: "audience" | "tagline"; placeholder: string },
+) {
+  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, field, placeholder } = props;
+  const [value, setValue] = useState((seed[field] as string | undefined) ?? "");
+  const canContinue = !!value.trim() && !busy;
+
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={canContinue}
+          onContinue={() => onContinue(value.trim())}
+          onRegenerate={onRegenerate}
+          regenerating={regenerating}
+        />
+      }
+    >
+      <div style={panel()}>
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} disabled={busy} style={inputStyle} />
+      </div>
+    </StepChrome>
+  );
+}
+
+interface PairField {
+  key: keyof BrandKitDraft;
+  label: string;
+  placeholder: string;
+}
+
+function PairStepBody(props: StepBodyProps & { fieldA: PairField; fieldB: PairField }) {
+  const { index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate, fieldA, fieldB } = props;
+  const [a, setA] = useState((seed[fieldA.key] as string | undefined) ?? "");
+  const [b, setB] = useState((seed[fieldB.key] as string | undefined) ?? "");
+  const canContinue = !!a.trim() && !!b.trim() && !busy;
+
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={canContinue}
+          onContinue={() => onContinue({ [fieldA.key]: a.trim(), [fieldB.key]: b.trim() })}
+          onRegenerate={onRegenerate}
+          regenerating={regenerating}
+        />
+      }
+    >
+      <div style={{ ...panel(), gap: 16 }}>
+        <div style={fieldGroup}>
+          <span style={label}>{fieldA.label}</span>
+          <textarea value={a} onChange={(e) => setA(e.target.value)} placeholder={fieldA.placeholder} disabled={busy} rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+        </div>
+        <div style={fieldGroup}>
+          <span style={label}>{fieldB.label}</span>
+          <textarea value={b} onChange={(e) => setB(e.target.value)} placeholder={fieldB.placeholder} disabled={busy} rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+        </div>
+      </div>
+    </StepChrome>
+  );
+}
+
+function PaletteStepBody({ index, total, question, seed, busy, regenerating, error, canGoBack, onBack, onContinue, onRegenerate }: StepBodyProps) {
+  const [swatches, setSwatches] = useState<PaletteSwatch[]>(
+    seed.palette?.length ? seed.palette : [{ hex: "#14161A", role: "Primary" }],
+  );
+  const canContinue = swatches.length > 0 && swatches.every((s) => /^#[0-9A-Fa-f]{6}$/.test(s.hex) && !!s.role.trim()) && !busy;
+
+  const update = (i: number, patch: Partial<PaletteSwatch>) =>
+    setSwatches((cur) => cur.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const remove = (i: number) => setSwatches((cur) => cur.filter((_, idx) => idx !== i));
+  const add = () => setSwatches((cur) => (cur.length >= 6 ? cur : [...cur, { hex: "#000000", role: "" }]));
+
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={canContinue}
+          onContinue={() => onContinue(swatches.map((s) => ({ hex: s.hex.toUpperCase(), role: s.role.trim() })))}
+          onRegenerate={onRegenerate}
+          regenerating={regenerating}
+        />
+      }
+    >
+      <div style={{ ...panel(), gap: 10 }}>
+        {swatches.map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 28, height: 28, borderRadius: 8, flex: "0 0 28px",
+                background: /^#[0-9A-Fa-f]{6}$/.test(s.hex) ? s.hex : "#EDEDEF",
+                boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+              }}
             />
+            <input
+              value={s.hex}
+              onChange={(e) => update(i, { hex: e.target.value })}
+              disabled={busy}
+              style={{ ...inputStyle, width: 110, fontFamily: MONO, fontSize: 13 }}
+            />
+            <input
+              value={s.role}
+              onChange={(e) => update(i, { role: e.target.value })}
+              placeholder="Role — e.g. Primary"
+              disabled={busy}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              type="button"
+              disabled={busy || swatches.length <= 1}
+              onClick={() => remove(i)}
+              aria-label="Remove swatch"
+              style={{ ...ghostLink, padding: 6, opacity: swatches.length <= 1 ? 0.35 : 1 }}
+            >
+              <Close size={13} />
+            </button>
           </div>
+        ))}
+        <button type="button" disabled={busy || swatches.length >= 6} onClick={add} style={{ ...ghostLink, alignSelf: "flex-start" }}>
+          + Add colour
+        </button>
+      </div>
+    </StepChrome>
+  );
+}
 
-          <div style={fieldGroup}>
-            <span style={label}>Visual mode</span>
-            <div style={chipRow}>
-              <button type="button" disabled={busy} onClick={() => setVisualMode(null)} style={chip(visualMode === null)}>
-                Let AI choose
-              </button>
-              {VISUAL_MODES.map((m) => (
-                <button key={m.id} type="button" disabled={busy} onClick={() => setVisualMode(m.id)} style={chip(visualMode === m.id)} title={m.note}>
-                  {m.name}
-                </button>
-              ))}
-            </div>
-          </div>
+function AvoidStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
+  const [selected, setSelected] = useState<string[]>(seed.avoid ?? []);
+  const toggle = (item: string) => setSelected((cur) => (cur.includes(item) ? cur.filter((a) => a !== item) : [...cur, item]));
 
-          <div style={fieldGroup}>
-            <span style={label}>Layout</span>
-            <div style={chipRow}>
-              {LAYOUTS.map((l) => (
-                <button key={l.id} type="button" disabled={busy} onClick={() => setLayout(l.id)} style={chip(l.id === layout)} title={l.note}>
-                  {l.name}
-                </button>
-              ))}
-            </div>
-          </div>
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={
+        <StepFooter
+          canGoBack={canGoBack}
+          onBack={onBack}
+          canContinue={!busy}
+          onContinue={() => onContinue(selected)}
+          continueLabel={selected.length ? "Continue" : "Nothing to avoid — continue"}
+        />
+      }
+    >
+      <div style={chipRow}>
+        {AVOIDS.map((a) => (
+          <button key={a} type="button" disabled={busy} onClick={() => toggle(a)} style={chip(selected.includes(a))}>
+            {a}
+          </button>
+        ))}
+      </div>
+    </StepChrome>
+  );
+}
 
-          <div style={fieldGroup}>
-            <span style={label}>Avoid</span>
-            <div style={chipRow}>
-              {AVOIDS.map((a) => (
-                <button key={a} type="button" disabled={busy} onClick={() => toggleAvoid(a)} style={chip(avoid.includes(a))}>
-                  {a}
-                </button>
-              ))}
-            </div>
-          </div>
+function ReviewStepBody({ index, total, question, seed, busy, error, canGoBack, onBack, onContinue }: StepBodyProps) {
+  return (
+    <StepChrome
+      index={index}
+      total={total}
+      question={question}
+      error={error}
+      footer={<StepFooter canGoBack={canGoBack} onBack={onBack} canContinue={!busy} onContinue={() => onContinue(true)} continueLabel="Generate the brand kit" />}
+    >
+      <div style={{ ...panel(), gap: 10 }}>
+        <Row k="Name" v={seed.name ?? ""} />
+        <Row k="Category" v={seed.category ?? ""} />
+        <Row k="Audience" v={seed.audience ?? ""} />
+        <Row k="Personality" v={seed.personality ?? ""} />
+        <Row k="Emotional promise" v={seed.emotionalPromise ?? ""} />
+        <Row k="Cultural position" v={seed.culturalPosition ?? ""} />
+        <Row k="Trust level" v={seed.trustLevel ?? ""} />
+        <Row k="Core metaphor" v={seed.coreMetaphor ?? ""} />
+        <Row k="Logo idea" v={seed.logoIdea ?? ""} />
+        <Row k="Visual mode" v={VISUAL_MODES.find((m) => m.id === seed.visualMode)?.name ?? ""} />
+        <Row k="Tagline" v={seed.tagline ?? ""} />
+        <Row k="Layout" v={LAYOUTS.find((l) => l.id === seed.layout)?.name ?? ""} />
+        <Row k="Avoid" v={seed.avoid?.length ? seed.avoid.join(", ") : "Nothing specified"} />
+      </div>
+      {seed.palette?.length ? (
+        <div style={{ display: "flex", gap: 6 }}>
+          {seed.palette.map((p) => (
+            <div key={p.hex} title={`${p.role} — ${p.hex}`} style={{ flex: 1, height: 28, borderRadius: 8, background: p.hex, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }} />
+          ))}
         </div>
       ) : null}
+    </StepChrome>
+  );
+}
 
+// ---- shared step chrome ------------------------------------------------
+
+function StepChrome({
+  index, total, question, error, children, footer,
+}: {
+  index: number;
+  total: number;
+  question: string;
+  error: string | null;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+}) {
+  const pct = total > 0 ? ((Math.max(0, index) + 1) / total) * 100 : 0;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 8 }}>
+      <div>
+        <div style={{ ...label, marginBottom: 10 }}>
+          Step {Math.max(0, index) + 1} of {total}
+        </div>
+        <div style={{ height: 3, background: "#EDEDEF", borderRadius: 99, overflow: "hidden", marginBottom: 22 }}>
+          <div style={{ height: "100%", width: `${pct}%`, background: INK, borderRadius: 99, transition: "width 200ms" }} />
+        </div>
+        <h1 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em", margin: 0, color: INK, lineHeight: 1.35 }}>
+          {question}
+        </h1>
+      </div>
+      {children}
       {error ? (
         <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5 }}>
           {error}
         </div>
       ) : null}
+      {footer}
+    </div>
+  );
+}
 
-      {busy ? (
-        <Busy label={status ?? "Working…"} />
-      ) : (
-        <button type="button" disabled={!canGenerate} onClick={onGenerate} style={{ ...cta(canGenerate), alignSelf: "flex-start", padding: "13px 22px", fontSize: 14 }}>
-          Generate the brand kit
+function StepFooter({
+  canGoBack, onBack, canContinue, onContinue, continueLabel = "Continue", onRegenerate, regenerating,
+}: {
+  canGoBack: boolean;
+  onBack: () => void;
+  canContinue: boolean;
+  onContinue: () => void;
+  continueLabel?: string;
+  onRegenerate?: () => void;
+  regenerating?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button
+        type="button"
+        disabled={!canGoBack}
+        onClick={onBack}
+        style={{ ...ghostLink, opacity: canGoBack ? 1 : 0.35, cursor: canGoBack ? "pointer" : "default" }}
+      >
+        <ChevronLeft size={11} /> Back
+      </button>
+      <div style={{ flex: 1 }} />
+      {onRegenerate ? (
+        <button type="button" onClick={onRegenerate} disabled={regenerating} style={ghostLink}>
+          <Refresh size={12} /> {regenerating ? "Asking again…" : "Ask again"}
         </button>
-      )}
+      ) : null}
+      <button type="button" disabled={!canContinue} onClick={onContinue} style={{ ...cta(canContinue), padding: "12px 20px", fontSize: 13.5 }}>
+        {continueLabel}
+      </button>
     </div>
   );
 }
@@ -388,6 +682,9 @@ function ResultView({
         <Row k="Category" v={strategy.category} />
         <Row k="Audience" v={strategy.audience} />
         <Row k="Personality" v={strategy.personality} />
+        <Row k="Emotional promise" v={strategy.emotionalPromise} />
+        <Row k="Cultural position" v={strategy.culturalPosition} />
+        <Row k="Trust level" v={strategy.trustLevel} />
         <Row k="Core metaphor" v={strategy.coreMetaphor} />
         <Row k="Logo idea" v={strategy.logoIdea} />
       </div>
@@ -397,9 +694,9 @@ function ResultView({
           <Download size={14} /> Download
         </a>
         <button type="button" onClick={onRegenerate} style={{ ...cta(true), background: CARD, color: INK, boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <Refresh size={13} /> Regenerate
+          <Refresh size={13} /> Start over
         </button>
-        <a href="/app#brands" style={{ ...ghostLink }}>
+        <a href="/app#brands" style={ghostLink}>
           Back to brands
         </a>
       </div>
@@ -410,7 +707,7 @@ function ResultView({
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: "flex", gap: 14 }}>
-      <span style={{ ...label, flex: "0 0 130px" }}>{k}</span>
+      <span style={{ ...label, flex: "0 0 150px" }}>{k}</span>
       <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)", lineHeight: 1.5 }}>{v}</span>
     </div>
   );
@@ -427,7 +724,7 @@ function Busy({ label: text }: { label: string }) {
   );
 }
 
-// ---- shell (unchanged from the old chat) ----------------------------------
+// ---- shell (unchanged from the previous pass) ----------------------------------
 
 function Header({ breadcrumb, tokens }: { breadcrumb: string; tokens: number | null }) {
   const pill: CSSProperties = {
