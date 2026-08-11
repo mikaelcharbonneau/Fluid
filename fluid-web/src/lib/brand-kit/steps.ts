@@ -227,15 +227,14 @@ function parseNamePreferences(value: unknown): NamePreferences {
 }
 
 /**
- * `{concepts, selectedId}` — the client sends back the whole pool it was
- * shown plus which one was clicked, same convention `palette` already uses.
- * The server never needs to remember what it last proposed.
+ * Shared by the pick (below) and by the turn route's regenerate handler,
+ * which needs the client's current accumulated pool — everything shown
+ * across every batch so far, not just what was last persisted — so a
+ * fresh "Ask again" batch appends instead of losing earlier ones.
  */
-function parseLogoConceptPick(value: unknown): { logoConcepts: LogoConcept[]; logoConceptId: string } {
-  const v = (value ?? {}) as Record<string, unknown>;
-  const raw = v.concepts;
-  if (!Array.isArray(raw) || raw.length === 0) throw new Error("No logo concepts to pick from.");
-  const concepts = raw
+export function parseLogoConceptsList(value: unknown): LogoConcept[] {
+  const raw = Array.isArray(value) ? value : [];
+  return raw
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
       const e = entry as Record<string, unknown>;
@@ -243,10 +242,22 @@ function parseLogoConceptPick(value: unknown): { logoConcepts: LogoConcept[]; lo
       const label = typeof e.label === "string" ? e.label.trim() : "";
       const idea = typeof e.idea === "string" ? e.idea.trim() : "";
       const imageUrl = typeof e.imageUrl === "string" ? e.imageUrl.trim() : "";
+      const batch = typeof e.batch === "number" && Number.isFinite(e.batch) ? e.batch : 0;
       if (!id || !label || !imageUrl) return null;
-      return { id, label, idea, imageUrl };
+      return { id, label, idea, imageUrl, batch };
     })
     .filter((c): c is LogoConcept => c !== null);
+}
+
+/**
+ * `{concepts, selectedId}` — the client sends back the whole pool it was
+ * shown plus which one was clicked, same convention `palette` already uses.
+ * The server never needs to remember what it last proposed.
+ */
+function parseLogoConceptPick(value: unknown): { logoConcepts: LogoConcept[]; logoConceptId: string } {
+  const v = (value ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(v.concepts) || v.concepts.length === 0) throw new Error("No logo concepts to pick from.");
+  const concepts = parseLogoConceptsList(v.concepts);
   if (concepts.length === 0) throw new Error("The logo concepts were malformed.");
 
   const selectedId = str(v.selectedId);

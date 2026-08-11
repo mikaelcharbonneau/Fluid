@@ -167,7 +167,15 @@ export function BrandChat() {
     setError(null);
     setRegenerating(true);
     setStatus(null);
-    const out = await postTurn({ brandId, step, regenerate: true }, (event) => setStatus(event.label));
+    // logoConcepts appends a fresh batch instead of replacing the pool (see
+    // the turn route) — it needs the current view (every batch shown so
+    // far), since regenerate never persists and the server's own copy is
+    // only whatever the last confirmed pick saved.
+    const value =
+      step === "logoConcepts"
+        ? { concepts: proposed?.logoConcepts ?? draft.logoConcepts ?? [] }
+        : undefined;
+    const out = await postTurn({ brandId, step, regenerate: true, value }, (event) => setStatus(event.label));
     setRegenerating(false);
     setStatus(null);
     if (out.error) {
@@ -176,7 +184,7 @@ export function BrandChat() {
     }
     setProposed(out.proposed ?? null);
     setDraftVersion((v) => v + 1);
-  }, [brandId, step]);
+  }, [brandId, step, draft, proposed]);
 
   const startOver = useCallback(() => {
     setError(null);
@@ -762,6 +770,25 @@ function AvoidWidget({ seed, busy, onSubmit }: WidgetProps) {
 function LogoConceptsWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: WidgetProps) {
   const concepts = seed.logoConcepts ?? [];
   const current = seed.logoConceptId ?? "";
+
+  // Grouped by generation round, not chunked by position — a batch can
+  // have fewer than 6 entries when a render fails, which would otherwise
+  // misalign every batch drawn after the first partial one.
+  const batches = new Map<number, typeof concepts>();
+  for (const c of concepts) {
+    const list = batches.get(c.batch);
+    if (list) list.push(c);
+    else batches.set(c.batch, [c]);
+  }
+  const batchNumbers = [...batches.keys()].sort((a, b) => a - b);
+  const latestBatch = batchNumbers[batchNumbers.length - 1] ?? 0;
+  const pickedBatch = concepts.find((c) => c.id === current)?.batch;
+
+  // This widget remounts on every turn (see ThreadMessage's `key` in the
+  // parent), so this only needs to pick the right default once: whichever
+  // batch the current pick lives in, or the newest batch just drawn.
+  const [activeTab, setActiveTab] = useState(pickedBatch ?? latestBatch);
+
   const pick = (id: string) => {
     if (busy || id === current) return;
     onSubmit({ concepts, selectedId: id });
@@ -771,10 +798,21 @@ function LogoConceptsWidget({ seed, busy, regenerating, onSubmit, onRegenerate }
     return <div style={{ fontSize: 13.5, color: MUTED }}>No concepts drawn yet — try asking again.</div>;
   }
 
+  const shown = batches.get(activeTab) ?? [];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {batchNumbers.length > 1 ? (
+        <div style={chipRow}>
+          {batchNumbers.map((b) => (
+            <button key={b} type="button" disabled={busy} onClick={() => setActiveTab(b)} style={chip(b === activeTab)}>
+              Batch {b + 1}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {concepts.map((c) => {
+        {shown.map((c) => {
           const selected = c.id === current;
           return (
             <button
