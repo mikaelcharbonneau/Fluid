@@ -111,3 +111,25 @@ export async function fetchBrand(id: string): Promise<{ brand?: BrandRow; error?
     return { error: NETWORK_ERROR };
   }
 }
+
+export interface DomainAvailability {
+  domain: string;
+  available: boolean | null;
+}
+
+/** Best-effort — a failed or unconfigured check should never block naming. */
+export async function checkDomains(domains: string[]): Promise<DomainAvailability[]> {
+  if (domains.length === 0) return [];
+  try {
+    const response = await fetch("/api/domains/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domains }),
+    });
+    if (!response.ok) return [];
+    const json = (await response.json().catch(() => ({}))) as { results?: DomainAvailability[] };
+    return json.results ?? [];
+  } catch {
+    return [];
+  }
+}
