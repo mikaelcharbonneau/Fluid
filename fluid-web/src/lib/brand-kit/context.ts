@@ -5,10 +5,14 @@
 // field here eventually gets an AI-drafted default before the user edits it
 // — see draft.ts.
 
-import type { BrandKitBrief, BrandKitLayout, BrandKitStrategy, LogoConcept, PaletteSwatch, VisualMode } from "./types";
+import { NAME_STYLES, type BrandKitBrief, type BrandKitLayout, type BrandKitStrategy, type LogoConcept, type NameCandidate, type NamePreferences, type PaletteSwatch, type VisualMode } from "./types";
 
 export interface BrandKitDraft {
+  /** Constraints for the name step below — collected right before it. */
+  namePreferences?: NamePreferences;
   name?: string;
+  /** The suggested pool — kept once generated, so re-picking or writing a custom name is free. */
+  nameCandidates?: NameCandidate[];
   brief?: string;
   category?: string;
   audience?: string;
@@ -40,8 +44,23 @@ export function draftPatch(draft: BrandKitDraft): { brandkitDraft: BrandKitDraft
 /** The plain-text context block every per-step draft call reads. */
 export function renderDraft(draft: BrandKitDraft): string {
   const lines: string[] = [];
-  if (draft.name) lines.push(`Brand name: ${draft.name}`);
   if (draft.brief) lines.push(`Brief: ${draft.brief}`);
+  if (draft.namePreferences) {
+    const p = draft.namePreferences;
+    if (p.styles.length && !p.styles.includes("all")) {
+      const names = p.styles.map((id) => NAME_STYLES.find((s) => s.id === id)?.name ?? id).join(", ");
+      lines.push(`Name style preference: ${names}`);
+    }
+    const composition = [
+      p.maxSyllables ? `up to ${p.maxSyllables} syllables` : null,
+      p.maxCharacters ? `up to ${p.maxCharacters} characters` : null,
+      p.maxWords ? `up to ${p.maxWords} words` : null,
+    ].filter((c): c is string => !!c);
+    if (composition.length) lines.push(`Name composition: ${composition.join(", ")}`);
+    if (p.blacklist.length) lines.push(`Name words to avoid: ${p.blacklist.join(", ")}`);
+    if (p.mustInclude.length) lines.push(`Name words to include: ${p.mustInclude.join(", ")}`);
+  }
+  if (draft.name) lines.push(`Brand name: ${draft.name}`);
   if (draft.category) lines.push(`Category: ${draft.category}`);
   if (draft.audience) lines.push(`Audience: ${draft.audience}`);
   if (draft.personality) lines.push(`Personality: ${draft.personality}`);

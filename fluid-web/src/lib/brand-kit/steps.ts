@@ -32,11 +32,13 @@
 // `BrandKitStrategy.logoIdea` is derived straight from whichever concept
 // gets picked (see `context.ts`'s `finalizeDraft`).
 
-import { LAYOUTS, VISUAL_MODES, type BrandKitLayout, type LogoConcept, type PaletteSwatch, type VisualMode } from "./types";
+import { LAYOUTS, NAME_STYLES, VISUAL_MODES, type BrandKitLayout, type LogoConcept, type NameCandidate, type NamePreferences, type NameStyle, type PaletteSwatch, type VisualMode } from "./types";
 import type { BrandKitDraft } from "./context";
 
 export type StepKey =
   | "brief"
+  | "namePreferences"
+  | "name"
   | "category"
   | "audience"
   | "personality"
@@ -58,6 +60,8 @@ export interface StepDef {
 
 export const STEPS: StepDef[] = [
   { key: "brief", question: "What's this, in a sentence or two?", aiDrafted: false },
+  { key: "namePreferences", question: "Any preferences for the name?", aiDrafted: false },
+  { key: "name", question: "What should we call it?", aiDrafted: true },
   { key: "category", question: "What shelf does it sit on?", aiDrafted: true },
   { key: "audience", question: "Who's this for?", aiDrafted: true },
   { key: "personality", question: "If the brand walked into a room, how would it behave?", aiDrafted: true },
@@ -74,7 +78,9 @@ const ORDER: StepKey[] = STEPS.map((s) => s.key);
 
 /** Fields each step is responsible for — used to answer and to clear forward. */
 const FIELDS_BY_STEP: Record<StepKey, Array<keyof BrandKitDraft>> = {
-  brief: ["name", "brief"],
+  brief: ["brief"],
+  namePreferences: ["namePreferences"],
+  name: ["name", "nameCandidates"],
   category: ["category"],
   audience: ["audience"],
   personality: ["personality"],
@@ -94,7 +100,11 @@ export function getStep(key: string): StepDef | undefined {
 function isAnswered(draft: BrandKitDraft, key: StepKey): boolean {
   switch (key) {
     case "brief":
-      return !!draft.name?.trim() && !!draft.brief?.trim();
+      return !!draft.brief?.trim();
+    case "namePreferences":
+      return draft.namePreferences !== undefined;
+    case "name":
+      return !!draft.name?.trim();
     case "category":
       return !!draft.category;
     case "audience":
@@ -177,6 +187,45 @@ function parsePalette(value: unknown): PaletteSwatch[] {
   return palette;
 }
 
+const NAME_STYLE_IDS = new Set(NAME_STYLES.map((s) => s.id));
+
+function parsePositiveInt(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+}
+
+/** Trimmed, deduplicated (case-insensitively), order-preserving. */
+function parseWordList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const w = item.trim();
+    if (!w || seen.has(w.toLowerCase())) continue;
+    seen.add(w.toLowerCase());
+    out.push(w);
+  }
+  return out;
+}
+
+/** Every field is optional — submitting with nothing set is a valid "no preference" answer. */
+function parseNamePreferences(value: unknown): NamePreferences {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const rawStyles = Array.isArray(v.styles) ? v.styles : [];
+  const styles = rawStyles.filter(
+    (s): s is NameStyle => typeof s === "string" && NAME_STYLE_IDS.has(s as NameStyle),
+  );
+  return {
+    styles: styles.length ? styles : ["all"],
+    maxSyllables: parsePositiveInt(v.maxSyllables),
+    maxCharacters: parsePositiveInt(v.maxCharacters),
+    maxWords: parsePositiveInt(v.maxWords),
+    blacklist: parseWordList(v.blacklist),
+    mustInclude: parseWordList(v.mustInclude),
+  };
+}
+
 /**
  * `{concepts, selectedId}` — the client sends back the whole pool it was
  * shown plus which one was clicked, same convention `palette` already uses.
@@ -205,13 +254,41 @@ function parseLogoConceptPick(value: unknown): { logoConcepts: LogoConcept[]; lo
   return { logoConcepts: concepts, logoConceptId: selectedId };
 }
 
+/**
+ * `{candidates, name}` — the client sends back the suggested pool it was
+ * shown (kept so re-picking is free) plus the chosen name, same convention
+ * `logoConcepts` uses. Unlike `logoConcepts`, the choice doesn't have to be
+ * one of the candidates — typing a custom name is always allowed, so an
+ * empty or malformed pool doesn't block the pick.
+ */
+function parseNamePick(value: unknown): { nameCandidates: NameCandidate[]; name: string } {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const raw = v.candidates;
+  const candidates = Array.isArray(raw)
+    ? raw
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const e = entry as Record<string, unknown>;
+          const name = typeof e.name === "string" ? e.name.trim() : "";
+          const why = typeof e.why === "string" ? e.why.trim() : "";
+          const domain = typeof e.domain === "string" ? e.domain.trim() : "";
+          if (!name) return null;
+          return { name, why, domain };
+        })
+        .filter((c): c is NameCandidate => c !== null)
+    : [];
+  return { nameCandidates: candidates, name: str(v.name) };
+}
+
 /** Validate and merge one step's answer into the draft. Throws on a malformed value. */
 export function applyAnswer(step: StepKey, value: unknown, draft: BrandKitDraft): BrandKitDraft {
-  const v = (value ?? {}) as Record<string, unknown>;
-
   switch (step) {
     case "brief":
-      return { ...draft, name: str(v.name), brief: str(v.brief) };
+      return { ...draft, brief: str(value) };
+    case "namePreferences":
+      return { ...draft, namePreferences: parseNamePreferences(value) };
+    case "name":
+      return { ...draft, ...parseNamePick(value) };
     case "category":
       return { ...draft, category: str(value) };
     case "audience":
