@@ -5,13 +5,36 @@ import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
 import { generateStepDraft, inferStrategySignals } from "@/lib/brand-kit/draft";
 import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
+import type { LogoConcept } from "@/lib/brand-kit/types";
 import { generateNameCandidates } from "@/lib/brand-kit/names";
 import { draftPatch, finalizeDraft, readDraft, type BrandKitDraft } from "@/lib/brand-kit/context";
-import { applyAnswer, clearFrom, getStep, nextStep } from "@/lib/brand-kit/steps";
+import { applyAnswer, clearFrom, getStep, nextStep, parseLogoConceptsList } from "@/lib/brand-kit/steps";
 import type { Activity } from "@/lib/ai/activity";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+// "Ask again" on logoConcepts appends a fresh batch rather than replacing
+// the pool — every batch stays pickable, grouped into tabs in the widget
+// (see BrandChat.tsx's LogoConceptsWidget). Each concept's id and storage
+// slot are already globally unique (logo-concepts.ts), so batches never
+// collide; this is just what keeps earlier batches in the array at all.
+//
+// `existing` comes from the client's current view (see the regenerate
+// branch below), not from `draft.logoConcepts` — regenerate never
+// persists, so the database only has whatever the last confirmed *pick*
+// saved. Reading from the draft here would silently drop every batch
+// shown since then on the second "Ask again" of a session.
+async function proposeLogoConcepts(
+  existing: LogoConcept[],
+  draft: BrandKitDraft,
+  brandId: string,
+  activity: Activity,
+): Promise<LogoConcept[]> {
+  const nextBatch = existing.length ? Math.max(...existing.map((c) => c.batch)) + 1 : 0;
+  const fresh = await generateLogoConcepts(draft, brandId, activity, nextBatch);
+  return [...existing, ...fresh];
+}
 
 // POST /api/brand-kit/turn — advance the stepper by one step.
 //
@@ -242,12 +265,24 @@ export async function POST(request: Request) {
         { status: 402 },
       );
     }
+    // The client's current view — every batch shown so far, not just what
+    // the database has — so a second "Ask again" in the same session
+    // appends onto the first instead of silently dropping it.
+    const existingConcepts = parseLogoConceptsList((body.value as { concepts?: unknown } | undefined)?.concepts);
+
     return streamActivity(
       async (activity: Activity) => {
         const enrichedDraft = await ensureStrategySignals(draft, activity);
         const proposed =
           step.key === "logoConcepts"
-            ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
+            ? {
+                logoConcepts: await proposeLogoConcepts(
+                  existingConcepts.length ? existingConcepts : (enrichedDraft.logoConcepts ?? []),
+                  enrichedDraft,
+                  finalBrandId,
+                  activity,
+                ),
+              }
             : step.key === "name"
               ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
               : await generateStepDraft(step.key, enrichedDraft, activity);
@@ -295,7 +330,7 @@ export async function POST(request: Request) {
       const enrichedDraft = await ensureStrategySignals(draft, activity);
       const proposed =
         target.key === "logoConcepts"
-          ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
+          ? { logoConcepts: await proposeLogoConcepts(enrichedDraft.logoConcepts ?? [], enrichedDraft, finalBrandId, activity) }
           : target.key === "name"
             ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
             : await generateStepDraft(target.key, enrichedDraft, activity);

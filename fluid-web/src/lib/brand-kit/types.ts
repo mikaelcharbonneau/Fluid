@@ -119,6 +119,13 @@ export interface LogoConcept {
   /** One-sentence rationale for the construction. */
   idea: string;
   imageUrl: string;
+  /**
+   * Which "Ask again" round this came from (0 = the first draw). Explicit
+   * rather than inferred from array position, because a batch can have
+   * fewer than 6 entries when a render fails — grouping by fixed chunks of
+   * 6 would misalign every batch after the first partial one.
+   */
+  batch: number;
 }
 
 /** The model's strategy read, before any image gets drawn. */

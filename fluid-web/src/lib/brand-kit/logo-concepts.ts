@@ -128,6 +128,7 @@ export async function generateLogoConcepts(
   draft: BrandKitDraft,
   brandId: string,
   activity: Activity,
+  batch = 0,
 ): Promise<LogoConcept[]> {
   activity.emit("note", "Planning 6 logo directions (brandkit skill)");
   const plan = await runBrandKitSkill({
@@ -152,12 +153,20 @@ export async function generateLogoConcepts(
   activity.emit("note", `Drawing ${plan.length} logo concepts with ${IMAGE_MODEL} (medium quality)`);
 
   const settled = await Promise.allSettled(
-    plan.map(async (concept, i): Promise<LogoConcept> => {
+    plan.map(async (concept): Promise<LogoConcept> => {
+      // Globally unique, not positional: "Ask again" appends a fresh batch
+      // to whatever's already been generated (see the turn route). A
+      // positional slot like the old `String(i)` would collide with the
+      // same slot in every earlier batch — since storage uploads upsert,
+      // that silently overwrote an earlier batch's *stored image* at the
+      // same path, so an old pick's imageUrl would start serving the new
+      // batch's artwork even though nothing about the pick itself changed.
+      const uniqueId = crypto.randomUUID();
       const prompt = conceptPrompt({ name, category, palette, avoid, concept });
       const image = await renderLogoImage({
         brandId,
         phase: "brandkit-logo-concepts",
-        slot: String(i),
+        slot: uniqueId,
         prompt,
         quality: RENDER_QUALITY,
         timeoutMs: RENDER_TIMEOUT_MS,
@@ -165,7 +174,7 @@ export async function generateLogoConcepts(
           activity.emit("prompt", `Prompt for "${concept.label}" (${model})`, sent);
         },
       });
-      return { id: `concept-${i}`, label: concept.label, idea: concept.idea, imageUrl: image.url };
+      return { id: `concept-${uniqueId}`, label: concept.label, idea: concept.idea, imageUrl: image.url, batch };
     }),
   );
 
