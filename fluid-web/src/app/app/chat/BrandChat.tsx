@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { fetchBrand, postTurn, type TurnResult } from "./api";
+import { checkDomains, fetchBrand, postTurn, type TurnResult } from "./api";
 import { ThinkingOrb } from "./ThinkingOrb";
 import {
   CARD, DISPLAY, FAINT, HAIRLINE, INK, MONO, MUTED, PAPER, chip, cta, label, panel,
@@ -517,6 +517,26 @@ function NamePreferencesWidget({ seed, busy, onSubmit }: WidgetProps) {
   );
 }
 
+// undefined = not checked yet, null = the check itself failed for this domain.
+type DomainStatus = boolean | null | undefined;
+
+function DomainBadge({ domain, status }: { domain: string; status: DomainStatus }) {
+  const dot = { width: 6, height: 6, borderRadius: 99, flex: "0 0 auto" as const };
+  if (status === undefined) {
+    return <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT, whiteSpace: "nowrap" }}>{domain}</span>;
+  }
+  if (status === null) {
+    // Unconfigured or the check failed — say nothing rather than guess.
+    return <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT, whiteSpace: "nowrap" }}>{domain}</span>;
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10, whiteSpace: "nowrap" }}>
+      <span style={{ ...dot, background: status ? "#16A34A" : "rgba(0,0,0,.22)" }} />
+      <span style={{ color: status ? "#16A34A" : FAINT }}>{domain}</span>
+    </span>
+  );
+}
+
 function NameWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: WidgetProps) {
   const [custom, setCustom] = useState("");
   const candidates = seed.nameCandidates ?? [];
@@ -526,6 +546,26 @@ function NameWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: Widget
     if (busy) return;
     onSubmit({ candidates, name });
   };
+
+  const domains = candidates.map((n) => n.domain).filter(Boolean);
+  const domainsKey = domains.join(",");
+  const [availability, setAvailability] = useState<Record<string, DomainStatus>>({});
+  useEffect(() => {
+    if (!domains.length) return;
+    let live = true;
+    checkDomains(domains).then((results) => {
+      if (!live) return;
+      setAvailability((cur) => {
+        const next = { ...cur };
+        for (const r of results) next[r.domain] = r.available;
+        return next;
+      });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainsKey]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -553,9 +593,7 @@ function NameWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: Widget
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: MUTED, lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {n.why}
                 </span>
-                {n.domain ? (
-                  <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT, whiteSpace: "nowrap", flex: "0 0 auto" }}>{n.domain}</span>
-                ) : null}
+                {n.domain ? <DomainBadge domain={n.domain} status={availability[n.domain]} /> : null}
               </button>
             );
           })}
