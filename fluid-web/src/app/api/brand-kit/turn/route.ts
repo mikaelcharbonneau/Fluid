@@ -5,6 +5,7 @@ import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
 import { generateStepDraft, inferStrategySignals } from "@/lib/brand-kit/draft";
 import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
+import { generateNameCandidates } from "@/lib/brand-kit/names";
 import { draftPatch, finalizeDraft, readDraft, type BrandKitDraft } from "@/lib/brand-kit/context";
 import { applyAnswer, clearFrom, getStep, nextStep } from "@/lib/brand-kit/steps";
 import type { Activity } from "@/lib/ai/activity";
@@ -81,13 +82,15 @@ export async function POST(request: Request) {
     if (brandId) {
       const { error: updateError } = await supabase
         .from("brands")
-        .update({ name: draft.name, brief: draft.brief })
+        .update({ brief: draft.brief })
         .eq("id", brandId);
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
     } else {
+      // `name` isn't known yet — the AI suggests it in the next step. The
+      // column defaults to 'Untitled brand' until that's answered.
       const { data: created, error: createError } = await supabase
         .from("brands")
-        .insert({ name: draft.name, brief: draft.brief, status: "draft", user_id: user.id })
+        .insert({ brief: draft.brief, status: "draft", user_id: user.id })
         .select("id")
         .single();
       if (createError || !created) {
@@ -134,6 +137,12 @@ export async function POST(request: Request) {
       });
       if (saveError) {
         return NextResponse.json({ error: `Your answer could not be saved: ${saveError.message}` }, { status: 500 });
+      }
+      // The display name lives on the row itself (brand cards, search), not
+      // just inside the jsonb draft — every other step only needs the latter.
+      if (step.key === "name") {
+        const { error: nameError } = await supabase.from("brands").update({ name: draft.name }).eq("id", brandId);
+        if (nameError) return NextResponse.json({ error: nameError.message }, { status: 500 });
       }
     }
   }
@@ -239,7 +248,9 @@ export async function POST(request: Request) {
         const proposed =
           step.key === "logoConcepts"
             ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
-            : await generateStepDraft(step.key, enrichedDraft, activity);
+            : step.key === "name"
+              ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
+              : await generateStepDraft(step.key, enrichedDraft, activity);
         await spendTokens(user.id, cost);
         return { done: false, brandId: finalBrandId, step: step.key, draft: enrichedDraft, proposed };
       },
@@ -285,7 +296,9 @@ export async function POST(request: Request) {
       const proposed =
         target.key === "logoConcepts"
           ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
-          : await generateStepDraft(target.key, enrichedDraft, activity);
+          : target.key === "name"
+            ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
+            : await generateStepDraft(target.key, enrichedDraft, activity);
       await spendTokens(user.id, cost);
       return { done: false, brandId: finalBrandId, step: target.key, draft: enrichedDraft, proposed };
     },

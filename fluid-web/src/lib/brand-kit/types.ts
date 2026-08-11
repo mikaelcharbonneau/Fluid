@@ -53,6 +53,47 @@ export const VISUAL_MODES: Array<{ id: VisualMode; name: string; note: string }>
   { id: "edgy", name: "Edgy", note: "Raw high-contrast texture, distressed type, rebellious and unpolished." },
 ];
 
+export type NameStyle =
+  | "all"
+  | "brandable"
+  | "evocative"
+  | "short-phrase"
+  | "compound"
+  | "alternate-spelling"
+  | "non-english"
+  | "real-words";
+
+export const NAME_STYLES: Array<{ id: NameStyle; name: string; example: string }> = [
+  { id: "all", name: "All styles", example: "No preference" },
+  { id: "brandable", name: "Brandable", example: "e.g. Google, Rolex" },
+  { id: "evocative", name: "Evocative", example: "e.g. Red Bull, Forever 21" },
+  { id: "short-phrase", name: "Short phrase", example: "e.g. Dollar Shave Club" },
+  { id: "compound", name: "Compound words", example: "e.g. FedEx, Microsoft" },
+  { id: "alternate-spelling", name: "Alternate spelling", example: "e.g. Lyft, Fiverr" },
+  { id: "non-english", name: "Non-English words", example: "e.g. Toyota, Audi" },
+  { id: "real-words", name: "Real words", example: "e.g. Apple, Amazon" },
+];
+
+/** The user's naming constraints, collected right before names are drafted. */
+export interface NamePreferences {
+  /** Defaults to `["all"]` — no style preference. */
+  styles: NameStyle[];
+  maxSyllables?: number;
+  maxCharacters?: number;
+  maxWords?: number;
+  blacklist: string[];
+  mustInclude: string[];
+}
+
+/** One AI-suggested brand-name candidate. */
+export interface NameCandidate {
+  name: string;
+  /** One sentence of strategic reasoning — why it fits, or a weakness worth knowing. */
+  why: string;
+  /** A domain worth checking. Availability is never claimed — the model can't check a registry. */
+  domain: string;
+}
+
 /** What the user actually gives us. */
 export interface BrandKitBrief {
   name: string;

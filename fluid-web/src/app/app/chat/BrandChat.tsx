@@ -37,8 +37,8 @@ import {
   Assets, Chevron, Close, Download, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
 } from "./icons";
 import { AVOIDS } from "./data";
-import { CATEGORIES, LAYOUTS, VISUAL_MODES } from "@/lib/brand-kit/types";
-import type { BrandKitResult, PaletteSwatch, VisualMode } from "@/lib/brand-kit/types";
+import { CATEGORIES, LAYOUTS, NAME_STYLES, VISUAL_MODES } from "@/lib/brand-kit/types";
+import type { BrandKitResult, NameStyle, PaletteSwatch, VisualMode } from "@/lib/brand-kit/types";
 import { STEPS, type StepKey } from "@/lib/brand-kit/steps";
 import type { BrandKitDraft } from "@/lib/brand-kit/context";
 import "./chat.css";
@@ -277,6 +277,10 @@ function Widget(props: WidgetProps & { stepKey: StepKey }) {
   switch (stepKey) {
     case "brief":
       return <BriefWidget {...common} />;
+    case "namePreferences":
+      return <NamePreferencesWidget {...common} />;
+    case "name":
+      return <NameWidget {...common} />;
     case "category":
       return <ChoiceWidget {...common} field="category" options={CATEGORIES.map((c) => ({ id: c, name: c }))} />;
     case "audience":
@@ -331,17 +335,12 @@ function AskAgain({ onClick, busy }: { onClick: () => void; busy: boolean }) {
 // ---- widgets --------------------------------------------------------
 
 function BriefWidget({ seed, busy, onSubmit }: WidgetProps) {
-  const [name, setName] = useState(seed.name ?? "");
   const [brief, setBrief] = useState(seed.brief ?? "");
-  const canSubmit = !!name.trim() && !!brief.trim() && !busy;
-  const submit = () => canSubmit && onSubmit({ name: name.trim(), brief: brief.trim() });
+  const canSubmit = !!brief.trim() && !busy;
+  const submit = () => canSubmit && onSubmit(brief.trim());
 
   return (
     <div style={panel()}>
-      <div style={fieldGroup}>
-        <span style={label}>Brand name</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Northwind" disabled={busy} style={inputStyle} />
-      </div>
       <div style={fieldGroup}>
         <span style={label}>Brief</span>
         <textarea
@@ -356,6 +355,232 @@ function BriefWidget({ seed, busy, onSubmit }: WidgetProps) {
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <SendButton enabled={canSubmit} onClick={submit} />
       </div>
+    </div>
+  );
+}
+
+function TagInput({
+  fieldLabel, placeholder, tags, onChange, busy,
+}: {
+  fieldLabel: string;
+  placeholder: string;
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  busy: boolean;
+}) {
+  const [value, setValue] = useState("");
+  const add = () => {
+    const v = value.trim();
+    if (!v || tags.includes(v)) {
+      setValue("");
+      return;
+    }
+    onChange([...tags, v]);
+    setValue("");
+  };
+  const remove = (t: string) => onChange(tags.filter((x) => x !== t));
+
+  return (
+    <div style={fieldGroup}>
+      <span style={label}>{fieldLabel}</span>
+      {tags.length ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {tags.map((t) => (
+            <span
+              key={t}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 8px 5px 10px",
+                borderRadius: 999, background: PAPER, boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+                fontSize: 12.5, color: INK,
+              }}
+            >
+              {t}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => remove(t)}
+                aria-label={`Remove ${t}`}
+                style={{ display: "inline-flex", color: FAINT, padding: 0 }}
+              >
+                <Close size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            add();
+          }
+        }}
+        placeholder={placeholder}
+        disabled={busy}
+        style={inputStyle}
+      />
+    </div>
+  );
+}
+
+function NamePreferencesWidget({ seed, busy, onSubmit }: WidgetProps) {
+  const existing = seed.namePreferences;
+  const [styles, setStyles] = useState<NameStyle[]>(existing?.styles ?? ["all"]);
+  const [maxSyllables, setMaxSyllables] = useState(existing?.maxSyllables ? String(existing.maxSyllables) : "");
+  const [maxCharacters, setMaxCharacters] = useState(existing?.maxCharacters ? String(existing.maxCharacters) : "");
+  const [maxWords, setMaxWords] = useState(existing?.maxWords ? String(existing.maxWords) : "");
+  const [blacklist, setBlacklist] = useState<string[]>(existing?.blacklist ?? []);
+  const [mustInclude, setMustInclude] = useState<string[]>(existing?.mustInclude ?? []);
+
+  const toggleStyle = (s: NameStyle) => {
+    if (s === "all") {
+      setStyles(["all"]);
+      return;
+    }
+    setStyles((cur) => {
+      const without = cur.filter((c) => c !== "all");
+      return without.includes(s) ? without.filter((c) => c !== s) : [...without, s];
+    });
+  };
+
+  const submit = () => {
+    if (busy) return;
+    onSubmit({
+      styles,
+      maxSyllables: maxSyllables.trim() ? Number(maxSyllables) : undefined,
+      maxCharacters: maxCharacters.trim() ? Number(maxCharacters) : undefined,
+      maxWords: maxWords.trim() ? Number(maxWords) : undefined,
+      blacklist,
+      mustInclude,
+    });
+  };
+
+  return (
+    <div style={{ ...panel(), gap: 18 }}>
+      <div style={fieldGroup}>
+        <span style={label}>Name style</span>
+        <div style={chipRow}>
+          {NAME_STYLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              disabled={busy}
+              onClick={() => toggleStyle(s.id)}
+              title={s.example}
+              style={chip(styles.includes(s.id))}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={fieldGroup}>
+        <span style={label}>Name composition</span>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>Max syllables</span>
+            <input
+              type="number" min={1} value={maxSyllables}
+              onChange={(e) => setMaxSyllables(e.target.value)}
+              placeholder="Any" disabled={busy} style={inputStyle}
+            />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>Max characters</span>
+            <input
+              type="number" min={1} value={maxCharacters}
+              onChange={(e) => setMaxCharacters(e.target.value)}
+              placeholder="Any" disabled={busy} style={inputStyle}
+            />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>Max words</span>
+            <input
+              type="number" min={1} value={maxWords}
+              onChange={(e) => setMaxWords(e.target.value)}
+              placeholder="Any" disabled={busy} style={inputStyle}
+            />
+          </div>
+        </div>
+      </div>
+
+      <TagInput fieldLabel="Blacklisted words" placeholder="Type a word, press Enter…" tags={blacklist} onChange={setBlacklist} busy={busy} />
+      <TagInput fieldLabel="Words to use exclusively" placeholder="Type a word, press Enter…" tags={mustInclude} onChange={setMustInclude} busy={busy} />
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <SendButton enabled={!busy} onClick={submit} />
+      </div>
+    </div>
+  );
+}
+
+function NameWidget({ seed, busy, regenerating, onSubmit, onRegenerate }: WidgetProps) {
+  const [custom, setCustom] = useState("");
+  const candidates = seed.nameCandidates ?? [];
+  const canSubmitCustom = !!custom.trim() && !busy;
+  const submitCustom = () => canSubmitCustom && onSubmit({ candidates, name: custom.trim() });
+  const pick = (name: string) => {
+    if (busy) return;
+    onSubmit({ candidates, name });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {candidates.length ? (
+        <div style={{ background: CARD, borderRadius: 18, boxShadow: `0 2px 6px rgba(0,0,0,.06), inset 0 0 0 1px ${HAIRLINE}`, overflow: "hidden" }}>
+          {candidates.map((n, i) => {
+            const selected = seed.name === n.name;
+            return (
+              <button
+                key={n.name}
+                type="button"
+                disabled={busy}
+                onClick={() => pick(n.name)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", width: "100%",
+                  borderTop: i > 0 ? `1px solid ${HAIRLINE}` : undefined,
+                  background: selected ? PAPER : "transparent",
+                  boxShadow: selected ? `inset 3px 0 0 ${INK}` : undefined,
+                  textAlign: "left", cursor: busy ? "default" : "pointer",
+                }}
+              >
+                <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 17, letterSpacing: "-0.02em", color: INK, flex: "0 0 auto" }}>
+                  {n.name}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: MUTED, lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {n.why}
+                </span>
+                {n.domain ? (
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT, whiteSpace: "nowrap", flex: "0 0 auto" }}>{n.domain}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 6, paddingLeft: 14, borderRadius: 14, background: CARD, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }}>
+        <span style={{ fontSize: 11.5, color: MUTED, whiteSpace: "nowrap" }}>Or write your own</span>
+        <input
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitCustom();
+            }
+          }}
+          placeholder="Type a name…"
+          disabled={busy}
+          style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", fontFamily: DISPLAY, fontSize: 15, fontWeight: 700, letterSpacing: "-0.015em", color: INK, padding: "8px 0" }}
+        />
+        <SendButton enabled={canSubmitCustom} onClick={submitCustom} />
+      </div>
+
+      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
     </div>
   );
 }
@@ -542,12 +767,30 @@ function LogoConceptsWidget({ seed, busy, regenerating, onSubmit, onRegenerate }
   );
 }
 
+function summarizeNamePreferences(p: WidgetProps["seed"]["namePreferences"]): string {
+  if (!p) return "No preference";
+  const parts: string[] = [];
+  if (p.styles.length && !p.styles.includes("all")) {
+    parts.push(p.styles.map((id) => NAME_STYLES.find((s) => s.id === id)?.name ?? id).join(", "));
+  }
+  const composition = [
+    p.maxSyllables ? `≤${p.maxSyllables} syllables` : null,
+    p.maxCharacters ? `≤${p.maxCharacters} chars` : null,
+    p.maxWords ? `≤${p.maxWords} words` : null,
+  ].filter((c): c is string => !!c);
+  if (composition.length) parts.push(composition.join(", "));
+  if (p.blacklist.length) parts.push(`avoid: ${p.blacklist.join(", ")}`);
+  if (p.mustInclude.length) parts.push(`include: ${p.mustInclude.join(", ")}`);
+  return parts.length ? parts.join(" · ") : "No preference";
+}
+
 function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
   const chosenLogo = seed.logoConcepts?.find((c) => c.id === seed.logoConceptId);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ ...panel(), gap: 10 }}>
         <Row k="Name" v={seed.name ?? ""} />
+        <Row k="Name preferences" v={summarizeNamePreferences(seed.namePreferences)} />
         <Row k="Category" v={seed.category ?? ""} />
         <Row k="Audience" v={seed.audience ?? ""} />
         <Row k="Personality" v={seed.personality ?? ""} />
