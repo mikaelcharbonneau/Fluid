@@ -3,20 +3,23 @@
 //
 // Chosen to cover every bullet in the skill's "BRAND STRATEGY FIRST" list
 // without going back to twenty screens — related bullets share one step with
-// clearly labeled sub-fields (e.g. `personality` asks for both the traits and
-// the emotional promise in one screen).
+// clearly labeled sub-fields.
 //
 // Two exceptions:
 //
-// `culturalPosition`/`trustLevel` (the skill's "cultural position" and
-// "trust level" bullets) are not a chat step at all. They turned out to be
-// the one pairing that didn't earn a dedicated screen — no concrete visual
-// lever the way category/palette/visualMode have, and heavily redundant
-// with `personality`/`emotionalPromise`. Rather than drop them (and the
-// skill's own checklist) entirely, they're inferred silently — see
-// `draft.ts`'s `inferPositioning` and its call site in the turn route —
-// right after `personality` is confirmed, so every step after it still
-// sees them in context exactly as if they'd been asked.
+// `emotionalPromise`/`culturalPosition`/`trustLevel` (the skill's "what
+// feeling", "cultural position" and "trust level" bullets) are not a chat
+// step at all. `emotionalPromise` used to be asked alongside `personality`,
+// but it's abstract marketing-speak to anyone who isn't a designer — "what
+// feeling does this promise" is a harder question than just describing how
+// the brand behaves, and the answer is largely implied by `personality`
+// anyway. `culturalPosition`/`trustLevel` never earned a dedicated screen
+// either — no concrete visual lever the way category/palette/visualMode
+// have. Rather than drop any of them (and the skill's own checklist)
+// entirely, all three are inferred silently — see `draft.ts`'s
+// `inferStrategySignals` and its call site in the turn route — right after
+// `personality` is confirmed, so every step after it still sees them in
+// context exactly as if they'd been asked.
 //
 // `coreMetaphor`/`logoIdea` used to be a step too, asking the user to
 // pre-describe the logo in text before any image existed. Once
@@ -57,11 +60,7 @@ export const STEPS: StepDef[] = [
   { key: "brief", question: "What's this, in a sentence or two?", aiDrafted: false },
   { key: "category", question: "What shelf does it sit on?", aiDrafted: true },
   { key: "audience", question: "Who's this for?", aiDrafted: true },
-  {
-    key: "personality",
-    question: "If the brand walked into a room, how would it behave — and what does it promise people will feel?",
-    aiDrafted: true,
-  },
+  { key: "personality", question: "If the brand walked into a room, how would it behave?", aiDrafted: true },
   { key: "visualMode", question: "Which visual world does this belong to?", aiDrafted: true },
   { key: "palette", question: "What's the palette?", aiDrafted: true },
   { key: "avoid", question: "Anything that must never show up?", aiDrafted: false },
@@ -78,7 +77,7 @@ const FIELDS_BY_STEP: Record<StepKey, Array<keyof BrandKitDraft>> = {
   brief: ["name", "brief"],
   category: ["category"],
   audience: ["audience"],
-  personality: ["personality", "emotionalPromise"],
+  personality: ["personality"],
   visualMode: ["visualMode"],
   palette: ["palette"],
   avoid: ["avoid"],
@@ -101,7 +100,7 @@ function isAnswered(draft: BrandKitDraft, key: StepKey): boolean {
     case "audience":
       return !!draft.audience;
     case "personality":
-      return !!draft.personality && !!draft.emotionalPromise;
+      return !!draft.personality;
     case "visualMode":
       return !!draft.visualMode;
     case "palette":
@@ -133,9 +132,10 @@ const PERSONALITY_IDX = ORDER.indexOf("personality");
  * were built from context that just changed. Mirrors the old flow's
  * "re-answering truncates what depended on it" rule.
  *
- * `culturalPosition`/`trustLevel` aren't tied to a step (see the file
- * header note) but are inferred from `personality`, so they're cleared
- * under the same condition as everything else that depends on it.
+ * `emotionalPromise`/`culturalPosition`/`trustLevel` aren't tied to a step
+ * (see the file header note) but are inferred from `personality`, so
+ * they're cleared under the same condition as everything else that depends
+ * on it.
  */
 export function clearFrom(draft: BrandKitDraft, key: StepKey): BrandKitDraft {
   const idx = ORDER.indexOf(key);
@@ -146,6 +146,7 @@ export function clearFrom(draft: BrandKitDraft, key: StepKey): BrandKitDraft {
     }
   }
   if (idx <= PERSONALITY_IDX) {
+    delete next.emotionalPromise;
     delete next.culturalPosition;
     delete next.trustLevel;
   }
@@ -216,7 +217,7 @@ export function applyAnswer(step: StepKey, value: unknown, draft: BrandKitDraft)
     case "audience":
       return { ...draft, audience: str(value) };
     case "personality":
-      return { ...draft, personality: str(v.personality), emotionalPromise: str(v.emotionalPromise) };
+      return { ...draft, personality: str(value) };
     case "visualMode": {
       const mode = str(value);
       if (!VISUAL_MODE_IDS.has(mode as VisualMode)) throw new Error("Unknown visual mode.");

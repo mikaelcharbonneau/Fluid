@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { streamActivity } from "@/lib/sse";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
-import { generateStepDraft, inferPositioning } from "@/lib/brand-kit/draft";
+import { generateStepDraft, inferStrategySignals } from "@/lib/brand-kit/draft";
 import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
 import { draftPatch, finalizeDraft, readDraft, type BrandKitDraft } from "@/lib/brand-kit/context";
 import { applyAnswer, clearFrom, getStep, nextStep } from "@/lib/brand-kit/steps";
@@ -140,20 +140,20 @@ export async function POST(request: Request) {
 
   const finalBrandId = brandId;
 
-  // culturalPosition/trustLevel aren't a chat step (see steps.ts) — inferred
-  // silently, once, right after personality is confirmed. A no-op once
-  // they're already set. Called at every point that needs a complete draft
-  // so it's never possible to reach `review` without them regardless of
-  // exactly which turn first crossed that threshold.
-  const ensurePositioning = async (current: BrandKitDraft, activity: Activity): Promise<BrandKitDraft> => {
+  // emotionalPromise/culturalPosition/trustLevel aren't a chat step (see
+  // steps.ts) — inferred silently, once, right after personality is
+  // confirmed. A no-op once they're already set. Called at every point that
+  // needs a complete draft so it's never possible to reach `review` without
+  // them regardless of exactly which turn first crossed that threshold.
+  const ensureStrategySignals = async (current: BrandKitDraft, activity: Activity): Promise<BrandKitDraft> => {
     if (!current.personality || current.culturalPosition) return current;
-    const positioning = await inferPositioning(current, activity);
-    const next = { ...current, ...positioning };
+    const signals = await inferStrategySignals(current, activity);
+    const next = { ...current, ...signals };
     const { error } = await supabase.rpc("brands_merge_data", {
       p_id: finalBrandId,
       p_patch: draftPatch(next),
     });
-    if (error) activity.emit("warn", "Inferred positioning could not be saved for next time.", error.message);
+    if (error) activity.emit("warn", "Inferred brand signals could not be saved for next time.", error.message);
     return next;
   };
 
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
 
     return streamActivity(
       async (activity: Activity) => {
-        const enrichedDraft = await ensurePositioning(draft, activity);
+        const enrichedDraft = await ensureStrategySignals(draft, activity);
         let finalized: ReturnType<typeof finalizeDraft>;
         try {
           finalized = finalizeDraft(enrichedDraft);
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
     }
     return streamActivity(
       async (activity: Activity) => {
-        const enrichedDraft = await ensurePositioning(draft, activity);
+        const enrichedDraft = await ensureStrategySignals(draft, activity);
         const proposed =
           step.key === "logoConcepts"
             ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }
@@ -281,7 +281,7 @@ export async function POST(request: Request) {
 
   return streamActivity(
     async (activity: Activity) => {
-      const enrichedDraft = await ensurePositioning(draft, activity);
+      const enrichedDraft = await ensureStrategySignals(draft, activity);
       const proposed =
         target.key === "logoConcepts"
           ? { logoConcepts: await generateLogoConcepts(enrichedDraft, finalBrandId, activity) }

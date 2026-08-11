@@ -6720,22 +6720,22 @@ const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, l
 // partial flow. `?mode=<id>` is read by BrandChat.tsx to preselect the chip.
 const QUICK_VISUAL_MODES = [
   {
-    id: 'dark-security', title: 'Security', sub: 'Shield forms, radar lines, vigilant and precise.',
-    preview: 'assets/min/preview-rebranding.jpg', previewBg: '#EC4C34',
-    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" /></svg>,
-  },
-  {
-    id: 'voice', title: 'Voice', sub: 'Waveform, mic motif, fluid and intimate.',
-    preview: 'assets/min/preview-logo.jpg', previewBg: '#1E6BF5',
+    id: 'minimal', title: 'Minimal', sub: 'Negative space, one accent color, precise and confident.',
+    preview: 'assets/min/preview-rebranding.jpg', previewBg: '#F3F3F4',
     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>,
   },
   {
+    id: 'playful', title: 'Playful', sub: 'Saturated color, chunky shapes, energetic and fun.',
+    preview: 'assets/min/preview-logo.jpg', previewBg: '#EC4C34',
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" /></svg>,
+  },
+  {
     id: 'luxury', title: 'Luxury', sub: 'Serif wordmark, embossing, tasteful and expensive.',
-    preview: 'assets/min/preview-name.jpg', previewBg: '#F3F3F4',
+    preview: 'assets/min/preview-name.jpg', previewBg: '#2A2420',
     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>,
   },
   {
-    id: 'dark-developer', title: 'Developer', sub: 'Terminal windows, prompt bars, sharp and builder-native.',
+    id: 'futuristic', title: 'Futuristic', sub: 'Electric accent, sharp geometry, advanced and precise.',
     preview: 'assets/min/preview-guidelines.jpg', previewBg: '#0E0F12',
     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>,
   },

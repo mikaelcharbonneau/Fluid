@@ -338,194 +338,235 @@ This layout should feel like a premium mini-deck.
 
 # VISUAL MODES
 
-Choose based on the brand.
+Choose based on the look and feeling the brand wants — not the industry it's
+in. These are style archetypes, not use-case buckets: a nonprofit and a SaaS
+product can both legitimately choose "Playful" if that's the right fit.
+Pick the one whose visual cues and mood best match the brand's personality
+and audience.
 
-## Dark Developer / Builder
+## Minimal
 
-Use for:
-developer tools, coding agents, infra, automation, AI builders.
+Quiet, restrained, negative-space-led. The design does less so the one idea
+in it reads clearly.
 
 Visual cues:
-- near-black panels
-- monospace accents
-- command lines
-- terminal windows
-- prompt bars
-- subtle grid
-- cyan, blue, coral, or lime accents
-- pixel or CRT texture if appropriate
+- abundant white or near-white space
+- one confident accent color, used sparingly
+- thin precise rules and alignment marks
+- simple geometric or typographic forms
+- flat surfaces, no texture or noise
+- generous margins, quiet grid
 
 Logo logic:
-- cursor + frame
-- bolt + build speed
-- scaffold + monogram
-- terminal glyph + symbol
-- modular construction mark
+- single reductive geometric mark
+- clean monogram
+- one deliberate cut or negative-space move
+- restrained wordmark
 
 Mood:
-precise, sharp, confident, builder-native.
+calm, precise, confident, uncluttered.
 
 ---
 
-## Dark Product / Operator
+## Playful
 
-Use for:
-business tools, growth tools, sales agents, automation, productivity.
+Saturated, energetic, and confident. The design wants to be noticed and
+enjoyed.
 
 Visual cues:
-- black / dark red / amber
-- glowing UI chips
-- card systems
-- segmented flows
-- icon rows
-- reward/progress motifs
-- minimal hero text
+- saturated primary or candy colors
+- oversized rounded shapes
+- chunky, confident display type
+- illustrated or graphic icon marks
+- energetic, asymmetric layouts
+- occasional pattern or confetti texture
 
 Logo logic:
-- signal, gift, path, operator mark, switch, loop, command system
+- rounded geometric mascot or icon
+- stacked chunky wordmark
+- shape-based mark with obvious personality
+- simple illustrated symbol
 
 Mood:
-fast, operational, tactical, premium.
+fun, energetic, approachable, confident.
 
 ---
 
-## Dark Nature / Calm System
+## Organic
 
-Use for:
-strategy, travel, wellness, climate, quiet premium SaaS.
+Earthy, organic, grounded. The design feels handled by people, not machines.
 
 Visual cues:
-- deep green
-- lime accent
-- misty landscapes
-- image UI circles
-- soft overlays
-- calm page labels
-- dark editorial grid
+- earthy palette: terracotta, sage, clay, cream, walnut
+- organic, hand-drawn or botanical linework
+- soft natural light, gentle shadow
+- textured paper or linen backgrounds
+- rounded, human forms
+- imagery of plants, materials, or landscapes
 
 Logo logic:
-- path, leaf, moon, horizon, compass, portal, folded mark
+- botanical or organic-form mark
+- hand-touched monogram
+- simple line-drawn symbol
+- earthy, grounded wordmark
 
 Mood:
-calm, trustworthy, focused.
+grounded, approachable, honest, calm.
 
 ---
 
-## Dark Security / Threat Intelligence
+## Luxury
 
-Use for:
-security, compliance, monitoring, network products.
+Refined and expensive-feeling through restraint, not decoration.
 
 Visual cues:
-- black/navy
-- shield forms
-- radar lines
-- threat labels
-- subtle motion traces
-- red/blue alert chips
-- controlled gradients
+- ivory, black, and gold, or deep jewel tones
+- fine serif wordmark
+- generous negative space
+- subtle embossing or foil-like detail
+- refined material textures (marble, silk, brass)
+- editorial, restrained imagery
 
 Logo logic:
-- shield, raptor, eye, watch, boundary, protected core
+- refined monogram or crest
+- fine-line symbolic mark
+- elegant typographic wordmark
 
 Mood:
-serious, vigilant, precise.
+tasteful, expensive, adult, understated.
 
 ---
 
-## Light Editorial / Compliance
+## Retro
 
-Use for:
-legal, privacy, compliance, documents, trust brands.
+Warm nostalgia drawn from mid-century and analog print design.
 
 Visual cues:
-- warm ivory
-- paper texture
-- small serif labels
-- seals / badges
-- color wheel / palette object
-- calm stationery
-- deep blue, red, gold accents
+- warm vintage palette (mustard, rust, cream, teal)
+- halftone or print-grain texture
+- mid-century or 70s-inspired geometric shapes
+- rounded or condensed vintage display type
+- sun, stripe, or wave motifs used sparingly
+- slightly worn, analog print feel
 
 Logo logic:
-- seal, dog, shield, document, stamp, monogram
+- retro badge or seal mark
+- geometric sunburst or arch motif
+- condensed vintage wordmark
 
 Mood:
-trustworthy, refined, institutional but modern.
+nostalgic, warm, characterful, fun.
 
 ---
 
-## Luxury / Beauty / Fashion
+## Futuristic
 
-Use for:
-beauty, fashion, hospitality, premium services.
+Advanced, precise, forward-looking. High-tech without being cold.
 
 Visual cues:
-- ivory / stone / espresso
-- serif wordmark
-- elegant monogram
-- paper grain
-- embossing
-- product labels
-- editorial crops
-- soft shadows
+- near-black base with one electric accent (cyan, violet, lime)
+- glass, metallic, or holographic surface cues
+- sharp geometric or circuit-inspired forms
+- glowing edges and thin light lines
+- high-contrast, high-precision layout
+- subtle grid or scanline texture
 
 Logo logic:
-- monogram, seal, petal, vessel, ritual object, refined typographic mark
+- angular geometric mark
+- glowing line-based symbol
+- modular, circuit-like construction
 
 Mood:
-tasteful, adult, expensive.
+advanced, precise, forward-looking, sharp.
 
 ---
 
-## Voice / Communication
+## Editorial
 
-Use for:
-voice AI, chat, assistants, speech, audio.
+Considered and credible, drawn from print magazines and documentary design.
 
 Visual cues:
-- dark indigo
-- lilac glow
-- waveform
-- mic motif
-- phone crop
-- command input
-- app icon
+- warm paper or ivory background
+- classic serif typography
+- structured, magazine-style grid
+- small caps labels and captions
+- restrained, documentary imagery
+- thin rules and pull-quote moments
 
 Logo logic:
-- wave + initial
-- sound orb
-- speech path
-- microphone abstraction
-- pulse ring
+- classic wordmark or masthead-style logotype
+- simple seal or emblem
+- typographic monogram
 
 Mood:
-fluid, intelligent, intimate.
+thoughtful, credible, literary, considered.
 
 ---
 
-## Cultural / Experimental
+## Corporate
 
-Use for:
-music, creative tools, events, gaming-adjacent, cultural products.
+Clean, structured, and confidently understated. Built to be trusted.
 
 Visual cues:
-- halftone
-- CRT texture
-- analog print
-- bold accent color
-- poster-style panels
-- unexpected image crops
-- simple but punchy logo
+- navy, charcoal, and white
+- clean sans-serif typography
+- structured grid, confident alignment
+- simple line-icon system
+- understated, corporate-appropriate imagery
+- minimal color, maximum clarity
 
 Logo logic:
-- custom wordmark
-- icon with attitude
-- symbolic mascot
-- print-inspired mark
+- confident geometric or typographic mark
+- simple abstract symbol
+- clean wordmark
 
 Mood:
-memorable, creative, still controlled.
+trustworthy, capable, understated, confident.
+
+---
+
+## Craft
+
+Tactile and personal, with the visible trace of a human hand.
+
+Visual cues:
+- kraft paper, muted natural tones
+- hand-lettering or stamped/letterpress texture
+- imperfect, human linework
+- small-batch labels and tags
+- tactile material textures
+- warm, unpolished photography
+
+Logo logic:
+- stamp or badge mark
+- hand-drawn symbol
+- lettered wordmark with character
+
+Mood:
+authentic, small-batch, personal, warm.
+
+---
+
+## Edgy
+
+Raw, high-contrast, countercultural. Confident enough to break the rules on
+purpose.
+
+Visual cues:
+- high-contrast black & white, or one jarring accent color
+- halftone, grain, or scan-line texture
+- torn-edge, sticker, or zine-collage elements
+- distressed or spray-paint type
+- asymmetric, off-grid layout
+- unexpected, cropped, high-contrast imagery
+
+Logo logic:
+- distressed or stenciled wordmark
+- raw geometric symbol with an intentional flaw
+- sticker-style badge or tag mark
+
+Mood:
+raw, rebellious, confident, unpolished on purpose.
 
 ---
 

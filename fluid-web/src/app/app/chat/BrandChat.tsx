@@ -282,13 +282,7 @@ function Widget(props: WidgetProps & { stepKey: StepKey }) {
     case "audience":
       return <TextWidget {...common} field="audience" placeholder="Who is this for?" />;
     case "personality":
-      return (
-        <PairWidget
-          {...common}
-          fieldA={{ key: "personality", label: "Personality", placeholder: "3-5 traits — how it behaves in a room" }}
-          fieldB={{ key: "emotionalPromise", label: "Emotional promise", placeholder: "The feeling this brand promises" }}
-        />
-      );
+      return <TextWidget {...common} field="personality" placeholder="3-5 traits — how it behaves in a room" />;
     case "visualMode":
       return <ChoiceWidget {...common} field="visualMode" options={VISUAL_MODES} />;
     case "palette":
@@ -393,7 +387,7 @@ function ChoiceWidget(
   );
 }
 
-function TextWidget(props: WidgetProps & { field: "audience" | "tagline"; placeholder: string }) {
+function TextWidget(props: WidgetProps & { field: "audience" | "personality" | "tagline"; placeholder: string }) {
   const { seed, busy, regenerating, onSubmit, onRegenerate, field, placeholder } = props;
   const [value, setValue] = useState((seed[field] as string | undefined) ?? "");
   const canSubmit = !!value.trim() && !busy;
@@ -416,39 +410,6 @@ function TextWidget(props: WidgetProps & { field: "audience" | "tagline"; placeh
           style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", fontSize: 14, color: INK, padding: "8px 0" }}
         />
         <SendButton enabled={canSubmit} onClick={submit} />
-      </div>
-      {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
-    </div>
-  );
-}
-
-interface PairField {
-  key: keyof BrandKitDraft;
-  label: string;
-  placeholder: string;
-}
-
-function PairWidget(props: WidgetProps & { fieldA: PairField; fieldB: PairField }) {
-  const { seed, busy, regenerating, onSubmit, onRegenerate, fieldA, fieldB } = props;
-  const [a, setA] = useState((seed[fieldA.key] as string | undefined) ?? "");
-  const [b, setB] = useState((seed[fieldB.key] as string | undefined) ?? "");
-  const canSubmit = !!a.trim() && !!b.trim() && !busy;
-  const submit = () => canSubmit && onSubmit({ [fieldA.key]: a.trim(), [fieldB.key]: b.trim() });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ ...panel(), gap: 16 }}>
-        <div style={fieldGroup}>
-          <span style={label}>{fieldA.label}</span>
-          <textarea value={a} onChange={(e) => setA(e.target.value)} placeholder={fieldA.placeholder} disabled={busy} rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
-        </div>
-        <div style={fieldGroup}>
-          <span style={label}>{fieldB.label}</span>
-          <textarea value={b} onChange={(e) => setB(e.target.value)} placeholder={fieldB.placeholder} disabled={busy} rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <SendButton enabled={canSubmit} onClick={submit} />
-        </div>
       </div>
       {onRegenerate ? <AskAgain onClick={onRegenerate} busy={regenerating} /> : null}
     </div>
@@ -590,7 +551,6 @@ function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
         <Row k="Category" v={seed.category ?? ""} />
         <Row k="Audience" v={seed.audience ?? ""} />
         <Row k="Personality" v={seed.personality ?? ""} />
-        <Row k="Emotional promise" v={seed.emotionalPromise ?? ""} />
         {chosenLogo ? (
           <>
             <div style={{ display: "flex", gap: 14, alignItems: "center" }}>

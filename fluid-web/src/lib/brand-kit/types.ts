@@ -26,24 +26,31 @@ export const LAYOUTS: Array<{ id: BrandKitLayout; name: string; note: string }> 
 ];
 
 export type VisualMode =
-  | "dark-developer"
-  | "dark-product"
-  | "dark-nature"
-  | "dark-security"
-  | "light-editorial"
+  | "minimal"
+  | "playful"
+  | "organic"
   | "luxury"
-  | "voice"
-  | "cultural";
+  | "retro"
+  | "futuristic"
+  | "editorial"
+  | "corporate"
+  | "craft"
+  | "edgy";
 
+// Style archetypes, not industries — any category can pick any mode. See
+// skills/brandkit/SKILL.md's "VISUAL MODES" section for the full cues each
+// one expands to.
 export const VISUAL_MODES: Array<{ id: VisualMode; name: string; note: string }> = [
-  { id: "dark-developer", name: "Dark developer / builder", note: "Terminal windows, prompt bars, cyan/coral accents." },
-  { id: "dark-product", name: "Dark product / operator", note: "Black/amber, glowing UI chips, tactical." },
-  { id: "dark-nature", name: "Dark nature / calm system", note: "Deep green, misty landscapes, quiet trust." },
-  { id: "dark-security", name: "Dark security / threat intel", note: "Navy, shield forms, radar lines, vigilant." },
-  { id: "light-editorial", name: "Light editorial / compliance", note: "Warm ivory, paper texture, institutional." },
-  { id: "luxury", name: "Luxury / beauty / fashion", note: "Ivory/espresso, serif wordmark, embossing." },
-  { id: "voice", name: "Voice / communication", note: "Dark indigo, lilac glow, waveform, intimate." },
-  { id: "cultural", name: "Cultural / experimental", note: "Halftone, CRT texture, bold, punchy." },
+  { id: "minimal", name: "Minimal", note: "Quiet negative space, one accent color, precise and confident." },
+  { id: "playful", name: "Playful", note: "Saturated color, chunky shapes, energetic and fun." },
+  { id: "organic", name: "Organic", note: "Earthy palette, organic linework, grounded and approachable." },
+  { id: "luxury", name: "Luxury", note: "Serif wordmark, fine linework, tasteful and expensive." },
+  { id: "retro", name: "Retro", note: "Vintage palette, halftone grain, nostalgic and characterful." },
+  { id: "futuristic", name: "Futuristic", note: "Near-black base, electric accent, sharp and advanced." },
+  { id: "editorial", name: "Editorial", note: "Warm paper, classic serif, magazine-style and considered." },
+  { id: "corporate", name: "Corporate", note: "Navy/charcoal, clean sans-serif, trustworthy and understated." },
+  { id: "craft", name: "Craft", note: "Kraft paper, hand-lettering, authentic and small-batch." },
+  { id: "edgy", name: "Edgy", note: "Raw high-contrast texture, distressed type, rebellious and unpolished." },
 ];
 
 /** What the user actually gives us. */

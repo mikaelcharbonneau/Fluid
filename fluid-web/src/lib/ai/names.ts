@@ -21,7 +21,6 @@ export interface NameBrief {
 }
 
 const COUNT = 10;
-const MODEL = "gpt-5.6-luna";
 
 // Leave enough room for the route to persist the results after the OpenAI
 // response returns, while failing before Vercel's function deadline.
@@ -145,7 +144,6 @@ export async function generateBrandNames(
   const text = await generateOpenAIText({
     instructions: SYSTEM,
     input: buildUserPrompt(input),
-    model: MODEL,
     maxOutputTokens: 32_000,
     reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,

@@ -4,20 +4,22 @@
 // every generated image is uploaded to the public `brand-assets` bucket and
 // only its URL is persisted on the brand record.
 //
-// Reference-led croquis must be true transparent PNGs. GPT Image 2 does not
-// support that output mode, so transparent requests use GPT Image 1.5 while
-// the rest of the product keeps GPT Image 2's rendering quality.
+// GPT Image 2 is the flagship image model (reasoning before draw, strong
+// type) and, as of its transparent-alpha output support, handles every
+// render this app needs — including reference-led croquis, which must come
+// back as true transparent PNGs.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_EDIT_URL = "https://api.openai.com/v1/images/edits";
-// GPT Image 2 is the flagship image model (reasoning before draw, strong type).
-// Override with OPENAI_IMAGE_MODEL only for experiments.
+// Override with OPENAI_IMAGE_MODEL / OPENAI_TRANSPARENT_IMAGE_MODEL only for
+// experiments — both default to the same model now that GPT Image 2 covers
+// transparent output too.
 const MODEL = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
 export const TRANSPARENT_IMAGE_MODEL =
-  process.env.OPENAI_TRANSPARENT_IMAGE_MODEL?.trim() || "gpt-image-1.5";
+  process.env.OPENAI_TRANSPARENT_IMAGE_MODEL?.trim() || "gpt-image-2";
 const BUCKET = "brand-assets";
 
 /** Exported so a prompt preview can report which model would receive it. */
@@ -104,7 +106,7 @@ const DEFAULT_RENDER_TIMEOUT_MS = 120_000;
 const RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
 const RETRY_DELAY_MS = 4_000;
 type ImageBackground = "opaque" | "transparent";
-/** Every size gpt-image-2 / gpt-image-1.5 accept. Square is the default everywhere else in the app. */
+/** Every size gpt-image-2 accepts. Square is the default everywhere else in the app. */
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
 const DEFAULT_SIZE: ImageSize = "1024x1024";
 
