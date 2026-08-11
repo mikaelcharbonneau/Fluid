@@ -118,7 +118,6 @@ export async function generateBrandTypography(
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     maxOutputTokens: 3_000,
-    reasoningEffort: "medium",
     timeoutMs: CALL_TIMEOUT_MS,
   });
 

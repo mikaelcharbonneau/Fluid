@@ -62,22 +62,26 @@ const ASPECT_HINT: Record<BrandKitLayout, string> = {
 };
 
 const VISUAL_MODE_CUES: Record<VisualMode, string> = {
-  "dark-developer":
-    "Near-black panels, monospace accents, command lines, terminal windows, prompt bars, subtle grid, cyan/blue/coral/lime accents. Logo logic: cursor + frame, bolt + build speed, scaffold + monogram. Mood: precise, sharp, builder-native.",
-  "dark-product":
-    "Black / dark red / amber, glowing UI chips, card systems, segmented flows, icon rows, minimal hero text. Logo logic: signal, gift, path, operator mark, switch, loop. Mood: fast, operational, tactical.",
-  "dark-nature":
-    "Deep green, lime accent, misty landscapes, soft overlays, calm page labels, dark editorial grid. Logo logic: path, leaf, moon, horizon, compass, folded mark. Mood: calm, trustworthy, focused.",
-  "dark-security":
-    "Black/navy, shield forms, radar lines, subtle motion traces, red/blue alert chips, controlled gradients. Logo logic: shield, raptor, eye, watch, boundary. Mood: serious, vigilant, precise.",
-  "light-editorial":
-    "Warm ivory, paper texture, small serif labels, seals/badges, calm stationery, deep blue/red/gold accents. Logo logic: seal, shield, document, stamp, monogram. Mood: trustworthy, refined, institutional but modern.",
+  minimal:
+    "Abundant white or near-white space, one confident accent color used sparingly, thin precise rules and alignment marks, simple geometric or typographic forms, flat surfaces with no texture or noise, generous margins, quiet grid. Logo logic: single reductive geometric mark, clean monogram, one deliberate negative-space move. Mood: calm, precise, confident, uncluttered.",
+  playful:
+    "Saturated primary or candy colors, oversized rounded shapes, chunky confident display type, illustrated or graphic icon marks, energetic asymmetric layouts, occasional pattern or confetti texture. Logo logic: rounded geometric mascot or icon, stacked chunky wordmark, shape-based mark with obvious personality. Mood: fun, energetic, approachable, confident.",
+  organic:
+    "Earthy palette (terracotta, sage, clay, cream, walnut), organic hand-drawn or botanical linework, soft natural light, textured paper or linen backgrounds, rounded human forms, imagery of plants, materials, or landscapes. Logo logic: botanical or organic-form mark, hand-touched monogram, simple line-drawn symbol. Mood: grounded, approachable, honest, calm.",
   luxury:
-    "Ivory/stone/espresso, serif wordmark, elegant monogram, paper grain, embossing, editorial crops, soft shadows. Logo logic: monogram, seal, petal, vessel, refined typographic mark. Mood: tasteful, adult, expensive.",
-  voice:
-    "Dark indigo, lilac glow, waveform, mic motif, phone crop, command input, app icon. Logo logic: wave + initial, sound orb, speech path, pulse ring. Mood: fluid, intelligent, intimate.",
-  cultural:
-    "Halftone, CRT texture, analog print, bold accent color, poster-style panels, unexpected image crops. Logo logic: custom wordmark, icon with attitude, print-inspired mark. Mood: memorable, creative, still controlled.",
+    "Ivory, black, and gold, or deep jewel tones, fine serif wordmark, generous negative space, subtle embossing or foil-like detail, refined material textures (marble, silk, brass), editorial restrained imagery. Logo logic: refined monogram or crest, fine-line symbolic mark, elegant typographic wordmark. Mood: tasteful, expensive, adult, understated.",
+  retro:
+    "Warm vintage palette (mustard, rust, cream, teal), halftone or print-grain texture, mid-century or 70s-inspired geometric shapes, rounded or condensed vintage display type, sun/stripe/wave motifs used sparingly, slightly worn analog print feel. Logo logic: retro badge or seal mark, geometric sunburst or arch motif, condensed vintage wordmark. Mood: nostalgic, warm, characterful, fun.",
+  futuristic:
+    "Near-black base with one electric accent (cyan, violet, lime), glass/metallic/holographic surface cues, sharp geometric or circuit-inspired forms, glowing edges and thin light lines, high-contrast high-precision layout, subtle grid or scanline texture. Logo logic: angular geometric mark, glowing line-based symbol, modular circuit-like construction. Mood: advanced, precise, forward-looking, sharp.",
+  editorial:
+    "Warm paper or ivory background, classic serif typography, structured magazine-style grid, small caps labels and captions, restrained documentary imagery, thin rules and pull-quote moments. Logo logic: classic wordmark or masthead-style logotype, simple seal or emblem, typographic monogram. Mood: thoughtful, credible, literary, considered.",
+  corporate:
+    "Navy, charcoal, and white, clean sans-serif typography, structured grid with confident alignment, simple line-icon system, understated corporate-appropriate imagery, minimal color for maximum clarity. Logo logic: confident geometric or typographic mark, simple abstract symbol, clean wordmark. Mood: trustworthy, capable, understated, confident.",
+  craft:
+    "Kraft paper and muted natural tones, hand-lettering or stamped/letterpress texture, imperfect human linework, small-batch labels and tags, tactile material textures, warm unpolished photography. Logo logic: stamp or badge mark, hand-drawn symbol, lettered wordmark with character. Mood: authentic, small-batch, personal, warm.",
+  edgy:
+    "High-contrast black & white, or one jarring accent color, halftone/grain/scan-line texture, torn-edge or sticker or zine-collage elements, distressed or spray-paint type, asymmetric off-grid layout, unexpected cropped high-contrast imagery. Logo logic: distressed or stenciled wordmark, raw geometric symbol with an intentional flaw, sticker-style badge or tag mark. Mood: raw, rebellious, confident, unpolished on purpose.",
 };
 
 const ANTI_GENERIC = `Never produce:

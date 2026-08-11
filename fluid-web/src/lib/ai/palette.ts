@@ -125,7 +125,6 @@ export async function generateBrandPalette(
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     maxOutputTokens: 4_000,
-    reasoningEffort: "medium",
     timeoutMs: CALL_TIMEOUT_MS,
   });
 

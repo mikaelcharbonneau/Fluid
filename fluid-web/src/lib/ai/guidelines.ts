@@ -137,7 +137,6 @@ export async function generateBrandGuidelines(
     instructions: SYSTEM,
     input: buildUserPrompt(input),
     maxOutputTokens: 6_000,
-    reasoningEffort: "medium",
     timeoutMs: CALL_TIMEOUT_MS,
   });
 

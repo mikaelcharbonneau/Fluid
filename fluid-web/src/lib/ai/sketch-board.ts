@@ -303,7 +303,7 @@ export function previewBoardPrompt(input: BoardBrief): {
   user: string;
   model: string;
 } {
-  return { system: SYSTEM, user: buildUserPrompt(input), model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5" };
+  return { system: SYSTEM, user: buildUserPrompt(input), model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5.6-luna" };
 }
 
 export interface ParsedConcept {

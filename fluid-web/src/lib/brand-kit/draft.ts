@@ -1,10 +1,13 @@
 // One AI-drafted answer per step.
 //
 // Each contract asks for only what that step needs — small, cheap, fast
-// calls (`effort: "low"`) — rather than the one big strategy blob the
+// calls with no reasoning — rather than the one big strategy blob the
 // previous pass generated in a single shot. Every call still gets the whole
 // skill body for grounding (category table, anti-generic rules, palette and
-// tagline discipline), same as before; only the ask is scoped down.
+// tagline discipline), same as before; only the ask is scoped down. None of
+// these are the "propose many genuinely distinct options at once" shape
+// that actually benefits from reasoning (see logo-concepts.ts) — each is a
+// single small answer, so they run without it.
 
 import { runBrandKitSkill } from "./run";
 import { renderDraft, type BrandKitDraft } from "./context";
@@ -54,12 +57,11 @@ function parsePalette(v: unknown): PaletteSwatch[] {
 
 function parseVisualMode(v: unknown): VisualMode {
   const raw = str(v, "visualMode").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  return VISUAL_MODE_IDS.has(raw as VisualMode) ? (raw as VisualMode) : "dark-developer";
+  return VISUAL_MODE_IDS.has(raw as VisualMode) ? (raw as VisualMode) : "minimal";
 }
 
 interface DraftSpec {
   contract: string;
-  effort?: "low" | "medium";
   maxTokens?: number;
   parse: (json: unknown) => Partial<BrandKitDraft>;
 }
@@ -78,17 +80,10 @@ Return JSON: { "audience": string }.`,
     parse: (j) => ({ audience: str((j as Record<string, unknown>).audience, "audience") }),
   },
   personality: {
-    contract: `Work through the skill's brand-strategy thinking on personality and
-emotional promise. Return JSON:
-{ "personality": string,       // 3-5 traits, comma separated — how it would behave in a room
-  "emotionalPromise": string } // one sentence: the feeling this brand promises to deliver`,
-    parse: (j) => {
-      const v = j as Record<string, unknown>;
-      return {
-        personality: str(v.personality, "personality"),
-        emotionalPromise: str(v.emotionalPromise, "emotionalPromise"),
-      };
-    },
+    contract: `Work through the skill's brand-strategy thinking on personality. Return
+JSON: { "personality": string } — 3-5 traits, comma separated, how it would
+behave in a room.`,
+    parse: (j) => ({ personality: str((j as Record<string, unknown>).personality, "personality") }),
   },
   visualMode: {
     contract: `Recommend one visual mode from the skill's VISUAL MODES section. Return
@@ -125,43 +120,49 @@ export async function generateStepDraft(
     contract: spec.contract,
     parse: spec.parse,
     activity,
-    effort: spec.effort ?? "low",
     maxTokens: spec.maxTokens ?? 1_200,
     timeoutMs: 45_000,
   });
 }
 
-const POSITIONING_CONTRACT = `Work through the skill's brand-strategy thinking on cultural position and
-trust level. Return JSON:
-{ "culturalPosition": string, // one sentence: where this sits culturally relative to its category
+const STRATEGY_SIGNALS_CONTRACT = `Work through the skill's brand-strategy thinking on emotional promise,
+cultural position, and trust level. Return JSON:
+{ "emotionalPromise": string, // one sentence: the feeling this brand promises to deliver
+  "culturalPosition": string, // one sentence: where this sits culturally relative to its category
   "trustLevel": string }      // one sentence: how much trust this needs to earn, and from whom`;
 
-function parsePositioning(json: unknown): { culturalPosition: string; trustLevel: string } {
+interface StrategySignals {
+  emotionalPromise: string;
+  culturalPosition: string;
+  trustLevel: string;
+}
+
+function parseStrategySignals(json: unknown): StrategySignals {
   const v = (json ?? {}) as Record<string, unknown>;
   return {
+    emotionalPromise: str(v.emotionalPromise, "emotionalPromise"),
     culturalPosition: str(v.culturalPosition, "culturalPosition"),
     trustLevel: str(v.trustLevel, "trustLevel"),
   };
 }
 
 /**
- * Not a chat step (see steps.ts's file header) — inferred silently from
+ * Not chat steps (see steps.ts's file header) — inferred silently from
  * whatever's confirmed so far, called once right after `personality` is
- * answered so everything drafted after it still has cultural position and
- * trust level in context, same as if it had been asked.
+ * answered so everything drafted after it still has these in context, same
+ * as if they'd been asked. `emotionalPromise` used to be its own field
+ * asked alongside `personality`; folding it in here means one signal a
+ * non-marketer would find abstract to answer directly is now inferred
+ * instead, same reasoning as `culturalPosition`/`trustLevel`.
  */
-export async function inferPositioning(
-  draft: BrandKitDraft,
-  activity: Activity,
-): Promise<{ culturalPosition: string; trustLevel: string }> {
-  activity.emit("note", "Inferring cultural position and trust level");
+export async function inferStrategySignals(draft: BrandKitDraft, activity: Activity): Promise<StrategySignals> {
+  activity.emit("note", "Inferring emotional promise, cultural position, and trust level");
   return runBrandKitSkill({
     skill: "brandkit",
     contextText: renderDraft(draft),
-    contract: POSITIONING_CONTRACT,
-    parse: parsePositioning,
+    contract: STRATEGY_SIGNALS_CONTRACT,
+    parse: parseStrategySignals,
     activity,
-    effort: "low",
     maxTokens: 1_200,
     timeoutMs: 45_000,
   });

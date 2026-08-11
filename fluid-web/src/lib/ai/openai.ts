@@ -55,8 +55,13 @@ export async function generateOpenAIText({
   // standard code-managed calls retain the app's established defaults.
   const selectedModel = prompt
     ? model?.trim() || ""
-    : model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5";
-  const selectedReasoning = reasoningEffort ?? (prompt ? undefined : "medium");
+    : model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5.6-luna";
+  // Reasoning is opt-in, not on by default: most calls here are single-pass
+  // structured completions (pick one of these options, propose this JSON
+  // shape) that don't need deliberation, and reasoning tokens cost real
+  // latency and money. Callers that genuinely need it (see logo-concepts.ts)
+  // pass reasoningEffort explicitly; everyone else runs without it.
+  const selectedReasoning = reasoningEffort;
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     signal: AbortSignal.timeout(timeoutMs),

@@ -209,7 +209,6 @@ export async function tagReferenceImage(imageUrl: string): Promise<TaggedReferen
     }],
     json: true,
     maxOutputTokens: 400,
-    reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
   });
   return parseTagResponse(text);

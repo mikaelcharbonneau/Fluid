@@ -48,7 +48,6 @@ async function ask(system: string, user: string, maxTokens = 700): Promise<strin
     instructions: system,
     input: user,
     maxOutputTokens: maxTokens,
-    reasoningEffort: "low",
     timeoutMs: CALL_TIMEOUT_MS,
   });
 }

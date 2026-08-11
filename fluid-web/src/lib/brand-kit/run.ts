@@ -90,7 +90,7 @@ export async function runBrandKitSkill<T>({
   contract,
   parse,
   activity = silentActivity,
-  effort = "low",
+  effort,
   maxTokens = DEFAULT_MAX_TOKENS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: RunBrandKitSkillOptions<T>): Promise<T> {
