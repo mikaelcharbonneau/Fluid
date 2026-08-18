@@ -1,0 +1,67 @@
+{
+  "source": "http://localhost:3000/app/chat (Fluid — brand-kit conversation)",
+  "tokens": {
+    "spacing": {
+      "scale": [6, 8, 9, 10, 11, 12, 13, 14, 16, 18],
+      "base_unit": null
+    },
+    "typography": {
+      "families": ["Metropolis", "JetBrains Mono"],
+      "scale": [
+        { "role": "question heading", "size": "17px", "weight": "800", "family": "Metropolis" },
+        { "role": "body/answer", "size": "15px", "weight": "400", "family": "Metropolis" },
+        { "role": "chip/button label", "size": "13px", "weight": "600", "family": "Metropolis" },
+        { "role": "field micro-label", "size": "9.5px", "weight": "600", "family": "JetBrains Mono" }
+      ]
+    },
+    "colors": [
+      { "role": "canvas", "value": "#FAFAFB" },
+      { "role": "card/panel", "value": "#FFFFFF" },
+      { "role": "text-primary", "value": "rgba(0,0,0,.72)" },
+      { "role": "text-muted", "value": "rgba(0,0,0,.52)" },
+      { "role": "border/hairline", "value": "rgba(0,0,0,.10)" },
+      { "role": "ink/selected", "value": "#000000" },
+      { "role": "error-only accent", "value": "#FD7947" }
+    ],
+    "radius": ["8px", "10px", "14px", "18px", "99px"],
+    "shadows": [
+      "inset 0 0 0 1px rgba(0,0,0,.10)",
+      "0 2px 6px rgba(0,0,0,.06), inset 0 0 0 1px rgba(0,0,0,.10)",
+      "0 0 0 2px #000, 0 6px 18px rgba(0,0,0,.08)"
+    ],
+    "image_ratios": [
+      { "usage": "logo concept thumbnail", "ratio": "1:1" }
+    ],
+    "grid": { "max_width": "820px (thread column)", "columns": 3, "gutter": "10px" }
+  },
+  "taste": [
+    {
+      "name": "Ink-only restraint",
+      "trigger": "When facing a product whose entire output is color (palettes, logos, brand boards)",
+      "decision": "Chose fully monochrome app chrome over any branded accent color",
+      "reason": "A visible product-brand accent color would visually compete with the user's own brand being built on screen",
+      "evidence": ["all accentCandidates resolve to #000/white", "#FD7947 scoped to error states only, never a primary action"]
+    },
+    {
+      "name": "Thread persistence over wizard",
+      "trigger": "When designing a 12-step conversational form where an early answer can invalidate later ones",
+      "decision": "Chose to keep every answered step permanently visible and re-editable over a single-screen Back/Next wizard",
+      "reason": "Showing the dependency chain honestly is more trustworthy than a Back button that hides what re-answering actually invalidates",
+      "evidence": ["all steps render simultaneously across every captured state", "zero centered layout moments; no step-counter/progress affordance observed"]
+    },
+    {
+      "name": "One pill shape for every choice-type",
+      "trigger": "When the flow needed both single-select (category, visual mode) and multi-select (avoid list, name styles) controls",
+      "decision": "Chose one identical chip visual for both interaction types over giving multi-select its own affordance",
+      "reason": "One learned tap-to-toggle pattern scans faster across a long form than stopping to parse each row's selection rule",
+      "evidence": ["99px radius is the most-used radius in the system, 61 occurrences", "no visual differentiator between single- and multi-select chips"]
+    },
+    {
+      "name": "Inset hairlines over shadow",
+      "trigger": "When needing to separate cards/inputs from the canvas behind them",
+      "decision": "Chose a 1px inset border as the default depth cue, reserving real shadow for exactly two states (panel lift, active pick)",
+      "reason": "Using shadow everywhere would cheapen the two moments where elevation is actually meaningful",
+      "evidence": ["84 of 91 sampled shadow values are inset hairlines", "genuine offset/blur shadow appears only 6 times total"]
+    }
+  ]
+}
