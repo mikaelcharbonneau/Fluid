@@ -5,6 +5,11 @@ const baseURL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Hydration mismatches only produce a console warning in React's
+  // development build — a production build silently accepts them for
+  // performance reasons. That check runs separately, against `next dev`;
+  // see playwright.hydration.config.ts.
+  testIgnore: "**/hydration.spec.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

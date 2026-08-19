@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:integration": "vitest run src/app",
     "test:e2e": "playwright test",
+    "test:e2e:hydration": "playwright test --config=playwright.hydration.config.ts",
     "skills:build": "node scripts/build-skills.mjs",
     "skills:check": "node scripts/build-skills.mjs --check",
     "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs"

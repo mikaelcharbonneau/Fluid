@@ -90,6 +90,7 @@ npm run lint             # eslint
 npm test                 # unit tests (src/lib) — Vitest
 npm run test:integration # API route tests (src/app) — Vitest, external services mocked
 npm run test:e2e          # browser tests — Playwright, runs a production build
+npm run test:e2e:hydration # hydration-warning check — Playwright, runs against `next dev`
 ```
 
 ## Testing
@@ -104,6 +105,13 @@ npm run test:e2e          # browser tests — Playwright, runs a production buil
 - **Browser tests** (`e2e/*.spec.ts`) drive a real production build with
   Playwright to check the customer-facing journeys (home page, login,
   signup, password reset).
+- **Hydration check** (`e2e/hydration.spec.ts`, run via
+  `playwright.hydration.config.ts`) loads the marketing/auth routes against
+  `next dev` and fails if the browser console logs a React hydration
+  warning. This runs against dev, not the production build: React's
+  production bundle skips the full attribute-diffing pass for performance
+  and silently accepts a mismatch instead of warning, so this is the only
+  build that can actually catch a regression here.
 
 Run everything locally the same way CI does:
 
@@ -111,6 +119,7 @@ Run everything locally the same way CI does:
 npm test && npm run test:integration
 npx playwright install --with-deps chromium   # first run only
 npm run test:e2e
+npm run test:e2e:hydration
 ```
 
 All three suites are required checks in CI (`.github/workflows/ci.yml`); a
