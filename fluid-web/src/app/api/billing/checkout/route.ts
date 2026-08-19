@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     line_items: [{ price: priceId, quantity: 1 }],
     allow_promotion_codes: true,
     success_url: `${origin}/app?billing=success#account`,
-    cancel_url: `${origin}/app#account`,
+    cancel_url: `${origin}/app/settings?tab=billing`,
     subscription_data: { metadata: { user_id: user.id } },
   });
 

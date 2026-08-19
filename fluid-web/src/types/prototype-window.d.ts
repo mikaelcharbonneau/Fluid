@@ -1,34 +1,10 @@
-// Prototype.jsx (now Prototype.tsx) attaches a handful of values to `window`
-// at module load instead of importing/exporting them normally — a leftover
-// of how the original design-export bundle shared state across its
-// concatenated <script> tags. Centralizing the declarations here (per
-// issue #169's fix step 6) makes every one of these compatibility shims
-// visible in one place, typed loosely as `any` since they're slated for
-// removal as Prototype.tsx's screens get extracted into real modules
-// (#175) rather than for precise typing now.
+// The original design-export bundle shared values across its concatenated
+// <script> tags by hanging them off `window`, and Prototype.tsx inherited
+// that. #175 split that file into real modules, so every one of those shims
+// is gone: the router, toast and brand-draft context are imported normally
+// now, and `__fluidSettingsTab` — which existed only because /app#settings
+// had nowhere to carry a tab — is a `?tab=` search param.
 //
-// Reviewed: RouterProvider/useRouter/ROUTE_META/makeProtoToast (Prototype's
-// internal hash router + toast helper) and useBrandDraft/BrandDraftProvider
-// (brand-state context) are assigned in Prototype.tsx itself. AppleHero/
-// FigmaHero/PerplexityHero/TeslaHero are read but never assigned anywhere
-// in this codebase — dead reads left over from a "dir-a-canvas.jsx" module
-// referenced only in a comment, which does not exist in this repo. Left
-// typed rather than removed: the reads are inert (always undefined) but
-// removing them is a behavioral change outside this issue's scope.
+// Kept as a file rather than deleted so this note survives: if a `window.X`
+// appears in app code again, it belongs in a module, not here.
 export {};
-
-declare global {
-  interface Window {
-    __fluidSettingsTab?: string;
-    RouterProvider?: any;
-    useRouter?: any;
-    ROUTE_META?: any;
-    makeProtoToast?: any;
-    useBrandDraft?: any;
-    BrandDraftProvider?: any;
-    AppleHero?: any;
-    FigmaHero?: any;
-    PerplexityHero?: any;
-    TeslaHero?: any;
-  }
-}
