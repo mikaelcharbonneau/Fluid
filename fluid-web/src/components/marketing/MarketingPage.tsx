@@ -5,7 +5,7 @@ import { CustomCursor } from "@/components/interaction/CustomCursor";
 import { ScrollProgress } from "./ScrollProgress";
 import { MarketingNav } from "./MarketingNav";
 import { Hero } from "./Hero";
-import { BrandFlow } from "./BrandFlow";
+import { BrandStory } from "./BrandStory";
 import { KitReveal } from "./KitReveal";
 import { Pricing } from "./Pricing";
 import { FinalCta } from "./FinalCta";
@@ -18,11 +18,14 @@ export function MarketingPage() {
 
   return (
     <div ref={rootRef}>
+      {/* #178: first in the tab order, so a keyboard visitor reaches the
+          input the page exists for without tabbing the whole nav. */}
+      <a className="skip-link" href="#start-here">Skip to the idea input</a>
       <CustomCursor hideNativeCursor />
       <ScrollProgress />
       <MarketingNav />
       <Hero />
-      <BrandFlow />
+      <BrandStory />
       <KitReveal />
       <Pricing />
       <FinalCta />

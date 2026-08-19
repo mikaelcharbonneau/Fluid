@@ -1,10 +1,9 @@
 "use client";
 
-import { useMagnetic } from "@/components/interaction/useMagnetic";
+import Link from "next/link";
+import { IdeaInput } from "./IdeaInput";
 
 export function Hero() {
-  const ctaRef = useMagnetic<HTMLAnchorElement>(0.4);
-
   return (
     <header className="hero" id="top">
       <div className="hero-pin">
@@ -22,18 +21,18 @@ export function Hero() {
               Your idea enters as a sentence. It leaves as a brand — strategy, naming, logo, palette, type, and
               guidelines, generated as one cohesive system.
             </p>
-            <div className="hero-cta" data-reveal="">
-              <a ref={ctaRef} className="btn" href="#start">
-                <span className="btn-label">Start with an idea</span>
-                <span className="arr">→</span>
-              </a>
+
+            {/* #178: the working conversion input lives here now, in the first
+                viewport. It used to sit only in the final CTA, ~18 viewports
+                down, behind the scroll-jacked story section. */}
+            <div className="hero-cta" id="start-here" data-reveal="">
+              <IdeaInput variant="hero" />
+              <p className="hero-fine">
+                Free to start — 20 tokens, no card. <Link href="#pricing">See pricing</Link> or{" "}
+                <Link href="#transform">watch how it works</Link>.
+              </p>
             </div>
           </div>
-        </div>
-
-        <div className="scroll-cue" aria-hidden="true">
-          <div className="bar" />
-          <span className="wf-label">scroll to explore</span>
         </div>
       </div>
     </header>
