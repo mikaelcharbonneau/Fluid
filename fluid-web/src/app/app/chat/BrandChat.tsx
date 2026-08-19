@@ -37,6 +37,9 @@ import {
   Assets, Chevron, Close, Download, Grid, Guides, Home, Refresh, Search, Send, Settings, Token,
 } from "./icons";
 import { AVOIDS } from "./data";
+import { ActivityFeed } from "./activity";
+import { composerAnswers, composerPrompt, surfaceOf } from "./surfaces";
+import type { ActivityEvent } from "@/lib/ai/activity";
 import { CATEGORIES, LAYOUTS, NAME_STYLES, VISUAL_MODES } from "@/lib/brand-kit/types";
 import type { BrandKitResult, NameStyle, PaletteSwatch, VisualMode } from "@/lib/brand-kit/types";
 import { STEPS, type StepKey } from "@/lib/brand-kit/steps";
@@ -66,6 +69,11 @@ export function BrandChat() {
   const [regenerating, setRegenerating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The full stream for the run in flight, and the stream that produced each
+  // step's draft, kept so the reasoning behind an answer survives the turn.
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [activityByStep, setActivityByStep] = useState<Partial<Record<StepKey, ActivityEvent[]>>>({});
+  const [canvasFocus, setCanvasFocus] = useState<StepKey | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +91,13 @@ export function BrandChat() {
     };
   }, [phase]);
 
+  // Every turn streams the same shape, so collection is identical everywhere:
+  // accumulate, and keep the newest label for the one-line status.
+  const collect = useCallback((event: ActivityEvent) => {
+    setStatus(event.label);
+    setActivity((cur) => [...cur, event]);
+  }, []);
+
   const applyTurnResult = useCallback((out: TurnResult) => {
     if (out.brandId) setBrandId(out.brandId);
     if (out.error) {
@@ -95,6 +110,12 @@ export function BrandChat() {
       return;
     }
     if (out.step) {
+      const produced = out.step;
+      setCanvasFocus(null);
+      setActivity((events) => {
+        if (events.length) setActivityByStep((by) => ({ ...by, [produced]: events }));
+        return events;
+      });
       setStep(out.step);
       setDraft(out.draft ?? {});
       setProposed(out.proposed ?? null);
@@ -119,14 +140,14 @@ export function BrandChat() {
         return;
       }
       setBrandId(brand.id);
-      postTurn({ brandId: brand.id }, (event) => setStatus(event.label)).then((out) => {
+      postTurn({ brandId: brand.id }, collect).then((out) => {
         setBusy(false);
         setStatus(null);
         setPhase("thread");
         applyTurnResult(out);
       });
     });
-  }, [resumeId, applyTurnResult]);
+  }, [resumeId, applyTurnResult, collect]);
 
   // ---- keep the thread scrolled to the newest message ---------------------
   useEffect(() => {
@@ -145,28 +166,31 @@ export function BrandChat() {
       setError(null);
       setBusy(true);
       setStatus(null);
-      const out = await postTurn({ brandId, step: stepKey, value }, (event) => setStatus(event.label));
+      setActivity([]);
+      const out = await postTurn({ brandId, step: stepKey, value }, collect);
       setBusy(false);
       setStatus(null);
       applyTurnResult(out);
     },
-    [brandId, applyTurnResult],
+    [brandId, applyTurnResult, collect],
   );
 
   const handleGenerate = useCallback(async () => {
     setError(null);
     setBusy(true);
     setStatus(null);
-    const out = await postTurn({ brandId, step: "review", value: true }, (event) => setStatus(event.label));
+    setActivity([]);
+    const out = await postTurn({ brandId, step: "review", value: true }, collect);
     setBusy(false);
     setStatus(null);
     applyTurnResult(out);
-  }, [brandId, applyTurnResult]);
+  }, [brandId, applyTurnResult, collect]);
 
   const handleRegenerate = useCallback(async () => {
     setError(null);
     setRegenerating(true);
     setStatus(null);
+    setActivity([]);
     // logoConcepts appends a fresh batch instead of replacing the pool (see
     // the turn route) — it needs the current view (every batch shown so
     // far), since regenerate never persists and the server's own copy is
@@ -175,7 +199,7 @@ export function BrandChat() {
       step === "logoConcepts"
         ? { concepts: proposed?.logoConcepts ?? draft.logoConcepts ?? [] }
         : undefined;
-    const out = await postTurn({ brandId, step, regenerate: true, value }, (event) => setStatus(event.label));
+    const out = await postTurn({ brandId, step, regenerate: true, value }, collect);
     setRegenerating(false);
     setStatus(null);
     if (out.error) {
@@ -184,7 +208,7 @@ export function BrandChat() {
     }
     setProposed(out.proposed ?? null);
     setDraftVersion((v) => v + 1);
-  }, [brandId, step, draft, proposed]);
+  }, [brandId, step, draft, proposed, collect]);
 
   const startOver = useCallback(() => {
     setError(null);
@@ -195,53 +219,169 @@ export function BrandChat() {
   const visibleSteps = STEPS.slice(0, Math.max(0, stepIndex) + 1);
   const breadcrumb = draft.name?.trim() || "New brand";
 
+  // The canvas appears the first time a step needs something to look at, and
+  // stays from then on — including while an earlier step is being re-answered.
+  const canvasVisible =
+    phase === "result" || visibleSteps.some((s) => surfaceOf(s.key) === "canvas");
+
+  const seedFor = useCallback(
+    (key: StepKey): BrandKitDraft => ({
+      ...draft,
+      ...(key === step ? (proposed ?? {}) : {}),
+      ...(key === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
+    }),
+    [draft, proposed, step, presetMode],
+  );
+
+  // A composer-answered step shows its AI draft as the composer's starting
+  // text. Derived, not stored: the Composer remounts on `${step}-${version}`,
+  // which is exactly when a new draft arrives.
+  const composerSeed = (() => {
+    if (!composerAnswers(step)) return "";
+    const seeded = { ...draft, ...(proposed ?? {}) } as Record<string, unknown>;
+    const value = seeded[step];
+    return typeof value === "string" ? value : "";
+  })();
+
+  const widgetFor = (key: StepKey) => (
+    <Widget
+      stepKey={key}
+      seed={seedFor(key)}
+      busy={busy}
+      regenerating={key === step && regenerating}
+      onSubmit={(value) => (key === "review" ? handleGenerate() : submitStep(key, value))}
+      onRegenerate={key === step && STEPS.find((s) => s.key === key)?.aiDrafted ? handleRegenerate : undefined}
+    />
+  );
+
   return (
     <div className="bchat">
       <Header breadcrumb={breadcrumb} tokens={tokens} />
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <Sidebar />
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-          <div ref={threadRef} className="bchat-thread" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "36px 24px 40px" }}>
-            <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 26 }}>
-              {phase === "loading" ? (
-                <Busy label={status ?? "Loading…"} />
-              ) : phase === "result" && result ? (
-                <ResultView result={result} name={breadcrumb} onRegenerate={startOver} />
-              ) : (
-                <>
-                  {visibleSteps.map((s) => {
-                    const isCurrent = s.key === step;
-                    const seed: BrandKitDraft = {
-                      ...draft,
-                      ...(isCurrent ? (proposed ?? {}) : {}),
-                      // A quick-path preset wins as the shown default until the
-                      // user reaches this step's own confirmed answer or asks
-                      // the AI to redraft it.
-                      ...(s.key === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
-                    };
-                    return (
-                      <ThreadMessage key={`${s.key}-${draftVersion}`} question={s.question} dimmed={!isCurrent}>
-                        <Widget
-                          stepKey={s.key}
-                          seed={seed}
-                          busy={busy}
-                          regenerating={isCurrent && regenerating}
-                          onSubmit={(value) => (s.key === "review" ? handleGenerate() : submitStep(s.key, value))}
-                          onRegenerate={isCurrent && s.aiDrafted ? handleRegenerate : undefined}
-                        />
+        <main style={{ flex: 1, minWidth: 0, display: "flex", minHeight: 0 }}>
+          {canvasVisible ? (
+            <CanvasColumn
+              phase={phase}
+              step={step}
+              focus={canvasFocus}
+              draft={draft}
+              result={result}
+              name={breadcrumb}
+              onRegenerate={startOver}
+              onReopen={setCanvasFocus}
+              widgetFor={widgetFor}
+            />
+          ) : null}
+
+          <div
+            style={{
+              flex: canvasVisible ? "0 0 440px" : 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              background: canvasVisible ? CARD : PAPER,
+              borderLeft: canvasVisible ? `1px solid ${HAIRLINE}` : undefined,
+            }}
+          >
+            <div
+              ref={threadRef}
+              className="bchat-thread"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: canvasVisible ? "20px 16px 24px" : "36px 24px 40px",
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: canvasVisible ? "100%" : 680,
+                  margin: canvasVisible ? 0 : "0 auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: canvasVisible ? 18 : 26,
+                }}
+              >
+                {phase === "loading" ? (
+                  <Busy label={status ?? "Loading…"} />
+                ) : (
+                  <>
+                    {visibleSteps.map((s) => {
+                      const isCurrent = s.key === step;
+                      const onCanvas = surfaceOf(s.key) === "canvas";
+                      return (
+                        <ThreadMessage
+                          key={`${s.key}-${draftVersion}`}
+                          question={s.question}
+                          dimmed={!isCurrent}
+                          compact={canvasVisible}
+                        >
+                          {isCurrent && (busy || regenerating) && activity.length === 0 ? (
+                            // The first event can be a few seconds out; say
+                            // something rather than look hung.
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              <span style={{ fontSize: 12.5, color: MUTED }}>{status ?? "Working…"}</span>
+                              <div className="bchat-bar" />
+                            </div>
+                          ) : null}
+                          {isCurrent && activity.length > 0 ? (
+                            <ActivityFeed events={activity} live={busy || regenerating} />
+                          ) : null}
+                          {!isCurrent && activityByStep[s.key]?.length ? (
+                            <ActivityFeed events={activityByStep[s.key] ?? []} live={false} />
+                          ) : null}
+                          {onCanvas ? (
+                            <span style={{ fontSize: 12.5, color: FAINT }}>
+                              {isCurrent ? "Answer it on the canvas ←" : "Shown on the canvas ←"}
+                            </span>
+                          ) : isCurrent && composerAnswers(s.key) ? (
+                            // The composer is this step's field — rendering the
+                            // widget too would put two inputs on one question.
+                            s.aiDrafted ? <AskAgain onClick={handleRegenerate} busy={regenerating} /> : null
+                          ) : (
+                            widgetFor(s.key)
+                          )}
+                        </ThreadMessage>
+                      );
+                    })}
+                    {phase === "result" ? (
+                      <ThreadMessage question="Your brand kit is on the canvas." dimmed={false} compact={canvasVisible}>
+                        <span style={{ fontSize: 13.5, color: MUTED }}>
+                          Download it there, or start over to run the whole thing again.
+                        </span>
                       </ThreadMessage>
-                    );
-                  })}
-                  {error ? (
-                    <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FBEAE3", color: "#8A3E1C", fontSize: 13.5, marginLeft: 42 }}>
-                      {error}
-                    </div>
-                  ) : null}
-                  {busy ? <Busy label={status ?? "Working…"} /> : null}
-                </>
-              )}
-              <div style={{ height: 8 }} />
+                    ) : null}
+                    {error ? (
+                      <div
+                        style={{
+                          padding: "14px 16px", borderRadius: 12, background: CARD,
+                          boxShadow: "inset 0 0 0 1px rgba(214,69,69,.24), 0 1px 2px rgba(0,0,0,.04)",
+                          marginLeft: 42, display: "flex", flexDirection: "column", gap: 6,
+                        }}
+                      >
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#D64545" }}>That turn did not finish</span>
+                        <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.72)", lineHeight: 1.5 }}>{error}</span>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+                <div style={{ height: 8 }} />
+              </div>
             </div>
+
+            {phase === "thread" ? (
+              <Composer
+                key={`${step}-${draftVersion}`}
+                initial={composerSeed}
+                onSend={(value) => submitStep(step, value)}
+                enabled={composerAnswers(step) && !busy}
+                hint={composerPrompt(step)}
+                tokens={tokens}
+                wide={!canvasVisible}
+              />
+            ) : null}
           </div>
         </main>
       </div>
@@ -251,20 +391,174 @@ export function BrandChat() {
 
 // ---- one message: the question, plus its always-live widget -------------
 
-function ThreadMessage({ question, dimmed, children }: { question: string; dimmed: boolean; children: ReactNode }) {
+function ThreadMessage({
+  question, dimmed, compact, children,
+}: {
+  question: string;
+  dimmed: boolean;
+  /** The docked column is narrower — the question steps down a size with it. */
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  const size = compact ? (dimmed ? 14 : 15) : dimmed ? 15 : 19;
   return (
-    <div className="bchat-msg" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+    <div className="bchat-msg" style={{ display: "flex", gap: compact ? 10 : 14, alignItems: "flex-start" }}>
       <div style={{ flex: "0 0 28px", width: 28, height: 28, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", opacity: dimmed ? 0.4 : 1 }}>
         <ThinkingOrb size={dimmed ? 18 : 22} />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{
-          fontFamily: DISPLAY, fontSize: dimmed ? 15 : 18, fontWeight: dimmed ? 600 : 700,
+          fontFamily: DISPLAY, fontSize: size, fontWeight: dimmed ? 600 : 700,
           letterSpacing: "-0.015em", color: dimmed ? "rgba(0,0,0,.4)" : INK, lineHeight: 1.4,
         }}>
           {question}
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+// ---- the canvas ----------------------------------------------------------
+//
+// Everything whose answer is something you look at. It mounts the first time
+// the script reaches such a step and stays for the rest of the run; settled
+// answers become cards that re-open the step that made them.
+
+function CanvasColumn({
+  phase, step, focus, draft, result, name, onRegenerate, onReopen, widgetFor,
+}: {
+  phase: Phase;
+  step: StepKey;
+  focus: StepKey | null;
+  draft: BrandKitDraft;
+  result: BrandKitResult | null;
+  name: string;
+  onRegenerate: () => void;
+  onReopen: (key: StepKey) => void;
+  widgetFor: (key: StepKey) => ReactNode;
+}) {
+  const active: StepKey | null = focus ?? (surfaceOf(step) === "canvas" ? step : null);
+  const activeQuestion = STEPS.find((s) => s.key === active)?.question ?? "";
+
+  const settled = (key: StepKey, title: string, body: ReactNode) =>
+    active === key ? null : (
+      <button
+        key={key}
+        type="button"
+        className="bchat-card"
+        onClick={() => onReopen(key)}
+        style={{
+          background: CARD, borderRadius: 14, padding: 14, width: "100%", textAlign: "left",
+          boxShadow: `inset 0 0 0 1px ${HAIRLINE}, 0 1px 2px rgba(0,0,0,.04)`,
+          display: "flex", flexDirection: "column", gap: 8,
+          transition: "box-shadow 160ms cubic-bezier(.22,.61,.36,1)",
+        }}
+      >
+        <span style={label}>{title}</span>
+        {body}
+      </button>
+    );
+
+  const picked = draft.logoConcepts?.find((c) => c.id === draft.logoConceptId);
+
+  return (
+    <div className="bchat-canvas" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 10, padding: "14px 24px" }}>
+        <span style={label}>Canvas</span>
+      </div>
+      <div className="bchat-canvas" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: 12, animation: "none" }}>
+        {phase === "result" && result ? (
+          <ResultView result={result} name={name} onRegenerate={onRegenerate} />
+        ) : (
+          <>
+            {draft.name ? settled("name", "Name",
+              <span style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 800, letterSpacing: "-0.035em", lineHeight: 1 }}>{draft.name}</span>) : null}
+
+            {draft.palette?.length ? settled("palette", "Palette",
+              <div style={{ display: "flex", gap: 6, width: "100%" }}>
+                {draft.palette.map((p) => (
+                  <span key={p.hex} title={`${p.role} — ${p.hex}`} style={{ flex: 1, height: 30, borderRadius: 8, background: p.hex, boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }} />
+                ))}
+              </div>) : null}
+
+            {picked ? settled("logoConcepts", "Logo",
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={picked.imageUrl} alt={picked.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                </div>
+                <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{picked.label}</span>
+              </div>) : null}
+
+            {active ? (
+              <div style={{
+                background: CARD, borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12,
+                boxShadow: "0 0 0 2px #000, 0 6px 18px rgba(0,0,0,.08)",
+              }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                  <span style={label}>{active === "review" ? "Review" : activeQuestion}</span>
+                </div>
+                {widgetFor(active)}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- the composer --------------------------------------------------------
+//
+// New: the flow never had a free-text input. It answers the steps whose answer
+// is a sentence; on the others it stays visibly inert rather than pretending.
+
+function Composer({
+  initial, onSend, enabled, hint, tokens, wide,
+}: {
+  /** The AI's draft for this step, if it drafted one. */
+  initial: string;
+  onSend: (value: string) => void;
+  enabled: boolean;
+  hint: string;
+  tokens: number | null;
+  wide: boolean;
+}) {
+  const [value, setValue] = useState(initial);
+  const canSend = enabled && !!value.trim();
+  const send = () => {
+    if (canSend) onSend(value.trim());
+  };
+  return (
+    <div style={{ flex: "0 0 auto", borderTop: `1px solid ${HAIRLINE}`, padding: 14, background: CARD }}>
+      <div style={{ maxWidth: wide ? 680 : "100%", margin: wide ? "0 auto" : 0 }}>
+        <div style={{
+          display: "flex", alignItems: "flex-end", gap: 8, padding: "8px 8px 8px 14px",
+          borderRadius: 14, background: CARD,
+          boxShadow: value ? "0 0 0 2px #000" : "inset 0 0 0 1px rgba(0,0,0,.14)",
+          opacity: enabled ? 1 : 0.6,
+        }}>
+          <input
+            value={value}
+            disabled={!enabled}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder={hint}
+            style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", fontSize: 13.5, color: INK, padding: "6px 0" }}
+          />
+          <SendButton enabled={canSend} onClick={send} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".04em", color: FAINT }}>
+            {tokens === null ? "—" : `${tokens} tokens left`}
+          </span>
+        </div>
       </div>
     </div>
   );
