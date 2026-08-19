@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run src/lib",
+    "test:watch": "vitest",
+    "test:integration": "vitest run src/app",
+    "test:e2e": "playwright test",
     "skills:build": "node scripts/build-skills.mjs",
     "skills:check": "node scripts/build-skills.mjs --check",
     "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs"
@@ -20,12 +24,19 @@
     "stripe": "^22.3.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
-    "typescript": "^5"
+    "jsdom": "^30.0.1",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "postcss": "8.5.25",

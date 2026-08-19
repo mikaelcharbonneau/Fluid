@@ -79,13 +79,44 @@ result yet, and every generated asset is regenerable on demand.
 ## Scripts
 
 ```bash
-npm run dev      # start the dev server
-npm run build    # production build (also runs the TypeScript check)
-npm run lint     # eslint
+npm run dev             # start the dev server
+npm run build           # production build (also runs the TypeScript check)
+npm run lint             # eslint
+npm test                 # unit tests (src/lib) — Vitest
+npm run test:integration # API route tests (src/app) — Vitest, external services mocked
+npm run test:e2e          # browser tests — Playwright, runs a production build
 ```
+
+## Testing
+
+- **Unit tests** (`src/lib/**/*.test.ts`) cover pure logic — brand-input
+  sanitization, token accounting, domain-availability parsing — with no
+  network or database access.
+- **Integration tests** (`src/app/api/**/__tests__/*.test.ts`) exercise route
+  handlers with Supabase, Stripe, and other external services mocked, so
+  they run in CI without contacting a live paid vendor and without a
+  database.
+- **Browser tests** (`e2e/*.spec.ts`) drive a real production build with
+  Playwright to check the customer-facing journeys (home page, login,
+  signup, password reset).
+
+Run everything locally the same way CI does:
+
+```bash
+npm test && npm run test:integration
+npx playwright install --with-deps chromium   # first run only
+npm run test:e2e
+```
+
+All three suites are required checks in CI (`.github/workflows/ci.yml`); a
+pull request cannot merge while any of them fail. If you see a flaky
+Playwright test, re-run with `npx playwright test --trace on` locally and
+check the uploaded `playwright-report` artifact from the failing CI run
+before assuming it's environmental — file an issue with the trace either way
+so flakes get tracked rather than silently re-run away.
 
 ## Deployment
 
 Hosted on Vercel. Every push gets a preview deployment; merging to `main`
-deploys to production. CI (`.github/workflows/ci.yml`) runs lint and build on
-every push and PR.
+deploys to production. CI (`.github/workflows/ci.yml`) runs lint, build,
+tests, and browser tests on every push and PR.

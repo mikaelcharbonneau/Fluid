@@ -26,7 +26,7 @@ Generation is metered by a token balance tied to a subscription plan
 fluid-web/   the actual Next.js application — see fluid-web/README.md
 chats/       original design-handoff conversation transcript (historical)
 project/     original HTML/CSS/JS design prototype this was built from (historical)
-.github/     CI (lint + typecheck + build on every push/PR to main)
+.github/     CI (lint, typecheck, build, and tests on every push/PR to main)
 ```
 
 `chats/` and `project/` are the artifacts from the initial Claude Design →
