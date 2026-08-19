@@ -197,23 +197,57 @@
      viewport instead of reflowing. Step them down instead. */
   .home-grid-4 { grid-template-columns: repeat(4, 1fr); }
   .home-grid-3 { grid-template-columns: repeat(3, 1fr); }
-  @media (max-width: 900px) {
-    .home-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  @media (max-width: 1120px) {
+    .home-grid-4, .home-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
   }
-  @media (max-width: 560px) {
+  @media (max-width: 680px) {
     .home-grid-4, .home-grid-3 { grid-template-columns: 1fr !important; }
   }
 
-  /* Home hero: text column vs. a decorative, fixed 432px-wide scrolling
-     collage. Below tablet width the collage has nowhere to go — drop it
-     rather than let it force an overflow or crush the text column (which
-     is what made the CTA buttons' labels wrap mid-word). */
+  /* Home hero: a centered greeting stacked over the composer. The composer is
+     capped at 760px and the padding is what carries the airiness, so both step
+     down together — otherwise the 72px gutters eat the field on a phone. */
   @media (max-width: 900px) {
-    .home-hero { flex-direction: column !important; align-items: stretch !important; }
-    .home-hero-collage { display: none !important; }
+    .home-hero { padding: 52px 32px 56px !important; min-height: 0 !important; }
+    .home-hero-title { font-size: 46px !important; }
+    .home-body { padding: 40px 32px 64px !important; }
   }
-  @media (max-width: 700px) {
-    .home-hero { padding: 24px !important; }
+  @media (max-width: 640px) {
+    .home-hero { padding: 40px 20px 44px !important; }
+    .home-hero-title { font-size: 36px !important; letter-spacing: -0.035em !important; }
+    .home-composer { padding: 16px 16px 12px !important; border-radius: 18px !important; }
+    /* 17px placeholder clips inside a two-row field at phone width. */
+    /* Two rows truncate the placeholder mid-sentence at this width; give it
+       the room to read as a whole example instead of a clipped fragment. */
+    .home-composer textarea { font-size: 15px !important; min-height: 4.4em; }
+    .home-composer .home-chip { font-size: 12px !important; padding: 7px 11px !important; }
+    .home-body { padding: 32px 20px 56px !important; }
+  }
+
+  /* Composer chips and seed pills: same affordance, two surfaces (opaque on
+     the card, translucent on the page), so they get one shared hover step. */
+  .home-chip { transition: background-color 160ms var(--ease-out); }
+  .home-chip:hover { background: #E9E9EC !important; }
+  .home-seed { transition: background-color 160ms var(--ease-out), transform 160ms var(--ease-out); }
+  .home-seed:hover { background: #fff !important; transform: translateY(-1px); }
+
+  /* In-progress cards. The thumbnail sits desaturated until the card is
+     hovered, so a row of them reads as one calm set rather than six competing
+     palettes; the scrim keeps the overlaid brand name legible on any artwork. */
+  .b-card { transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out); }
+  .b-card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(0, 0, 0, .12); }
+  .b-thumb { position: relative; overflow: hidden; }
+  .b-thumb > :first-child { width: 100%; height: 100%; filter: grayscale(1) contrast(.55) brightness(.9); transition: filter 420ms var(--ease-out); }
+  .b-card:hover .b-thumb > :first-child { filter: none; }
+  .b-thumb--plain::before { display: none; }
+  .b-thumb::before {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(to top, rgba(0, 0, 0, .42), rgba(0, 0, 0, 0) 62%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .b-card, .b-thumb > :first-child, .home-seed, .home-chip { transition: none; }
+    .b-card:hover { transform: none; }
+    .home-seed:hover { transform: none; }
   }
 
   /* Reference gallery: a masonry collage rather than a uniform grid. Every
