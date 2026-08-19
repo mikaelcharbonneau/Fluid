@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run src/lib",
+    "test": "vitest run src/lib src/components",
     "test:watch": "vitest",
     "test:integration": "vitest run src/app",
     "test:e2e": "playwright test",
