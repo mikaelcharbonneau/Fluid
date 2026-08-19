@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDomainAvailability } from "@/lib/domains";
+import { capabilities } from "@/lib/env/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -24,6 +25,13 @@ export async function POST(request: Request) {
     : [];
   if (domains.length === 0) {
     return NextResponse.json({ results: [] });
+  }
+  // No Vercel registrar token configured: degrade explicitly rather than
+  // throwing mid-request. `available: null` is the same shape the client
+  // already handles for a single failed lookup — it just shows the name
+  // suggestion without an availability badge.
+  if (!capabilities.domainAvailability) {
+    return NextResponse.json({ results: domains.map((domain) => ({ domain, available: null })) });
   }
 
   try {

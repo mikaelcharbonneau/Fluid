@@ -6,6 +6,8 @@
 //
 // https://vercel.com/docs/domains/registrar-api
 
+import { requireVercelAccessToken, serverEnv } from "@/lib/env/server";
+
 const REGISTRAR_URL = "https://api.vercel.com/v1/registrar/domains/availability";
 // The API accepts at most 50 per call; the name-suggestions step only ever
 // shows 10, but this stays a hard ceiling regardless of caller.
@@ -17,23 +19,17 @@ export interface DomainAvailability {
   available: boolean | null;
 }
 
-function apiToken(): string {
-  const token = (process.env.VERCEL_ACCESS_TOKEN ?? "").trim();
-  if (!token) throw new Error("VERCEL_ACCESS_TOKEN is not configured.");
-  return token;
-}
-
 export async function checkDomainAvailability(domains: string[]): Promise<DomainAvailability[]> {
   const clean = [...new Set(domains.map((d) => d.trim().toLowerCase()).filter(Boolean))].slice(0, MAX_BATCH);
   if (clean.length === 0) return [];
 
-  const teamId = process.env.VERCEL_TEAM_ID?.trim();
+  const teamId = serverEnv.VERCEL_TEAM_ID;
   const url = teamId ? `${REGISTRAR_URL}?teamId=${encodeURIComponent(teamId)}` : REGISTRAR_URL;
 
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiToken()}`,
+      Authorization: `Bearer ${requireVercelAccessToken()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ domains: clean }),

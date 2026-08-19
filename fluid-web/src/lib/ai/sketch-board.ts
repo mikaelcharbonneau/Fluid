@@ -24,6 +24,7 @@ import { captionBrief } from "./caption-reference";
 import { MARK_TYPES, DESIGN_PRINCIPLES, ANTI_CLICHE, CRITIQUE_RUBRIC } from "./design";
 import { analyzeLettermarkReference } from "./lettermark-reference-prompt";
 import { reportError } from "@/lib/monitoring/log";
+import { serverEnv } from "@/lib/env/server";
 
 export interface BoardSketch {
   id: string;
@@ -304,7 +305,7 @@ export function previewBoardPrompt(input: BoardBrief): {
   user: string;
   model: string;
 } {
-  return { system: SYSTEM, user: buildUserPrompt(input), model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5.6-luna" };
+  return { system: SYSTEM, user: buildUserPrompt(input), model: serverEnv.OPENAI_TEXT_MODEL || "gpt-5.6-luna" };
 }
 
 export interface ParsedConcept {

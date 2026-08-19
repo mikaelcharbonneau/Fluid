@@ -34,7 +34,12 @@ npx vercel env pull .env.local
 
 Alternatively, copy `.env.example` to `.env.local` and fill in each value by
 hand — see that file for where each key comes from (Supabase dashboard,
-OpenAI platform, Stripe dashboard).
+OpenAI platform, Stripe dashboard). Every variable is validated at import time
+by `src/lib/env/` (schema, allowed prefixes, minimum secret length); a
+variable required in production that's still missing fails server startup
+rather than the first request that happens to need it — see
+`src/lib/env/schema.ts` for the full classification and
+`src/lib/env/startup.ts` for the startup check.
 
 Run the dev server:
 

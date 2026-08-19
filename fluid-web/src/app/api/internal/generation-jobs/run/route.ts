@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { runOneGenerationJob } from "@/lib/generation-jobs/worker";
 import { reportError } from "@/lib/monitoring/log";
+import { cronSecret } from "@/lib/env/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 function isAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET || process.env.GENERATION_JOBS_CRON_SECRET;
+  const secret = cronSecret();
   if (!secret) return false;
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }

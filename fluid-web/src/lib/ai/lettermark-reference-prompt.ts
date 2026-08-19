@@ -1,13 +1,13 @@
 import { generateOpenAIText } from "./openai";
+import { serverEnv } from "@/lib/env/server";
 
 // This is the reusable prompt created and maintained in the OpenAI platform.
 // Deliberately do not pin a version: publishing a newer version there should
 // update Fluid without a code deployment. Set the optional environment values
 // only when a preview needs to stay on a specific prompt revision.
 const PROMPT_ID =
-  process.env.OPENAI_LETTERMARK_ANALYSIS_PROMPT_ID?.trim() ||
-  "pmpt_6a71ddea001c8195bc04aa26d6cb7cf30ece838170135934";
-const PROMPT_VERSION = process.env.OPENAI_LETTERMARK_ANALYSIS_PROMPT_VERSION?.trim();
+  serverEnv.OPENAI_LETTERMARK_ANALYSIS_PROMPT_ID || "pmpt_6a71ddea001c8195bc04aa26d6cb7cf30ece838170135934";
+const PROMPT_VERSION = serverEnv.OPENAI_LETTERMARK_ANALYSIS_PROMPT_VERSION;
 
 function cleanPrompt(raw: string): string {
   return raw
