@@ -116,3 +116,95 @@
     animation: none;
   }
 }
+
+/* ---- canvas + activity feed ------------------------------------------- */
+
+@keyframes bchat-canvas-in {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes bchat-track {
+  0% { left: -38%; }
+  100% { left: 100%; }
+}
+
+@keyframes bchat-pulse {
+  0%, 100% { opacity: .25; }
+  50% { opacity: 1; }
+}
+
+.bchat-canvas {
+  background: #f0f0f2;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+  animation: bchat-canvas-in 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.bchat-canvas::-webkit-scrollbar {
+  width: 10px;
+}
+
+.bchat-canvas::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  border: 2.5px solid #f0f0f2;
+}
+
+.bchat-canvas::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bchat-bar {
+  position: relative;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.bchat-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  border-radius: 2px;
+  background: #000;
+  animation: bchat-track 1.25s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.bchat-dot {
+  animation: bchat-pulse 1.3s ease-in-out infinite;
+}
+
+.bchat-blkhd:hover {
+  color: #000;
+}
+
+.bchat-prom {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: rgba(0, 0, 0, 0.62);
+  background: #f5f5f6;
+  border-radius: 8px;
+  padding: 10px 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* A settled answer on the canvas — click to re-open that step. */
+.bchat-card:hover {
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bchat-canvas,
+  .bchat-bar::after,
+  .bchat-dot {
+    animation: none;
+  }
+}
