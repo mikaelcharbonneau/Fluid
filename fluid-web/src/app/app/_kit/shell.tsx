@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import Image from "next/image";
 import { __assets } from "./assets";
 import { useBrandDraft } from "../_state/brand-draft-context";
 import { useRouter } from "../_state/router-context";
@@ -17,14 +18,23 @@ import { useRouter } from "../_state/router-context";
 // `<script type="text/babel">` gets its own transform scope.
 
 // Uses the same wordmark file as the marketing site so the two never drift.
-export const FluidWordmark = ({ height = 22, color = 'ink' }) => (
-  <img
-    className="fl-wordmark"
-    src={color === 'mono' ? __assets['assets/min/fluid-wordmark-mono.png'] : __assets['uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png']}
-    alt="Fluid"
-    style={{ height, width: 'auto', display: 'block' }}
-  />
-);
+export const FluidWordmark = ({ height = 22, color = 'ink' }) => {
+  // The two marks have different intrinsic sizes; both render at `height`
+  // with width auto, so next/image needs each one's real aspect ratio to
+  // reserve the right box.
+  const mono = color === 'mono';
+  return (
+    <Image
+      className="fl-wordmark"
+      src={mono ? __assets['assets/min/fluid-wordmark-mono.png'] : __assets['uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png']}
+      alt="Fluid"
+      width={mono ? 520 : 700}
+      height={mono ? 173 : 161}
+      priority
+      style={{ height, width: 'auto', display: 'block' }}
+    />
+  );
+};
 
 const ChevronRight = ({ size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -69,7 +79,9 @@ const ARailIcon = ({ d, active, label }: any) => (
     {active && <div style={{position:'absolute',left:0,top:18,bottom:18,width:2,background:'#000',borderRadius:2}}/>}
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
-    <span style={{fontSize: 9.5, fontWeight: 600, letterSpacing: 0.04, color: active ? 'var(--fg-2)' : 'var(--fg-4)'}}>{label}</span>
+    {/* --fg-3, not --fg-4: these are the rail's only labels. At --fg-4 they
+        measured 2.35:1, well under AA (#171). */}
+    <span style={{fontSize: 9.5, fontWeight: 600, letterSpacing: 0.04, color: active ? 'var(--fg-2)' : 'var(--fg-3)'}}>{label}</span>
   </div>
 );
 

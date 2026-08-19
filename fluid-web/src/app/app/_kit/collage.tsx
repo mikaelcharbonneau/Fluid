@@ -5,6 +5,9 @@
 // around it is new.
 
 import React from "react";
+import Image from "next/image";
+import { COLLAGE_DIMENSIONS } from "./collage-dimensions";
+import { CARD_BUTTON_RESET } from "./a11y";
 import { __assets } from "./assets";
 import { ArrowRight } from "./ui";
 
@@ -26,9 +29,10 @@ import { ArrowRight } from "./ui";
 
 // Every brand image, with its column assignment. Interleaved 1-2-3-1-2-3…
 // so each column carries a balanced mix of portrait / landscape / square.
-const COLLAGE_IMAGES = Array.from({ length: 24 }, (_, i) =>
-  `${__assets['assets/collage/brand-' + String(i + 1).padStart(2, '0') + '.png']}`
-);
+const COLLAGE_IMAGES = Array.from({ length: 24 }, (_, i) => ({
+  src: `${__assets['assets/collage/brand-' + String(i + 1).padStart(2, '0') + '.png']}`,
+  ...COLLAGE_DIMENSIONS[i + 1],
+}));
 
 const COL_1 = [0, 3, 6, 9, 12, 15, 18, 21].map((i) => COLLAGE_IMAGES[i]);
 
@@ -37,10 +41,12 @@ const COL_2 = [1, 4, 7, 10, 13, 16, 19, 22].map((i) => COLLAGE_IMAGES[i]);
 const COL_3 = [2, 5, 8, 11, 14, 17, 20, 23].map((i) => COLLAGE_IMAGES[i]);
 
 // ---- A single brand card --------------------------------------------
-const BrandImgCard = ({ src }: any) => (
-  <img
-    src={src}
+const BrandImgCard = ({ image }: any) => (
+  <Image
+    src={image.src}
     alt=""
+    width={image.width}
+    height={image.height}
     draggable={false}
     style={{
       display: 'block', width: '100%', height: 'auto', borderRadius: 12,
@@ -83,7 +89,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }:
   const dur = shift ? shift / speed : 20;
   // Negative delay offsets each column's starting phase so they never align.
   const delay = shift ? -(phase * dur) : 0;
-  const cards = images.map((src: any, i: any) => <BrandImgCard key={i} src={src} />);
+  const cards = images.map((image: any, i: any) => <BrandImgCard key={i} image={image} />);
   return (
     <div
       ref={ref}
@@ -164,7 +170,8 @@ export const QUICK_VISUAL_MODES = [
 
 // ---- Quick path card — focus on one thing ------------------------------
 export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }: any) =>
-<div data-route={route} onClick={onClick} style={{
+<button type="button" data-route={route} onClick={onClick} style={{
+  ...CARD_BUTTON_RESET,
   background: 'var(--bg-elev)', borderRadius: 16,
   boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
   display: 'flex', flexDirection: 'column', cursor: 'pointer', overflow: 'hidden'
@@ -174,8 +181,8 @@ export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, cu
     position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 -1px 0 var(--line)'
   }}>
       {customPreview ||
-    <img src={preview} alt="" draggable={false} style={{
-      width: '100%', height: '100%', objectFit: 'cover',
+    <Image src={preview} alt="" draggable={false} fill sizes="(max-width: 900px) 100vw, 33vw" style={{
+      objectFit: 'cover',
       objectPosition: previewPos || 'center', display: 'block'
     }} />
     }
@@ -193,5 +200,5 @@ export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, cu
         Start <ArrowRight size={11} />
       </div>
     </div>
-  </div>;
+  </button>;
 

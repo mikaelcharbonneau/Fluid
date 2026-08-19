@@ -64,7 +64,9 @@
   display: flex; align-items: center; gap: 14px;
   margin: 22px 0;
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--fg-4); white-space: nowrap;
+  /* --fg-3, not --fg-4: this is real text ("or log in with email"), and at
+     --fg-4 it measured 2.35:1 — well under AA. See design-tokens.css. */
+  color: var(--fg-3); white-space: nowrap;
 }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 

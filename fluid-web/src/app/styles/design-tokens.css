@@ -411,8 +411,18 @@
   /* -------- Foreground text -------- */
   --fg-1: #000000;                    /* primary — pure black */
   --fg-2: rgba(0, 0, 0, 0.72);        /* secondary */
-  --fg-3: rgba(0, 0, 0, 0.52);        /* tertiary / meta */
-  --fg-4: rgba(0, 0, 0, 0.34);        /* hint / disabled */
+  /* --fg-3 and --fg-4 were 0.52 and 0.34. Both were being used for ordinary
+     text — 40 of --fg-4's 53 uses are a `color:` — and both failed WCAG AA:
+     0.52 measured 4.29:1 on white, 0.34 just 2.35:1. axe reported those as
+     serious violations across the marketing pages, the auth pages and ten of
+     the eighteen app screens (#171).
+     Raised so the whole scale clears 4.5:1 on every surface in the palette
+     (white through --bg-sunken): --fg-3 lands at 5.96–6.19:1, --fg-4 at
+     4.61–4.74:1. They sit closer together than before because AA leaves
+     little room below --fg-2 — that is the constraint, not an oversight.
+     Anything that needs to be lighter still must not be text. */
+  --fg-3: rgba(0, 0, 0, 0.62);        /* tertiary / meta */
+  --fg-4: rgba(0, 0, 0, 0.55);        /* hint — the lightest readable step */
   --fg-on-color: #FFFFFF;
   --fg-on-cream: #000000;
 
@@ -424,7 +434,11 @@
   --success:       #44D9C7;              /* fluid teal */
   --info:          #9AD3E6;              /* fluid sky, deepened */
   --danger:        #FD7947;              /* fluid coral — decorative warmth only */
-  --destructive:   #D64545;              /* dedicated destructive red — for delete/irreversible actions */
+  /* #C03636, darkened from #D64545: the original measured 4.38:1 on white
+     and less on tinted surfaces, just under AA, and this token carries error
+     text — the one place a reader most needs to be able to read (#171).
+     Same hue, 5.49:1 on white and 4.83:1 on --bg-sunken. */
+  --destructive:   #C03636;              /* dedicated destructive red — for delete/irreversible actions */
 
   /* -------- The signature Fluid Gradient --------
      The canonical atmospheric mesh is shipped as a high-resolution image
@@ -600,3 +614,41 @@ body[data-brand="solid"] { --fl-accent: #FD7947; }
    in both alternative modes (brightness(0) → pure black, alpha preserved). */
 body[data-brand="rare"]  .fl-wordmark,
 body[data-brand="solid"] .fl-wordmark { filter: brightness(0); }
+
+/* ============================================================
+   Focus visibility (#171)
+   ============================================================
+   Before this, nothing in the app styled focus at all: keyboard users got
+   whatever the UA drew, and on the selection cards — which set
+   `appearance: none` and carry heavy box-shadows — that outline was easy to
+   lose against the card's own ring.
+
+   `:focus-visible` rather than `:focus`, so the ring appears for keyboard
+   and assistive-tech focus but not on pointer clicks. Two layers: a white
+   halo under a black ring, so it stays legible on light surfaces, dark
+   panels (`[data-dark]`) and photographic tiles alike. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--fg-1, #000);
+  outline-offset: 2px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.9);
+}
+
+/* On dark sections the ring inverts, otherwise black-on-black vanishes. */
+[data-dark] :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: #fff;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+/* The auth inputs already draw their own focus treatment (a darkened border
+   plus a soft ring); let it stand rather than stacking a second one. */
+.auth-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(a, button, input, select, textarea, summary, [tabindex]) {
+    transition: outline-offset 120ms ease;
+  }
+}

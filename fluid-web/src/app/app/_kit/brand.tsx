@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import Image from "next/image";
 
 // ══════════════════════════════════════════════════════════════════════
 // Brand-kit export — all client-side, no dependencies. Downloads the logo
@@ -38,7 +39,9 @@ export function pickLogoSvg(b: any) {
 // Rasterize an SVG string to a PNG Blob at `size`px via an offscreen canvas.
 export function svgToPngBlob(svg: any, size: any) {
   return new Promise<Blob>((resolve, reject) => {
-    const img = new Image();
+    // `window.Image` explicitly: this module also imports next/image as
+    // `Image`, and the bare `new Image()` would resolve to that component.
+    const img = new window.Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = size; canvas.height = size;
@@ -121,10 +124,14 @@ export const BA_CardVisual = ({ brand, height = 132 }: any) => {
   if (boardImage) {
     return (
       <div style={{ position: 'relative', height, background: 'var(--bg-sunken)', overflow: 'hidden' }}>
-        <img
+        {/* Model-generated, so its intrinsic size is not known here; the
+            wrapper fixes the height, so `fill` is the right shape. */}
+        <Image
           src={boardImage}
           alt={brandDisplayName(brand) + ' brand kit board'}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+          fill
+          sizes="(max-width: 1040px) 100vw, 50vw"
+          style={{ objectFit: 'cover', objectPosition: 'top', display: 'block' }}
         />
       </div>
     );
@@ -166,7 +173,16 @@ export const BA_CardVisual = ({ brand, height = 132 }: any) => {
 
 // Render model-generated SVG safely: an <img> data-URI can't execute scripts,
 // unlike innerHTML. The SVG is also sanitized server-side (defense in depth).
+//
+// #171 exception — deliberately NOT next/image. Optimizing SVG requires
+// `images.dangerouslyAllowSVG`, which turns the optimizer loose on SVG
+// markup; doing that for *model-generated* SVG is exactly the case the flag
+// is named after. There is also nothing to win: this is a vector at a fixed
+// square size, already resolution-independent, and it is a data URI, so
+// there is no network fetch to optimize. Width and height are set, so it
+// still reserves its box.
 export const SvgMark = ({ svg, size = 120, bg }: any) => (
+  // eslint-disable-next-line @next/next/no-img-element
   <img
     src={'data:image/svg+xml;utf8,' + encodeURIComponent(svg)}
     alt="Logo concept"

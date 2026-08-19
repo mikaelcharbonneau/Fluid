@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function AuthShowcase({ wordmarkSrc, palette }: { wordmarkSrc: string; palette?: string[] }) {
   return (
     <aside className="auth-showcase" data-dark="">
@@ -5,7 +7,7 @@ export function AuthShowcase({ wordmarkSrc, palette }: { wordmarkSrc: string; pa
       <span className="sc-glow two" aria-hidden="true" />
 
       <div className="sc-mark">
-        <img className="fl-wordmark" src={wordmarkSrc} alt="Fluid" />
+        <Image className="fl-wordmark" src={wordmarkSrc} alt="Fluid" width={700} height={161} priority />
       </div>
 
       <div className="sc-body">

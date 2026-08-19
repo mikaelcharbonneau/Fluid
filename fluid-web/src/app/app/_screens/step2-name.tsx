@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "../_kit/a11y";
 import { signalBalanceChanged } from "../_kit/api";
 import { resolveBrandName } from "../_kit/brand";
 import { Sparkle, Thinking } from "../_kit/ui";
@@ -21,18 +22,21 @@ import { useRouter } from "../_state/router-context";
 // =====================================================================
 // Compact name card — just the name, selectable, with a like (heart) toggle.
 const ANameCard = ({ n, sel, liked, onClick, onLike }: any) => (
-  <div onClick={onClick} style={{
+  <div style={{
     position:'relative', background:'var(--bg-elev)', borderRadius:12,
-    padding:'16px 30px 16px 14px', minHeight:58,
+    minHeight:58,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-    display:'flex', alignItems:'center', cursor:'pointer',
+    display:'flex', alignItems:'center',
   }}>
-    <span style={{
+    <button type="button" onClick={onClick} aria-pressed={!!sel} style={{
+      ...CARD_BUTTON_RESET,
+      padding:'16px 30px 16px 14px', minHeight:58,
+      display:'flex', alignItems:'center', cursor:'pointer',
       fontFamily:'var(--font-display)', fontWeight:700, fontSize:17,
       letterSpacing:'-0.02em', color:'#000',
       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%',
-    }}>{n}</span>
-    <button onClick={(e) => { e.stopPropagation(); onLike(); }} aria-label={liked ? 'Unlike ' + n : 'Like ' + n} style={{
+    }}>{n}</button>
+    <button onClick={onLike} aria-label={liked ? 'Unlike ' + n : 'Like ' + n} aria-pressed={!!liked} style={{
       position:'absolute', top:8, right:6, width:22, height:22, borderRadius:99,
       background:'transparent', border:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
     }}>
@@ -283,7 +287,7 @@ export const DirA_Step2_Name = () => {
                   background: sel ? '#000' : 'var(--bg)',
                   boxShadow: sel ? 'none' : 'inset 0 0 0 1px var(--line)',
                 }}>
-                  <span onClick={() => chooseName(name)} style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, color: sel ? '#fff' : '#000', cursor:'pointer'}}>{name}</span>
+                  <button type="button" onClick={() => chooseName(name)} aria-pressed={sel} style={{...CARD_BUTTON_RESET, width:'auto', fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, color: sel ? '#fff' : '#000', cursor:'pointer'}}>{name}</button>
                   <button onClick={() => toggleLike(name)} aria-label={'Remove ' + name} style={{width:20, height:20, borderRadius:99, background:'transparent', border:0, cursor:'pointer', color: sel ? 'rgba(255,255,255,.7)' : 'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>

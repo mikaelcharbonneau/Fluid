@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "./a11y";
 import { ADockActivity, useActivityLog } from "./activity";
 import { __assets } from "./assets";
 import { AShell } from "./shell";
@@ -30,23 +31,36 @@ const AStepProgress = ({ step }: any) => {
         return (
         <React.Fragment key={s.n}>
           {i > 0 && <div style={{width:16,height:1.5,background:s.n <= step ? '#000' : 'var(--line)'}}/>}
-          <div
-            onClick={done ? () => navigate('step' + s.n) : undefined}
-            title={done ? 'Back to ' + s.label : undefined}
-            style={{display:'flex',alignItems:'center',gap:6, cursor: done ? 'pointer' : 'default'}}
-          >
-            <div style={{
-              width:22,height:22,borderRadius:'50%',
-              background: s.n === step ? '#000' : (s.n < step ? 'var(--line-strong)' : 'transparent'),
-              color: s.n === step ? '#fff' : (s.n < step ? 'var(--fg-1)' : 'var(--fg-3)'),
-              border: s.n >= step ? '1px solid var(--line-strong)' : 'none',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)'
-            }}>{s.n < step ? (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ) : s.n}</div>
-            <span style={{fontSize:12,fontWeight:s.n === step ? 700 : 500,color:s.n === step ? '#000' : 'var(--fg-3)'}}>{s.label}</span>
-          </div>
+          {/* Only completed steps are navigable, so only those are controls —
+              rendering an always-on button would put empty targets in the tab
+              order for steps that go nowhere. */}
+          {(() => {
+            const inner = (
+              <>
+                <span style={{
+                  width:22,height:22,borderRadius:'50%',
+                  background: s.n === step ? '#000' : (s.n < step ? 'var(--line-strong)' : 'transparent'),
+                  color: s.n === step ? '#fff' : (s.n < step ? 'var(--fg-1)' : 'var(--fg-3)'),
+                  border: s.n >= step ? '1px solid var(--line-strong)' : 'none',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)'
+                }}>{s.n < step ? (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                ) : s.n}</span>
+                <span style={{fontSize:12,fontWeight:s.n === step ? 700 : 500,color:s.n === step ? '#000' : 'var(--fg-3)'}}>{s.label}</span>
+              </>
+            );
+            const layout = {display:'flex',alignItems:'center',gap:6} as React.CSSProperties;
+            return done ? (
+              <button type="button" onClick={() => navigate('step' + s.n)}
+                aria-label={'Back to ' + s.label} title={'Back to ' + s.label}
+                style={{...CARD_BUTTON_RESET, width:'auto', ...layout, cursor:'pointer'}}>
+                {inner}
+              </button>
+            ) : (
+              <div aria-current={s.n === step ? 'step' : undefined} style={{...layout, cursor:'default'}}>{inner}</div>
+            );
+          })()}
         </React.Fragment>
         );
       })}

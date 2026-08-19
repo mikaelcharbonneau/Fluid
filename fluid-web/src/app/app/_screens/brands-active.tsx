@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "../_kit/a11y";
 import { BA_CardVisual, brandDisplayName, isBrandKitBrand } from "../_kit/brand";
 import { AShell, CHAT } from "../_kit/shell";
 import { AEmptyState, PlusIcon, Sparkle, Thinking } from "../_kit/ui";
@@ -82,11 +83,14 @@ function relTime(iso: any) {
 
 // Card for a real, user-saved brand. The top visual reflects the brand's own
 // generated identity (logo / palette) rather than a generic tile.
+// The card carries its own Delete button, so the card itself cannot be one
+// (nested interactive elements are invalid and unreachable by keyboard).
+// The open action is a real button covering the card's body instead, with
+// Delete as its sibling — #171.
 const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
   <div
-    onClick={onOpen}
     style={{
-      borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)',
+      borderRadius: 16, overflow: 'hidden', background: 'var(--bg-elev)',
       boxShadow: 'inset 0 0 0 1px var(--line)', display: 'flex', flexDirection: 'column',
       position: 'relative',
     }}
@@ -98,7 +102,7 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
         instead. Any positioned sibling added after this one needs the same
         consideration. */}
     <button
-      onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}
+      onClick={onDelete}
       aria-label={'Delete ' + brandDisplayName(brand)}
       title="Delete brand"
       style={{
@@ -109,21 +113,24 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>
-    <BA_CardVisual brand={brand} />
-    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {brandDisplayName(brand)}
+    <button type="button" onClick={onOpen}
+      style={{ ...CARD_BUTTON_RESET, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+      <BA_CardVisual brand={brand} />
+      <span style={{ display: 'flex', width: '100%', padding: '14px 16px', flexDirection: 'column', gap: 10 }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {brandDisplayName(brand)}
+          </span>
+          <BA_StatusPill status={brand.status} />
         </span>
-        <BA_StatusPill status={brand.status} />
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--fg-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {brand.brief ? brand.brief : 'No description yet'}
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>
-        Edited {relTime(brand.updated_at)}
-      </div>
-    </div>
+        <span style={{ display: 'block', fontSize: 13, color: 'var(--fg-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {brand.brief ? brand.brief : 'No description yet'}
+        </span>
+        <span style={{ display: 'block', fontSize: 11.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>
+          Edited {relTime(brand.updated_at)}
+        </span>
+      </span>
+    </button>
   </div>
 );
 
@@ -274,7 +281,46 @@ export const DirA_BrandsActive = () => {
 // than a native window.confirm() — which several real embedding contexts
 // (sandboxed iframes, in-app webviews, automated browsers) suppress and
 // auto-resolve to `false`, silently breaking delete.
-const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => (
+const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => {
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const titleId = React.useId();
+  const descId = React.useId();
+
+  // #171: this was a bare overlay div — no dialog role, no way to dismiss it
+  // from the keyboard, and focus left behind on the page underneath. It now
+  // takes focus on open, keeps Tab inside itself while it is up, closes on
+  // Escape, and hands focus back to whatever opened it.
+  React.useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    panel?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!busy) onCancel();
+        return;
+      }
+      if (e.key !== 'Tab' || !panel) return;
+      const focusable = panel.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [busy, onCancel]);
+
+  return (
   <div
     onClick={onCancel}
     style={{
@@ -285,6 +331,11 @@ const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => (
     }}
   >
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descId}
       onClick={(e) => e.stopPropagation()}
       style={{
         width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18,
@@ -293,10 +344,10 @@ const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => (
       }}
     >
       <div>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', color: '#000' }}>
+        <div id={titleId} style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', color: '#000' }}>
           Delete &ldquo;{name}&rdquo;?
         </div>
-        <div style={{ fontSize: 13.5, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
+        <div id={descId} style={{ fontSize: 13.5, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
           This permanently removes the brand and everything generated for it — logo, palette, type, guidelines. This can&rsquo;t be undone.
         </div>
       </div>
@@ -326,7 +377,8 @@ const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => (
       </div>
     </div>
   </div>
-);
+  );
+};
 
 async function apiDeleteBrand(id: any) {
   try {

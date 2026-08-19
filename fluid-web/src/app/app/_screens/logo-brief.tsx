@@ -160,7 +160,7 @@ export const DirA_LogoBrief = () => {
                 {busy('brief_sharper') ? 'Working…' : 'Sharpen the angle'}
               </button>
               <div style={{flex:1}}/>
-              <span className="logo-shortcut" style={{fontSize:10.5,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
+              <span className="logo-shortcut" style={{fontSize:10.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
             </div>
             {assistErr && <div role="alert" style={{marginTop:10,fontSize:11.5,color:'#A8421F'}}>{assistErr}</div>}
           </div>

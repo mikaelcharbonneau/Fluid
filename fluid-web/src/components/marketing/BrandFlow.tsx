@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const SERVICE_MOSAIC = [
   [
     "/assets/uuid/de41faa1-d8a8-4614-be87-fe2631f8cd57.jpg",
@@ -195,7 +197,7 @@ export function BrandFlow() {
                     <div className="bf-logo-explore">
                       {LOGO_SKETCHES.map((src, i) => (
                         <div className={`lx sketch${i === 5 ? " chosen" : ""}`} data-lx={i} key={src}>
-                          <img src={src} alt="" />
+                          <Image src={src} alt="" width={520} height={520} />
                         </div>
                       ))}
                     </div>
@@ -208,7 +210,7 @@ export function BrandFlow() {
                     <div className="kc" data-k="0" style={{ gridColumn: "span 4", gridRow: "span 2" }}>
                       <span className="kc-cap">Logo</span>
                       <div className="kc-body">
-                        <img src="/assets/uuid/196c5943-6844-4354-8332-20ba6ce9042b.png" alt="" style={{ width: "64%" }} />
+                        <Image src="/assets/uuid/196c5943-6844-4354-8332-20ba6ce9042b.png" alt="" width={520} height={520} style={{ width: "64%", height: "auto" }} />
                       </div>
                     </div>
                     <div className="kc" data-k="1" style={{ gridColumn: "span 8" }}>
@@ -254,13 +256,13 @@ export function BrandFlow() {
                     <div className="kc" data-k="3" style={{ gridColumn: "span 4" }}>
                       <span className="kc-cap">App icon</span>
                       <div className="kc-body iconwrap">
-                        <img src="/assets/uuid/017aa8ad-23be-4e06-8f2c-0cea154cf47a.png" alt="" />
+                        <Image src="/assets/uuid/017aa8ad-23be-4e06-8f2c-0cea154cf47a.png" alt="" width={351} height={360} />
                       </div>
                     </div>
                     <div className="kc" data-k="4" style={{ gridColumn: "span 8" }}>
                       <span className="kc-cap">Wordmark</span>
                       <div className="kc-body">
-                        <img src="/assets/uuid/ff314af0-d60a-45f5-9c32-660e75675988.png" alt="" style={{ width: "62%" }} />
+                        <Image src="/assets/uuid/ff314af0-d60a-45f5-9c32-660e75675988.png" alt="" width={700} height={184} style={{ width: "62%", height: "auto" }} />
                       </div>
                     </div>
                     <div className="kc" data-k="5" style={{ gridColumn: "span 4" }}>
