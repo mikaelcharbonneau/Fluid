@@ -1,12 +1,14 @@
-"use client";
+import { ScreenFallback } from "./_kit/screen-fallback";
+import { LegacyHashRedirect } from "./legacy-hash-redirect";
 
-import dynamic from "next/dynamic";
-import "../styles/prototype.css";
-
-// The prototype writes components to `window` at module load and drives its
-// own hash router, so it must render client-only (no SSR prerender).
-const Prototype = dynamic(() => import("./Prototype"), { ssr: false });
-
-export default function AppPage() {
-  return <Prototype />;
+// /app itself renders nothing: it exists to forward both the bare URL and the
+// pre-#175 /app#<route> links to their real route. Server component — the
+// only client code here is the fragment reader.
+export default function AppEntry() {
+  return (
+    <>
+      <LegacyHashRedirect />
+      <ScreenFallback />
+    </>
+  );
 }

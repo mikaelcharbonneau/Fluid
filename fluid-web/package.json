@@ -14,7 +14,8 @@
     "test:e2e:hydration": "playwright test --config=playwright.hydration.config.ts",
     "skills:build": "node scripts/build-skills.mjs",
     "skills:check": "node scripts/build-skills.mjs --check",
-    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs"
+    "verify:logo-reference-ranking": "node scripts/verify-logo-reference-ranking.mjs",
+    "measure:js": "node scripts/measure-route-js.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.70.0",

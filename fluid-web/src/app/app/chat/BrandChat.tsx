@@ -1248,7 +1248,7 @@ function ResultView({
         <button type="button" onClick={onRegenerate} style={{ ...cta(true), background: CARD, color: INK, boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, display: "inline-flex", alignItems: "center", gap: 8 }}>
           <Refresh size={13} /> Start over
         </button>
-        <a href="/app#brands" style={ghostLink}>
+        <a href="/app/brands" style={ghostLink}>
           Back to brands
         </a>
       </div>
@@ -1294,7 +1294,7 @@ function Header({ breadcrumb, tokens }: { breadcrumb: string; tokens: number | n
       <img src="/assets/uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png" alt="Fluid" style={{ height: 22, width: "auto", display: "block" }} />
       <div style={{ width: 1, height: 28, background: HAIRLINE }} />
       <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: MUTED, whiteSpace: "nowrap" }}>
-        <a href="/app#brands" style={{ fontWeight: 500, color: MUTED }}>Brands</a>
+        <a href="/app/brands" style={{ fontWeight: 500, color: MUTED }}>Brands</a>
         <Chevron size={12} />
         <span style={{ color: INK, fontWeight: 600 }}>{breadcrumb}</span>
       </nav>
@@ -1323,10 +1323,10 @@ function Header({ breadcrumb, tokens }: { breadcrumb: string; tokens: number | n
 
 function Sidebar() {
   const items = [
-    { name: "Home", href: "/app#home", Icon: Home, active: false },
-    { name: "Brands", href: "/app#brands", Icon: Grid, active: true },
-    { name: "Assets", href: "/app#assets", Icon: Assets, active: false },
-    { name: "Guides", href: "/app#guides", Icon: Guides, active: false },
+    { name: "Home", href: "/app/home", Icon: Home, active: false },
+    { name: "Brands", href: "/app/brands", Icon: Grid, active: true },
+    { name: "Assets", href: "/app/assets", Icon: Assets, active: false },
+    { name: "Guides", href: "/app/guides", Icon: Guides, active: false },
   ];
   return (
     <aside style={{
@@ -1350,7 +1350,7 @@ function Sidebar() {
         </a>
       ))}
       <div style={{ flex: 1 }} />
-      <a href="/app#settings" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "14px 0", color: MUTED }}>
+      <a href="/app/settings" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "14px 0", color: MUTED }}>
         <Settings size={20} />
         <span style={{ fontSize: 9.5, fontWeight: 600, color: FAINT }}>Settings</span>
       </a>

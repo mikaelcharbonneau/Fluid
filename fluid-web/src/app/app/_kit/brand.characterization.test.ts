@@ -1,14 +1,17 @@
-// Characterization tests for a handful of pure functions extracted (named
-// exports, no behavior change) from Prototype.tsx as part of #169's type
-// safety pass. This is not full coverage of a 9,000-line file — see the
-// issue for the acknowledged scope — but it locks down the brand-name
-// resolution logic specifically: src/lib/brands.ts's chosenBrandName is a
-// deliberate duplicate of resolveBrandName/deriveBrandName here (its own
-// comments say so), and the two silently drifting apart is exactly the kind
-// of regression a characterization test exists to catch before #175 moves
-// this logic out of this file for good.
+// Characterization tests for a handful of pure functions that used to live in
+// the single-file Prototype.tsx, written for #169's type safety pass and kept
+// pointed at their new home in _kit/brand.tsx after #175 split that file into
+// per-route modules — the assertions below are unchanged, which is most of
+// what makes them useful here: they are the evidence the split moved this
+// logic without altering it.
+//
+// They also lock down the brand-name resolution specifically: src/lib/brands's
+// chosenBrandName is a deliberate duplicate of resolveBrandName/
+// deriveBrandName (its own comments say so), and the two silently drifting
+// apart is exactly the kind of regression a characterization test exists to
+// catch.
 import { describe, expect, it } from "vitest";
-import { deriveBrandName, escHtml, kitSlug, resolveBrandName } from "./Prototype";
+import { deriveBrandName, escHtml, kitSlug, resolveBrandName } from "./brand";
 
 describe("deriveBrandName", () => {
   it("takes the first four words of the brief, capitalized", () => {

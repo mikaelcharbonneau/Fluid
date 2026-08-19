@@ -25,7 +25,7 @@ export function LoginForm() {
       });
       const data = await res.json();
       if (res.ok) {
-        window.location.assign("/app#home");
+        window.location.assign("/app/home");
         return;
       }
       setError(data?.error || "Something went wrong. Try again.");

@@ -41,10 +41,9 @@ export async function proxy(request: NextRequest) {
   // Redirect while carrying over any auth cookies getUser() refreshed onto
   // `response`. A bare NextResponse.redirect() would drop those Set-Cookie
   // headers, leaving the browser with a rotated (now-invalid) token.
-  const redirectTo = (nextPath: string, hash?: string) => {
+  const redirectTo = (nextPath: string) => {
     const url = request.nextUrl.clone();
     url.pathname = nextPath;
-    if (hash) url.hash = hash;
     const redirect = NextResponse.redirect(url);
     for (const cookie of response.cookies.getAll()) {
       redirect.cookies.set(cookie);
@@ -57,7 +56,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if ((pathname === "/login" || pathname === "/signup") && user) {
-    return redirectTo("/app", "home");
+    return redirectTo("/app/home");
   }
 
   return response;
