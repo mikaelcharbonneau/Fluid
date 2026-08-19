@@ -10,6 +10,7 @@
 // and then the stream closes.
 
 import { createActivity, type Activity, type ActivityEvent } from "@/lib/ai/activity";
+import { reportError } from "@/lib/monitoring/log";
 
 export type StreamMessage =
   | { type: "activity"; event: ActivityEvent }
@@ -58,7 +59,7 @@ export function streamActivity(
         const data = await job(activity);
         send({ type: "result", data });
       } catch (err) {
-        console.error("Generation stream failed:", err);
+        reportError("Generation stream failed", err);
         const mapped = options.onError?.(err);
         const message =
           mapped?.message ??

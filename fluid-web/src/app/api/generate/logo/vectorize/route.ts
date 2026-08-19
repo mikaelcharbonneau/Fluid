@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { vectorizeImage } from "@/lib/ai/vectorize";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     };
     const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
-      console.error("Failed to cache vectorized logo:", saveError.message);
+      reportError("Failed to cache vectorized logo", saveError);
     }
 
     return NextResponse.json({ svg, url });

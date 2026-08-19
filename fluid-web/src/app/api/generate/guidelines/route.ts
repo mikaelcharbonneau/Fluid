@@ -4,6 +4,7 @@ import { generateBrandGuidelines } from "@/lib/ai/guidelines";
 import { styleContext, isDelegated } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
     p_patch: { guidelines },
   });
   if (saveError) {
-    console.error("Failed to cache generated guidelines:", saveError.message);
+    reportError("Failed to cache generated guidelines", saveError);
   }
 
   return NextResponse.json({ guidelines });

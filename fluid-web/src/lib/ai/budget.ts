@@ -1,3 +1,5 @@
+import { reportError } from "@/lib/monitoring/log";
+
 // Phase timing and deadline guards for the long AI routes.
 //
 // Vercel kills a function the instant it hits maxDuration, with no chance to
@@ -43,10 +45,9 @@ export function startClock(label: string, budgetMs: number): Clock {
     guard(step, needMs) {
       const left = budgetMs - (Date.now() - t0);
       if (left < needMs) {
-        console.error(
-          `[${label}] aborting before "${step}": ${left}ms left, needs ~${needMs}ms`,
-        );
-        throw new OutOfTimeError(step);
+        const error = new OutOfTimeError(step);
+        reportError(`[${label}] aborting before "${step}"`, error, { left, needMs });
+        throw error;
       }
     },
   };

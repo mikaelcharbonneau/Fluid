@@ -23,6 +23,7 @@ import { BOARD_SIZE, type BoardSlot, slotStyleName, slotTypeName } from "../logo
 import { captionBrief } from "./caption-reference";
 import { MARK_TYPES, DESIGN_PRINCIPLES, ANTI_CLICHE, CRITIQUE_RUBRIC } from "./design";
 import { analyzeLettermarkReference } from "./lettermark-reference-prompt";
+import { reportError } from "@/lib/monitoring/log";
 
 export interface BoardSketch {
   id: string;
@@ -462,7 +463,7 @@ export async function generateSketchBoard(input: BoardBrief): Promise<BoardSketc
   for (const result of rendered) {
     if (result.status === "fulfilled") sketches.push(result.value);
     else {
-      console.error("A board sketch failed to render:", result.reason);
+      reportError("A board sketch failed to render", result.reason);
       activity.emit(
         "warn",
         "A sketch failed to render and was dropped",
@@ -652,7 +653,7 @@ export async function generateReferenceCroquisBoard(
   for (const result of rendered) {
     if (result.status === "fulfilled") sketches.push(result.value);
     else {
-      console.error("A reference-led board sketch failed to render:", result.reason);
+      reportError("A reference-led board sketch failed to render", result.reason);
       activity.emit(
         "warn",
         "A sketch failed to render and was dropped",
