@@ -55,7 +55,7 @@ Open [http://localhost:3000](http://localhost:3000).
 src/app/
   page.tsx              marketing site (HTML fragment injected from _fragments/)
   login/ signup/ ...     auth pages
-  app/Prototype.jsx      the wizard + dashboard UI — single-file, all screens
+  app/Prototype.tsx      the wizard + dashboard UI — single-file, all screens
                           in one module scope (ported from the original
                           original design export; see AGENTS.md)
   api/

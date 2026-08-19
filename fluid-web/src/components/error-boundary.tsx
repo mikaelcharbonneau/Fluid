@@ -20,7 +20,7 @@ interface State {
 }
 
 // A component-level error boundary for high-risk surfaces that aren't their
-// own route yet (Prototype.jsx renders all 18 product screens in one module
+// own route yet (Prototype.tsx renders all 18 product screens in one module
 // — see #175). Catching here means a crash in, say, logo generation doesn't
 // blank the whole authenticated shell; the rest of the product stays usable
 // and the user gets a retry instead of a dead page.

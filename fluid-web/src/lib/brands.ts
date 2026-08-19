@@ -2,7 +2,7 @@
 
 export type BrandStatus = "draft" | "live";
 
-// Mirrors deriveBrandName() in Prototype.jsx — the placeholder the client
+// Mirrors deriveBrandName() in Prototype.tsx — the placeholder the client
 // writes into `name` from the opening words of the brief. Duplicated here on
 // purpose: it is the only way to tell a real chosen name from a brief
 // fragment, and the two must stay in step.
@@ -17,7 +17,7 @@ function briefPlaceholderName(brief: string): string {
 //
 // `brand.name` is NOT a name field in the usual sense: the client's
 // setField('brief', ...) handler derives it from the first few words of the
-// brief (deriveBrandName in Prototype.jsx) as a placeholder so the brands
+// brief (deriveBrandName in Prototype.tsx) as a placeholder so the brands
 // list doesn't read "Untitled brand" everywhere. Every AI generator must use
 // this helper instead of `brand.name_choice || brand.name` — that fallback
 // silently hands the model a brief fragment as if it were the brand name.
