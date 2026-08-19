@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "../_kit/a11y";
 import { __assets } from "../_kit/assets";
 import { BA_CardVisual, brandDisplayName, isBrandKitBrand } from "../_kit/brand";
 import { BrandCollage, QUICK_VISUAL_MODES, QuickPath } from "../_kit/collage";
@@ -62,7 +63,10 @@ export const DirA_Home = () => {
             You have <strong style={{ color: '#fff' }}>{startBalance} free tokens</strong> — enough for your first full brand.
           </span>
         </div>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 20px', maxWidth: 560 }}>
+        {/* Explicit white: this panel is dark, and without a colour the
+            heading inherited --fg-1 (black) and rendered at 1.09:1 against
+            the panel — effectively invisible (#171). */}
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 20px', maxWidth: 560, color: '#fff' }}>
           Three steps from a sentence to a brand.
         </h2>
         <div className="home-grid-3" style={{ display: 'grid', gap: 18, marginBottom: 26 }}>
@@ -95,7 +99,7 @@ export const DirA_Home = () => {
         </div>
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
           {drafts.slice(0, 4).map((b: any) => (
-            <div key={b.id}
+            <button type="button" key={b.id}
               onClick={() => {
                 // Same distinction as the Brands page: a brand-kit
                 // conversation resumes at its own URL, not the legacy wizard.
@@ -106,15 +110,15 @@ export const DirA_Home = () => {
                 loadBrand(b.id);
                 navigate(b.data && b.data.workflow === 'logo' ? 'logo-brief' : 'step' + (b.step || 1));
               }}
-              style={{ borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+              style={{ ...CARD_BUTTON_RESET, borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-elev)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
               <BA_CardVisual brand={b} height={96} />
-              <div style={{ padding: '13px 15px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ display: 'flex', padding: '13px 15px', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brandDisplayName(b)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>
                   {isBrandKitBrand(b) ? 'Brand kit · In progress' : (b.data && b.data.workflow === 'logo' ? 'Logo · Brief' : `Step ${b.step || 1} of 5`)}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
           ))}
         </div>
       </section>

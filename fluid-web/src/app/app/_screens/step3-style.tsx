@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "../_kit/a11y";
 import { FONT_FALLBACK, ensureGoogleFont } from "../_kit/brand";
 import { AInspirationCard, APPLE_DISPLAY, AppleHero, FIGMA_TYPE, FigmaHero, PERPLEXITY_DISPLAY, PerplexityHero, TESLA_TYPE, TeslaHero, VISUAL_STYLE_OPTIONS } from "../_kit/brand-showcase";
 import { AI_CHOICE } from "../_kit/logo-flow";
@@ -290,7 +291,8 @@ const ASlider = ({ left, right, value, onChange }: any) => (
 
 // Palette option — a labeled set of swatches
 const APaletteOption = ({ name, mood, palette, sel, onClick }: any) => (
-  <div onClick={onClick} style={{
+  <button type="button" onClick={onClick} aria-pressed={!!sel} style={{
+    ...CARD_BUTTON_RESET,
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     padding: 14, display:'flex', flexDirection:'column', gap: 10,
@@ -310,12 +312,13 @@ const APaletteOption = ({ name, mood, palette, sel, onClick }: any) => (
       <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing:'-0.015em', color:'var(--fg-1)'}}>{name}</div>
       <div style={{fontSize: 10.5, color:'var(--fg-3)', marginTop: 1}}>{mood}</div>
     </div>
-  </div>
+  </button>
 );
 
 // Font pair option — display + body sample
 const AFontPairOption = ({ name, mood, display, body, sel, onClick }: any) => (
-  <div onClick={onClick} style={{
+  <button type="button" onClick={onClick} aria-pressed={!!sel} style={{
+    ...CARD_BUTTON_RESET,
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     padding: 14, display:'flex', flexDirection:'column', gap: 10,
@@ -346,7 +349,7 @@ const AFontPairOption = ({ name, mood, display, body, sel, onClick }: any) => (
       <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing:'-0.015em', color:'var(--fg-1)'}}>{name}</div>
       <div style={{fontSize: 10.5, color:'var(--fg-3)', marginTop: 1, fontFamily:'var(--font-mono)'}}>{display.name} / {body.name}</div>
     </div>
-  </div>
+  </button>
 );
 
 // Curated palettes for the "build it piece by piece" path.
@@ -379,29 +382,30 @@ const INSPIRATION_BRANDS = [
 
 // A user-uploaded font, previewed in that font, selectable + removable.
 const ACustomFontCard = ({ family, sel, onClick, onRemove }: any) => (
-  <div onClick={onClick} style={{
+  <div style={{
     background:'var(--bg-elev)', borderRadius: 14, position:'relative',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
-    padding: 14, display:'flex', flexDirection:'column', gap: 10, cursor:'pointer',
+    padding: 14, display:'flex', flexDirection:'column', gap: 10,
   }}>
     {sel && (
-      <div style={{position:'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: 99, background: '#000', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <div style={{position:'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: 99, background: '#000', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', zIndex: 1}}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
     )}
-    <div style={{ background:'var(--bg)', borderRadius: 8, boxShadow:'inset 0 0 0 1px var(--line)', padding:'12px 14px', minHeight: 78, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
-      <div style={{ fontFamily:'"' + family + '", sans-serif', fontSize: 24, color:'#000', lineHeight: 1 }}>Aa</div>
-      <div style={{ fontFamily:'"' + family + '", sans-serif', fontSize: 11, color:'var(--fg-2)', lineHeight: 1.45 }}>The quick brown fox jumps over the lazy dog.</div>
-    </div>
-    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
-      <div style={{minWidth:0}}>
-        <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing:'-0.015em', color:'var(--fg-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{family}</div>
-        <div style={{fontSize: 10.5, color:'var(--fg-3)', marginTop: 1, fontFamily:'var(--font-mono)'}}>Your font</div>
-      </div>
-      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} aria-label={'Remove ' + family} style={{width:22, height:22, borderRadius:99, background:'transparent', border:0, cursor:'pointer', color:'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center', flex:'0 0 auto'}}>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
+    <button type="button" onClick={onClick} aria-pressed={!!sel}
+      style={{ ...CARD_BUTTON_RESET, cursor:'pointer', display:'flex', flexDirection:'column', gap: 10 }}>
+      <span style={{ display:'block', width:'100%', background:'var(--bg)', borderRadius: 8, boxShadow:'inset 0 0 0 1px var(--line)', padding:'12px 14px', minHeight: 78 }}>
+        <span style={{ display:'block', fontFamily:'"' + family + '", sans-serif', fontSize: 24, color:'#000', lineHeight: 1 }}>Aa</span>
+        <span style={{ display:'block', marginTop: 10, fontFamily:'"' + family + '", sans-serif', fontSize: 11, color:'var(--fg-2)', lineHeight: 1.45 }}>The quick brown fox jumps over the lazy dog.</span>
+      </span>
+      <span style={{ display:'block', minWidth:0, width:'100%' }}>
+        <span style={{display:'block', fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing:'-0.015em', color:'var(--fg-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{family}</span>
+        <span style={{display:'block', fontSize: 10.5, color:'var(--fg-3)', marginTop: 1, fontFamily:'var(--font-mono)'}}>Your font</span>
+      </span>
+    </button>
+    <button onClick={onRemove} aria-label={'Remove ' + family} style={{position:'absolute', bottom:14, right:14, width:22, height:22, borderRadius:99, background:'transparent', border:0, cursor:'pointer', color:'var(--fg-3)', display:'inline-flex', alignItems:'center', justifyContent:'center', flex:'0 0 auto'}}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 );
 
@@ -409,7 +413,8 @@ const ACustomFontCard = ({ family, sel, onClick, onRemove }: any) => (
 const AUploadFontCard = ({ onPick }: any) => {
   const ref = React.useRef<any>(null);
   return (
-    <div onClick={() => ref.current && ref.current.click()} style={{
+    <button type="button" onClick={() => ref.current && ref.current.click()} style={{
+      ...CARD_BUTTON_RESET,
       borderRadius: 14, minHeight: 140, cursor:'pointer',
       boxShadow:'inset 0 0 0 1.5px var(--line)', background:'var(--bg)',
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap: 8, textAlign:'center', padding: 14,
@@ -421,7 +426,7 @@ const AUploadFontCard = ({ onPick }: any) => {
       </div>
       <div style={{fontFamily:'var(--font-display)', fontSize: 13, fontWeight: 700, color:'#000'}}>Upload your font</div>
       <div style={{fontSize: 10.5, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>.ttf · .otf · .woff · .woff2</div>
-    </div>
+    </button>
   );
 };
 

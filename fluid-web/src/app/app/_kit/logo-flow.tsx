@@ -5,6 +5,8 @@
 // around it is new.
 
 import React from "react";
+import Image from "next/image";
+import { CARD_BUTTON_RESET } from "./a11y";
 import { MAX_VERSION_COLORS } from "@/lib/logo-refine";
 import { logoReferencesFor } from "@/lib/logo-references";
 import { ADockActivity, useActivityLog } from "./activity";
@@ -502,11 +504,12 @@ export const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDisli
       // shove the masonry columns around as it arrives.
       aspectRatio: reference.aspectRatio || undefined,
     }}>
-      <img
+      <Image
         src={reference.imageUrl}
         alt={`${reference.name} — ${reference.markType} reference`}
-        loading="lazy"
-        style={reference.aspectRatio ? {height:'100%',objectFit:'cover'} : undefined}
+        fill
+        sizes="(max-width: 900px) 50vw, 25vw"
+        style={{ objectFit: reference.aspectRatio ? 'cover' : 'contain' }}
       />
     </div>
     {/* Why this reference is here: the attributes it shares with the chosen
@@ -662,8 +665,9 @@ export const ASketchCard = ({ sketch, liked, onLike, onImageError }: any) => (
       display:'flex', alignItems:'center', justifyContent:'center',
       overflow:'hidden',
     }}>
-      <img src={sketch.image_url} alt={sketch.name} loading="lazy" onError={onImageError}
-        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
+      <Image src={sketch.image_url} alt={sketch.name} onError={onImageError}
+        fill sizes="(max-width: 900px) 50vw, 25vw"
+        style={{objectFit:'contain', display:'block'}}/>
     </div>
     <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
       <div style={{minWidth:0}}>
@@ -691,7 +695,8 @@ export const ASketchCard = ({ sketch, liked, onLike, onImageError }: any) => (
 // A high-fidelity finalist card: the finished mark plus the designer's
 // rationale and the creative director's verdict from the critique pass.
 export const AFinalistCard = ({ f, sel, busy, onClick }: any) => (
-  <div onClick={onClick} style={{
+  <button type="button" onClick={onClick} aria-pressed={!!sel} aria-busy={!!busy} style={{
+    ...CARD_BUTTON_RESET,
     background:'var(--bg-elev)', borderRadius: 16, padding: 12, cursor:'pointer',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     display:'flex', flexDirection:'column', gap:10,
@@ -714,15 +719,16 @@ export const AFinalistCard = ({ f, sel, busy, onClick }: any) => (
         : sel && <span style={{fontSize:10, fontWeight:700, color:'#fff', background:'#000', padding:'3px 8px', borderRadius:99, letterSpacing:'0.04em'}}>SELECTED</span>}
     </div>
     <div style={{background:'#fff', borderRadius: 10, height: 130, padding:8, boxShadow:'inset 0 0 0 1px var(--line)'}}>
-      <img src={f.image_url} alt={f.name} loading="lazy"
-        style={{width:'100%', height:'100%', objectFit:'contain', display:'block'}}/>
+      <Image src={f.image_url} alt={f.name}
+        fill sizes="(max-width: 900px) 50vw, 25vw"
+        style={{objectFit:'contain', display:'block'}}/>
     </div>
     <div>
       <div style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:13.5, letterSpacing:'-0.015em', color:'#000'}}>{f.name}</div>
       {f.idea && <div style={{fontSize:11, color:'var(--fg-3)', lineHeight:1.4, marginTop:2}}>{f.idea}</div>}
       {f.critique && <div style={{fontSize:10.5, color:'var(--fg-4)', lineHeight:1.4, marginTop:6, paddingTop:6, borderTop:'1px solid var(--line)', fontStyle:'italic'}}>Studio note — {f.critique}</div>}
     </div>
-  </div>
+  </button>
 );
 
 // A selectable choice card with an illustrative preview.
@@ -743,6 +749,13 @@ const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }: a
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {refs.map((r: any, n: any) => (
+        // #171 exception — deliberately NOT next/image. These are bundled
+        // vector wordmarks (/logo-refs/**.svg); optimizing them would mean
+        // turning on `images.dangerouslyAllowSVG` app-wide, which also opens
+        // it to the model-generated SVG this app renders elsewhere. Vectors
+        // gain nothing from resizing or format negotiation, and the reel
+        // sits in a fixed-size box, so nothing shifts.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           key={r.src}
           className="mark-ref-frame"

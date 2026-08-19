@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import Image from "next/image";
 
 const PALETTE = [
   { name: "Teal", hex: "#44D9C7" },
@@ -42,7 +43,7 @@ export function KitReveal() {
             <span className="t">Logo</span>
           </div>
           <div className="stage" style={{ display: "grid", placeItems: "center" }}>
-            <img src="/assets/uuid/196c5943-6844-4354-8332-20ba6ce9042b.png" alt="" style={{ width: "60%" }} />
+            <Image src="/assets/uuid/196c5943-6844-4354-8332-20ba6ce9042b.png" alt="" width={520} height={520} style={{ width: "60%", height: "auto" }} />
           </div>
         </div>
         <div className="bcard" style={cardStyle(8, 90)}>
@@ -94,10 +95,12 @@ export function KitReveal() {
             <span className="t">App icon</span>
           </div>
           <div className="stage" style={{ display: "grid", placeItems: "center", padding: "14px" }}>
-            <img
+            <Image
               src="/assets/uuid/017aa8ad-23be-4e06-8f2c-0cea154cf47a.png"
               alt=""
-              style={{ height: "100%", maxHeight: "120px", maxWidth: "100%", objectFit: "contain", display: "block" }}
+              width={351}
+              height={360}
+              style={{ height: "100%", width: "auto", maxHeight: "120px", maxWidth: "100%", objectFit: "contain", display: "block" }}
             />
           </div>
         </div>
@@ -106,7 +109,7 @@ export function KitReveal() {
             <span className="t">Wordmark</span>
           </div>
           <div className="stage" style={{ display: "grid", placeItems: "center" }}>
-            <img src="/assets/uuid/69452e02-b4ea-435d-8b03-dbf9854c7dce.png" alt="" style={{ width: "50%" }} />
+            <Image src="/assets/uuid/69452e02-b4ea-435d-8b03-dbf9854c7dce.png" alt="" width={700} height={184} style={{ width: "50%", height: "auto" }} />
           </div>
         </div>
         <div className="bcard" style={cardStyle(4, 370)}>

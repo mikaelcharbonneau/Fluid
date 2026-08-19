@@ -26,6 +26,7 @@
 // before the current step is, by definition, already answered (that's what
 // the server's `nextStep` guarantees).
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { checkDomains, fetchBrand, postTurn, type TurnResult } from "./api";
@@ -485,8 +486,7 @@ function CanvasColumn({
             {picked ? settled("logoConcepts", "Logo",
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={picked.imageUrl} alt={picked.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  <Image src={picked.imageUrl} alt={picked.label} fill sizes="40px" style={{ objectFit: "contain" }} />
                 </div>
                 <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{picked.label}</span>
               </div>) : null}
@@ -1124,8 +1124,7 @@ function LogoConceptsWidget({ seed, busy, regenerating, onSubmit, onRegenerate }
               }}
             >
               <div style={{ borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}` }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.imageUrl} alt={c.label} style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "contain" }} />
+                <Image src={c.imageUrl} alt={c.label} width={512} height={512} style={{ display: "block", width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "contain" }} />
               </div>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "rgba(0,0,0,.72)", padding: "0 2px" }}>{c.label}</span>
             </button>
@@ -1170,8 +1169,7 @@ function ReviewWidget({ seed, busy, onSubmit }: WidgetProps) {
               <span style={{ ...label, flex: "0 0 150px" }}>Logo</span>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#fff", boxShadow: `inset 0 0 0 1px ${HAIRLINE}`, flex: "0 0 40px" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={chosenLogo.imageUrl} alt={chosenLogo.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  <Image src={chosenLogo.imageUrl} alt={chosenLogo.label} fill sizes="40px" style={{ objectFit: "contain" }} />
                 </div>
                 <span style={{ fontSize: 13.5, color: "rgba(0,0,0,.78)" }}>{chosenLogo.label}</span>
               </div>
@@ -1221,8 +1219,7 @@ function ResultView({
       </div>
 
       <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: `0 2px 6px rgba(0,0,0,.06), inset 0 0 0 1px ${HAIRLINE}` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={result.imageUrl} alt={`${name} brand kit board`} style={{ display: "block", width: "100%", height: "auto" }} />
+        <Image src={result.imageUrl} alt={`${name} brand kit board`} width={1024} height={1024} style={{ display: "block", width: "100%", height: "auto" }} />
       </div>
 
       <div style={{ display: "flex", gap: 6 }}>
@@ -1290,8 +1287,7 @@ function Header({ breadcrumb, tokens }: { breadcrumb: string; tokens: number | n
       padding: "0 24px", borderBottom: `1px solid ${HAIRLINE}`, background: PAPER,
       position: "relative", zIndex: 2,
     }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png" alt="Fluid" style={{ height: 22, width: "auto", display: "block" }} />
+      <Image src="/assets/uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png" alt="Fluid" width={700} height={161} priority style={{ height: 22, width: "auto", display: "block" }} />
       <div style={{ width: 1, height: 28, background: HAIRLINE }} />
       <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: MUTED, whiteSpace: "nowrap" }}>
         <a href="/app/brands" style={{ fontWeight: 500, color: MUTED }}>Brands</a>

@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "./a11y";
 import { Thinking } from "./ui";
 
 // Wizard layout wrapper
@@ -65,33 +66,46 @@ const fmtAt = (ms: any) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 const AActivityRow = ({ event }: any) => {
   const [open, setOpen] = React.useState(false);
   const hasDetail = !!event.detail;
+
+  const rowStyle = {
+    display: 'flex', alignItems: 'baseline', gap: 10,
+    cursor: hasDetail ? 'pointer' : 'default',
+  } as React.CSSProperties;
+
+  const rowContent = (
+    <>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'rgba(255,255,255,.35)',
+        flex: '0 0 46px', textAlign: 'right',
+      }}>{fmtAt(event.at)}</span>
+      <span style={{
+        fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+        color: (ACTIVITY_TONE as any)[event.kind] || 'rgba(255,255,255,.5)',
+        flex: '0 0 58px',
+      }}>{event.kind}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,.85)', lineHeight: 1.45 }}>
+        {event.label}
+        {hasDetail && (
+          <span style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
+            {open ? '▾ hide' : '▸ show'}
+          </span>
+        )}
+      </span>
+    </>
+  );
+
   return (
     <div style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-      <div
-        onClick={hasDetail ? () => setOpen((o) => !o) : undefined}
-        style={{
-          display: 'flex', alignItems: 'baseline', gap: 10,
-          cursor: hasDetail ? 'pointer' : 'default',
-        }}
-      >
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'rgba(255,255,255,.35)',
-          flex: '0 0 46px', textAlign: 'right',
-        }}>{fmtAt(event.at)}</span>
-        <span style={{
-          fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
-          color: (ACTIVITY_TONE as any)[event.kind] || 'rgba(255,255,255,.5)',
-          flex: '0 0 58px',
-        }}>{event.kind}</span>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,.85)', lineHeight: 1.45 }}>
-          {event.label}
-          {hasDetail && (
-            <span style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
-              {open ? '▾ hide' : '▸ show'}
-            </span>
-          )}
-        </span>
-      </div>
+      {/* Only a row with detail expands, so only that row is a control —
+          an always-rendered button would be an empty target on the rest. */}
+      {hasDetail ? (
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+          style={{ ...CARD_BUTTON_RESET, ...rowStyle }}>
+          {rowContent}
+        </button>
+      ) : (
+        <div style={rowStyle}>{rowContent}</div>
+      )}
       {open && (
         <pre style={{
           margin: '8px 0 4px 114px', padding: '10px 12px', borderRadius: 8,
@@ -126,9 +140,28 @@ export const ADockActivity = ({ events, running, failure, open, onToggle }: any)
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
+      {/* #171: generation runs for tens of seconds and its progress was only
+          ever conveyed visually. This announces the current step — politely,
+          so it waits for a pause rather than interrupting — and escalates a
+          failure to an assertive alert. Kept off-screen: the dock already
+          shows the same text, this is the same information for a reader. */}
       <div
+        role={failure ? 'alert' : 'status'}
+        aria-live={failure ? 'assertive' : 'polite'}
+        aria-atomic="true"
+        style={{
+          position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+          overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+        }}
+      >
+        {failure || (running ? (latest ? latest.label : 'Working…') : (latest ? `Finished: ${latest.label}` : ''))}
+      </div>
+      <button
+        type="button"
         onClick={onToggle}
-        style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', minWidth: 0 }}
+        aria-expanded={!!open}
+        aria-busy={!!running}
+        style={{ ...CARD_BUTTON_RESET, display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', minWidth: 0 }}
       >
         {running
           ? <Thinking/>
@@ -148,7 +181,7 @@ export const ADockActivity = ({ events, running, failure, open, onToggle }: any)
         }}>
           {events.length} {open ? '▾' : '▸'}
         </span>
-      </div>
+      </button>
 
       {open && (
         <div

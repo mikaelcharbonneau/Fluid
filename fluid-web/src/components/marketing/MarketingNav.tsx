@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMagnetic } from "@/components/interaction/useMagnetic";
 
@@ -9,7 +10,7 @@ export function MarketingNav() {
   return (
     <nav className="nav">
       <Link className="nav-brand" href="#top" aria-label="Fluid home">
-        <img className="fl-wordmark" src="/assets/uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png" alt="Fluid" />
+        <Image className="fl-wordmark" src="/assets/uuid/97b97e78-4145-428a-9c6f-c0ff3d3cb43d.png" alt="Fluid" width={700} height={161} priority />
       </Link>
       <div className="nav-links">
         <a className="nav-link" href="#transform">

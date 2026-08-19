@@ -103,7 +103,7 @@ export const DirA_Step1_Brief = () => {
             <button onClick={() => runAssist('brief_punchier')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('brief_punchier') ? 0.5 : 1}}>{busy('brief_punchier') ? 'Working…' : 'Make it punchier'}</button>
             <button onClick={() => runAssist('brief_sharper')} disabled={!!assisting} style={{...pill, opacity: assisting && !busy('brief_sharper') ? 0.5 : 1}}>{busy('brief_sharper') ? 'Working…' : 'Sharpen the angle'}</button>
             <div style={{flex:1}}/>
-            <span style={{fontSize:10.5,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
+            <span style={{fontSize:10.5,color:'var(--fg-3)',fontFamily:'var(--font-mono)'}}>⌘↵ to continue</span>
           </div>
           {assistErr && <div style={{marginTop:10, fontSize:11.5, color:'#A8421F'}}>{assistErr}</div>}
         </div>

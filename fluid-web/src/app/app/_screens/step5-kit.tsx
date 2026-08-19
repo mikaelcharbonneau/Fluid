@@ -5,6 +5,7 @@
 // around it is new.
 
 import React from "react";
+import { CARD_BUTTON_RESET } from "../_kit/a11y";
 import { signalBalanceChanged } from "../_kit/api";
 import { FONT_FALLBACK, SvgMark, downloadBlob, ensureGoogleFont, escHtml, kitSlug, pickLogoSvg, svgToPngBlob } from "../_kit/brand";
 import { VISUAL_STYLE_OPTIONS } from "../_kit/brand-showcase";
@@ -274,7 +275,8 @@ const KitLogoSection = ({ draft }: any) => {
           {logos.map((c: any) => {
             const sel = chosen === c.name;
             return (
-              <div key={c.name} onClick={() => setField && setField('logo_choice', c.name)} style={{
+              <button type="button" key={c.name} onClick={() => setField && setField('logo_choice', c.name)} aria-pressed={sel} style={{
+                ...CARD_BUTTON_RESET,
                 background: 'var(--bg-elev)', borderRadius: 16, padding: 16, cursor: 'pointer',
                 boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
                 display: 'flex', flexDirection: 'column', gap: 12,
@@ -290,7 +292,7 @@ const KitLogoSection = ({ draft }: any) => {
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#000', letterSpacing: '-0.018em' }}>{c.name}</div>
                   {c.descriptor && <div style={{ fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.4, marginTop: 2 }}>{c.descriptor}</div>}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -537,6 +539,24 @@ function buildBrandSheetHtml(b: any) {
 const KitExport = ({ b }: any) => {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
+
+  // #171: the menu used to be dismissable only by clicking a transparent
+  // backdrop div — no way out, and no way in, from the keyboard. Escape now
+  // closes it and returns focus to the trigger, and opening it moves focus to
+  // the first item so the menu is reachable at all without a pointer.
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
   const data = b.data || {};
   const hasLogo = !!pickLogoSvg(b);
   const hasPalette = !!(data.palette && (data.palette.colors || []).length);
@@ -553,7 +573,7 @@ const KitExport = ({ b }: any) => {
   const dlCss = () => { downloadBlob(slug + '-palette.css', new Blob([buildPaletteCss(b)], { type: 'text/css' })); setOpen(false); };
 
   const item = (label: any, onClick: any, enabled: any) => (
-    <button onClick={enabled ? onClick : undefined} disabled={!enabled} style={{
+    <button role="menuitem" onClick={enabled ? onClick : undefined} disabled={!enabled} style={{
       display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
       background: 'transparent', border: 0, cursor: enabled ? 'pointer' : 'default',
       fontSize: 13, fontWeight: 500, color: enabled ? 'var(--fg-1)' : 'var(--fg-4)', fontFamily: 'inherit',
@@ -562,7 +582,8 @@ const KitExport = ({ b }: any) => {
 
   return (
     <div style={{ position: 'relative', flex: '0 0 auto' }}>
-      <button onClick={() => setOpen((o) => !o)} style={{
+      <button ref={triggerRef} onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu" aria-expanded={open} aria-busy={busy} style={{
         padding: '11px 16px', borderRadius: 12, background: '#000', color: '#fff',
         fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 0,
         display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -572,8 +593,10 @@ const KitExport = ({ b }: any) => {
       </button>
       {open && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{
+          {/* Click-away catcher. Presentational: Escape is the keyboard route
+              out, handled above, so this must not appear to assistive tech. */}
+          <div onClick={() => setOpen(false)} aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div ref={menuRef} role="menu" aria-label="Export brand kit" style={{
             position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41, minWidth: 210,
             background: 'var(--bg-elev)', borderRadius: 12, padding: 6,
             boxShadow: '0 12px 30px rgba(0,0,0,.16), inset 0 0 0 1px var(--line)',

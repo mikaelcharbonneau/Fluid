@@ -5,6 +5,8 @@
 // around it is new.
 
 import React from "react";
+import Image from "next/image";
+import { CARD_BUTTON_RESET } from "./a11y";
 import { __assets } from "./assets";
 
 // =====================================================================
@@ -50,10 +52,11 @@ const BRAND_LOGO_SRC = {
 // `fill` mode: stretch to fill an overflow-hidden parent tile (parent owns
 // the radius). Otherwise renders a self-contained rounded square at `size`.
 const BrandLogoImg = ({ brand, size = 48, radius, fill = false, style }: any) => (
-  <img src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false}
-    style={fill
-      ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }
-      : { width: size, height: size, borderRadius: radius != null ? radius : Math.round(size * 0.22), objectFit: 'cover', display: 'block', ...style }} />
+  fill
+    ? <Image src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false} fill sizes="120px"
+        style={{ objectFit: 'cover', display: 'block', ...style }} />
+    : <Image src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false} width={size} height={size}
+        style={{ width: size, height: size, borderRadius: radius != null ? radius : Math.round(size * 0.22), objectFit: 'cover', display: 'block', ...style }} />
 );
 
 // ── Apple hero — brand identity sheet ─────────────────────────────────
@@ -388,7 +391,8 @@ export const TeslaHero = () => {
 // the palette lives inside the hero so it is shown exactly once and stays
 // consistent with the rest of the brand sheet.
 export const AInspirationCard = ({ name, category, style, hero, sel, onClick }: any) => (
-  <div onClick={onClick} style={{
+  <button type="button" onClick={onClick} aria-pressed={!!sel} style={{
+    ...CARD_BUTTON_RESET,
     background:'var(--bg-elev)', borderRadius: 18,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
     overflow:'hidden', display:'flex', flexDirection:'column',
@@ -432,7 +436,7 @@ export const AInspirationCard = ({ name, category, style, hero, sel, onClick }: 
         <div style={{fontSize: 11, color:'var(--fg-3)', marginTop: 2}}>{category}</div>
       </div>
     </div>
-  </div>
+  </button>
 );
 
 export const VISUAL_STYLE_OPTIONS = [

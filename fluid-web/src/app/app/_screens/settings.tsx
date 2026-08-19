@@ -33,12 +33,16 @@ const { useState: useSetState } = React;
 // ---------------------------------------------------------------------
 
 // Self-contained pill toggle. Black when on, hairline well when off.
-const Toggle = ({ defaultOn = false }) => {
+// `label` is not optional in practice: the control is a bare pill with no
+// text of its own, so without it a screen reader announces just "button"
+// (#171 — axe flagged exactly this). Call sites pass their Row's title.
+const Toggle = ({ defaultOn = false, label }: any) => {
   const [on, setOn] = useSetState(defaultOn);
   return (
     <button
-      onClick={() => setOn((v) => !v)}
+      onClick={() => setOn((v: any) => !v)}
       aria-pressed={on}
+      aria-label={label}
       style={{
         width: 42, height: 24, borderRadius: 999, padding: 2, flex: '0 0 42px',
         background: on ? '#000' : 'var(--bg-sunken)',
@@ -98,7 +102,7 @@ const Field = ({ label, value, sub, suffix, mono, wide }: any) => (
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
       {suffix}
     </span>
-    {sub && <span style={{ fontSize: 11.5, color: 'var(--fg-4)' }}>{sub}</span>}
+    {sub && <span style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>{sub}</span>}
   </label>
 );
 
@@ -201,7 +205,7 @@ const SecAccount = () => {
 
     <Card title="Security">
       <Row title="Two-factor authentication" desc="Require a one-time code from your authenticator app at sign-in.">
-        <Toggle defaultOn />
+        <Toggle label="Two-factor authentication" defaultOn />
       </Row>
       <Row title="Password" desc="Last changed 4 months ago.">
         <button style={{ padding: '9px 14px', borderRadius: 10, background: 'var(--bg-sunken)', color: 'var(--fg-1)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Update password</button>
@@ -256,7 +260,7 @@ const SecWorkspace = () => {
         <Segmented options={["Private", "Team", "Public"]} defaultValue="Team" size="sm" />
       </Row>
       <Row title="Asset library" desc="Let everyone in the workspace reuse logos, palettes and type." last>
-        <Toggle defaultOn />
+        <Toggle label="Asset library" defaultOn />
       </Row>
     </Card>
 
@@ -290,16 +294,16 @@ const SecFluid = () => (
 
     <Card accent title="Reasoning & behaviour" desc="Fluid narrates its choices in the bottom dock as it works. Tune how present that voice is.">
       <Row title="Show reasoning in the dock" desc="Stream Fluid's thinking as it drafts strategy, names and logos.">
-        <Toggle defaultOn />
+        <Toggle label="Show reasoning in the dock" defaultOn />
       </Row>
       <Row title="Creativity" desc="How far Fluid strays from safe, conventional territory.">
         <Segmented options={["Measured", "Balanced", "Experimental"]} defaultValue="Balanced" size="sm" />
       </Row>
       <Row title="Auto-suggest next steps" desc="Light up adjacent cards with proposals as you fill one in.">
-        <Toggle defaultOn />
+        <Toggle label="Auto-suggest next steps" defaultOn />
       </Row>
       <Row title="Live brand references" desc="Let Fluid look at real-world brands on the web for inspiration." last>
-        <Toggle />
+        <Toggle label="Live brand references" />
       </Row>
     </Card>
 
@@ -336,8 +340,10 @@ const NotifRow = ({ title, desc, email, app, last }: any) => (
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-1)' }}>{title}</div>
       {desc && <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>{desc}</div>}
     </div>
-    <div style={{ flex: '0 0 64px', display: 'flex', justifyContent: 'center' }}><Toggle defaultOn={email} /></div>
-    <div style={{ flex: '0 0 64px', display: 'flex', justifyContent: 'center' }}><Toggle defaultOn={app} /></div>
+    {/* Both toggles in a row control the same notification, so the channel
+        has to be part of the name or they announce identically. */}
+    <div style={{ flex: '0 0 64px', display: 'flex', justifyContent: 'center' }}><Toggle label={title + ' — email'} defaultOn={email} /></div>
+    <div style={{ flex: '0 0 64px', display: 'flex', justifyContent: 'center' }}><Toggle label={title + ' — in-app'} defaultOn={app} /></div>
   </div>
 );
 
@@ -347,8 +353,8 @@ const SecNotifications = () => (
     <Card title="Preferences">
       <div style={{ display: 'flex', alignItems: 'center', gap: 24, paddingBottom: 6, borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1 }} />
-        <div style={{ flex: '0 0 64px', textAlign: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-4)' }}>Email</div>
-        <div style={{ flex: '0 0 64px', textAlign: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-4)' }}>In-app</div>
+        <div style={{ flex: '0 0 64px', textAlign: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>Email</div>
+        <div style={{ flex: '0 0 64px', textAlign: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>In-app</div>
       </div>
       <NotifRow title="Brand generation complete" desc="When Fluid finishes drafting a brand or asset." email app />
       <NotifRow title="Comments & mentions" desc="When a teammate replies or @-mentions you." email app />
@@ -480,7 +486,7 @@ const SecBilling = () => {
         })}
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--fg-4)' }}>
+      <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
         Every account starts with 20 free tokens. Unused tokens don’t roll over — each billing month resets to your plan’s allowance.
       </div>
     </div>
@@ -525,7 +531,7 @@ export const DirA_Settings = () => {
             width: 244, flex: '0 0 244px', borderRight: '1px solid var(--line)',
             padding: '44px 16px', position: 'sticky', top: 0, alignSelf: 'flex-start',
           }}>
-            <div className="eyebrow" style={{ color: 'var(--fg-4)', padding: '0 12px', marginBottom: 16 }}>Settings</div>
+            <div className="eyebrow" style={{ color: 'var(--fg-3)', padding: '0 12px', marginBottom: 16 }}>Settings</div>
             <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {SETTINGS_NAV.map((it) => {
                 const on = active === it.id;
