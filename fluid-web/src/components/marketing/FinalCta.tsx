@@ -1,12 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMagnetic } from "@/components/interaction/useMagnetic";
+import { IdeaInput } from "./IdeaInput";
 
 export function FinalCta() {
-  const router = useRouter();
-  const submitRef = useMagnetic<HTMLButtonElement>(0.4);
-
   return (
     <section className="final" id="start" data-dark="">
       <svg className="ribbon-bg" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -36,19 +32,7 @@ export function FinalCta() {
           </span>
         </h2>
         <p className="sub">Leave with a brand. Type one sentence and watch the system assemble.</p>
-        <form
-          className="idea-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            router.push("/signup");
-          }}
-        >
-          <input type="text" placeholder="A productivity tool for founders who run on rituals…" aria-label="Your idea" />
-          <button ref={submitRef} className="btn" type="submit">
-            <span className="btn-label">Generate</span>
-            <span className="arr">→</span>
-          </button>
-        </form>
+        <IdeaInput variant="final" autoFocusLabel="Describe your idea in one sentence" />
       </div>
     </section>
   );
