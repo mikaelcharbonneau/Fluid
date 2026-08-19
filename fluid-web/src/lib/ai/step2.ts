@@ -3,7 +3,7 @@
 // actually chose instead of generating in a vacuum.
 //
 // NOTE: the option tables below mirror the curated lists in the Step 2 UI
-// (Prototype.jsx: VISUAL_STYLE_OPTIONS / PALETTE_OPTIONS / OPEN_SOURCE_FONT_PAIRS).
+// (Prototype.tsx: VISUAL_STYLE_OPTIONS / PALETTE_OPTIONS / OPEN_SOURCE_FONT_PAIRS).
 // Keep them in sync if those lists change.
 
 import { platformContext } from "./platform";

@@ -1,6 +1,4 @@
 "use client";
-/* eslint-disable */
-// @ts-nocheck
 // =====================================================================
 // Fluid — Interactive product prototype (ported verbatim from the
 // original design export). All screens share one module scope, exactly as
@@ -45,7 +43,7 @@ const { useState, useEffect } = React;
 
 // Asset resolver — logical bundle paths live under /public/assets/<path>.
 // Mirrors the original window.__assets Proxy (path -> inlined blob URL).
-const __assets = new Proxy({}, {
+const __assets: Record<string, string> = new Proxy({} as Record<string, string>, {
   get(_t, key) {
     return typeof key === "string" ? "/assets/" + key : undefined;
   },
@@ -82,7 +80,7 @@ const FluidCompact = ({ size = 28 }) => (
 
 // Tiny "✦" sparkle used to flag AI-generated content. Stroke-only,
 // matches the Lucide style mentioned in the design system.
-const Sparkle = ({ size = 14, color = 'currentColor', style }) => (
+const Sparkle = ({ size = 14, color = 'currentColor', style }: any) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>
@@ -128,7 +126,7 @@ const RibbonStrip = ({ width = 200, height = 6, opacity = 1 }) => (
 );
 
 // A pill-shaped tag with optional dot — used for status chips throughout
-const Chip = ({ children, tone = 'neutral', style }) => {
+const Chip = ({ children, tone = 'neutral', style }: any) => {
   const tones = {
     neutral: { bg: 'var(--bg-sunken)', fg: 'var(--fg-2)', dot: null },
     live:    { bg: 'rgba(68,217,199,.22)', fg: '#0E6B5E', dot: '#44D9C7' },
@@ -137,7 +135,7 @@ const Chip = ({ children, tone = 'neutral', style }) => {
     coral:   { bg: 'rgba(253,121,71,.14)', fg: '#A8421F', dot: '#FD7947' },
     sky:     { bg: 'rgba(154,211,230,.34)', fg: '#2F6B83', dot: null },
   };
-  const t = tones[tone] || tones.neutral;
+  const t = (tones as any)[tone] || tones.neutral;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -154,9 +152,9 @@ const Chip = ({ children, tone = 'neutral', style }) => {
 };
 
 // Palette swatch row — eight colors, optional labels.
-const Palette = ({ colors, size = 24, gap = 6, radius = 6 }) => (
+const Palette = ({ colors, size = 24, gap = 6, radius = 6 }: any) => (
   <div style={{ display: 'flex', gap }}>
-    {colors.map((c, i) => (
+    {colors.map((c: any, i: any) => (
       <div key={i} style={{
         width: size, height: size, borderRadius: radius,
         background: c, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06)',
@@ -210,7 +208,7 @@ Object.assign(window, {
 // Top dock + slim icon rail + main area. Frame is 1440×900; the dock is
 // 60px, the rail is 60px, leaving a 1380×840 working surface.
 
-const ARailIcon = ({ d, active, label }) => (
+const ARailIcon = ({ d, active, label }: any) => (
   <div style={{
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
     padding: '14px 0', position: 'relative',
@@ -225,7 +223,7 @@ const ARailIcon = ({ d, active, label }) => (
 
 // Token balance pill in the top bar. Colors shift as the balance runs low,
 // and clicking it jumps straight to Settings → Billing to top up.
-const TokenPill = ({ billing }) => {
+const TokenPill = ({ billing }: any) => {
   const { navigate } = useRouter();
   if (!billing) return null;
   const balance = typeof billing.balance === 'number' ? billing.balance : 0;
@@ -261,7 +259,7 @@ const TokenPill = ({ billing }) => {
 
 // Raised when a generation is refused for lack of tokens. A single fixed
 // banner (rather than five per-step error variants) with a direct path to top up.
-const NoTokensBanner = ({ onClose }) => {
+const NoTokensBanner = ({ onClose }: any) => {
   const { navigate } = useRouter();
   const goBilling = () => {
     if (typeof window !== 'undefined') window.__fluidSettingsTab = 'billing';
@@ -283,7 +281,7 @@ const NoTokensBanner = ({ onClose }) => {
   );
 };
 
-const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
+const AShell = ({ children, activeNav = 'brands', breadcrumb }: any) => {
   const { user, billing } = useBrandDraft();
   return (
   <div className="ab" style={{display:'flex',flexDirection:'column'}}>
@@ -299,7 +297,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
       <FluidWordmark height={22}/>
       <div className="ash-divider" style={{width:1, height:28, background:'var(--line)'}}/>
       <nav className="ash-breadcrumb" style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--fg-3)', minWidth:0, overflow:'hidden', whiteSpace:'nowrap'}}>
-        {breadcrumb.map((b,i) => (
+        {breadcrumb.map((b: any,i: any) => (
           <React.Fragment key={i}>
             {i>0 && <ChevronRight size={12}/>}
             <span style={{color: i === breadcrumb.length-1 ? 'var(--fg-1)' : 'var(--fg-3)', fontWeight: i === breadcrumb.length-1 ? 600 : 500}}>{b}</span>
@@ -355,7 +353,7 @@ const AShell = ({ children, activeNav = 'brands', breadcrumb }) => {
 // content rather than an empty void.
 // =====================================================================
 
-const StartCard = ({ title, sub, icon }) => (
+const StartCard = ({ title, sub, icon }: any) => (
   <div style={{
     background: 'var(--bg-elev)', borderRadius: 16, padding: 18,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -377,7 +375,7 @@ const StartCard = ({ title, sub, icon }) => (
 // Template card — a polished starter. Each card shows a tinted preview
 // block (with a stylized mark or typographic sample), category eyebrow,
 // name, tagline, and a 4-swatch palette strip.
-const TemplateCard = ({ category, name, tagline, palette, mood, mark }) => (
+const TemplateCard = ({ category, name, tagline, palette, mood, mark }: any) => (
   <div style={{
     background: 'var(--bg-elev)', borderRadius: 16,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -399,7 +397,7 @@ const TemplateCard = ({ category, name, tagline, palette, mood, mark }) => (
       <div style={{fontFamily:'var(--font-display)', fontWeight: 700, fontSize: 15, letterSpacing: '-0.018em', color: 'var(--fg-1)', lineHeight: 1}}>{name}</div>
       <div style={{fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.4}}>{tagline}</div>
       <div style={{display:'flex', gap: 4, marginTop: 4}}>
-        {palette.map((c, i) => (
+        {palette.map((c: any, i: any) => (
           <div key={i} style={{flex: 1, height: 14, borderRadius: 4, background: c, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06)'}}/>
         ))}
       </div>
@@ -409,7 +407,7 @@ const TemplateCard = ({ category, name, tagline, palette, mood, mark }) => (
 
 // Community card — a brand someone made with Fluid. Shows a thumbnail,
 // brand name + author, kit summary (3 swatches + type sample).
-const CommunityCard = ({ name, author, when, mood, mark, palette, type }) => (
+const CommunityCard = ({ name, author, when, mood, mark, palette, type }: any) => (
   <div style={{
     background: 'var(--bg-elev)', borderRadius: 16,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -431,7 +429,7 @@ const CommunityCard = ({ name, author, when, mood, mark, palette, type }) => (
         <span style={{fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)', whiteSpace:'nowrap'}}>{type}</span>
       </div>
       <div style={{display:'flex', gap: 3}}>
-        {palette.map((c, i) => (
+        {palette.map((c: any, i: any) => (
           <div key={i} style={{flex: 1, height: 8, borderRadius: 99, background: c}}/>
         ))}
       </div>
@@ -481,7 +479,7 @@ const DirA_Brands = () => (
             From idea to identity — instantly.
           </h2>
           <p style={{fontSize:15, color:'var(--fg-2)', margin:'0 0 22px', maxWidth: 480, lineHeight:1.5}}>
-            Tell Fluid about your idea. We'll draft a strategy, name, logo, palette, and type — in about 60&nbsp;seconds.
+            Tell Fluid about your idea. We&apos;ll draft a strategy, name, logo, palette, and type — in about 60&nbsp;seconds.
           </p>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
             <button style={{padding:'12px 20px',borderRadius:12,background:'#000',color:'#fff',fontSize:14,fontWeight:600, display:'inline-flex',alignItems:'center',gap:8}}>
@@ -666,7 +664,7 @@ const DirA_Brands = () => (
 
 // Card shell — every studio card uses this. The "step number" lives in
 // the corner; the body slot is whatever the card carries.
-const ACard = ({ n, title, sub, state, children, style, span }) => {
+const ACard = ({ n, title, sub, state, children, style, span }: any) => {
   const states = {
     empty:   { dot: 'var(--fg-4)',         label: 'Empty' },
     waiting: { dot: 'var(--line-strong)',  label: 'Waiting on basics' },
@@ -674,7 +672,7 @@ const ACard = ({ n, title, sub, state, children, style, span }) => {
     live:    { dot: '#44D9C7',             label: 'Streaming' },
     done:    { dot: '#000',                label: 'Locked' },
   };
-  const s = states[state] || states.empty;
+  const s = (states as any)[state] || states.empty;
   return (
     <div style={{
       gridColumn: span ? `span ${span}` : 'auto',
@@ -711,7 +709,7 @@ const ACard = ({ n, title, sub, state, children, style, span }) => {
 };
 
 // Progress tracker for the wizard flow
-const AStepProgress = ({ step }) => {
+const AStepProgress = ({ step }: any) => {
   const { navigate } = useRouter();
   const steps = [
     { n: 1, label: 'Brief' },
@@ -766,13 +764,13 @@ const AStepProgress = ({ step }) => {
  * once something looks wrong, which is always after the run finished.
  */
 const useActivityLog = () => {
-  const [events, setEvents] = React.useState([]);
+  const [events, setEvents] = React.useState<any[]>([]);
   const [running, setRunning] = React.useState(false);
   const [runName, setRunName] = React.useState('');
   const [failure, setFailure] = React.useState('');
 
   React.useEffect(() => {
-    const onActivity = (e) => {
+    const onActivity = (e: any) => {
       const d = e.detail || {};
       if (d.kind === 'start') {
         setRunning(true);
@@ -804,11 +802,11 @@ const ACTIVITY_TONE = {
   warn: '#FD7947',
 };
 
-const fmtAt = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
+const fmtAt = (ms: any) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 // One line of the log. Events carrying a detail — an image prompt, the model's
 // reasoning — expand in place rather than opening anything.
-const AActivityRow = ({ event }) => {
+const AActivityRow = ({ event }: any) => {
   const [open, setOpen] = React.useState(false);
   const hasDetail = !!event.detail;
   return (
@@ -826,7 +824,7 @@ const AActivityRow = ({ event }) => {
         }}>{fmtAt(event.at)}</span>
         <span style={{
           fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
-          color: ACTIVITY_TONE[event.kind] || 'rgba(255,255,255,.5)',
+          color: (ACTIVITY_TONE as any)[event.kind] || 'rgba(255,255,255,.5)',
           flex: '0 0 58px',
         }}>{event.kind}</span>
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,.85)', lineHeight: 1.45 }}>
@@ -856,8 +854,8 @@ const AActivityRow = ({ event }) => {
  * Collapsed it is one line — the newest, because during a run the newest line
  * is the answer to "what is it doing". Expanded it is the whole run.
  */
-const ADockActivity = ({ events, running, failure, open, onToggle }) => {
-  const bodyRef = React.useRef(null);
+const ADockActivity = ({ events, running, failure, open, onToggle }: any) => {
+  const bodyRef = React.useRef<any>(null);
   const latest = events.length ? events[events.length - 1] : null;
 
   // Follow the tail while it runs, but not once the client has expanded the log
@@ -908,14 +906,14 @@ const ADockActivity = ({ events, running, failure, open, onToggle }) => {
             borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 6,
           }}
         >
-          {events.map((ev, i) => <AActivityRow key={`${ev.seq}-${i}`} event={ev} />)}
+          {events.map((ev: any, i: any) => <AActivityRow key={`${ev.seq}-${i}`} event={ev} />)}
         </div>
       )}
     </div>
   );
 };
 
-const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, onBack, nextLabel, backLabel, dockCopy, nextDisabled, isThinking }) => {
+const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNext, onBack, nextLabel, backLabel, dockCopy, nextDisabled, isThinking }: any) => {
   const { navigate } = useRouter();
   const activity = useActivityLog();
   const [logOpen, setLogOpen] = React.useState(false);
@@ -1029,7 +1027,7 @@ const AWizardLayout = ({ step, title, subtitle, status, progress, children, onNe
 
 // Reusable card shell for each field on the brief screen. Step number
 // badge + title on the left, optional badge / counter on the right.
-const AFieldCard = ({ n, title, optional, meta, children }) => (
+const AFieldCard = ({ n, title, optional, meta, children }: any) => (
   <div style={{
     background: 'var(--bg-elev)', borderRadius: 20,
     boxShadow: 'var(--shadow-sm), inset 0 0 0 1px var(--line)',
@@ -1061,7 +1059,7 @@ const AFieldCard = ({ n, title, optional, meta, children }) => (
 );
 
 // Pill-style competitor chip with a remove ×
-const ACompetitorChip = ({ name, domain, onRemove }) => (
+const ACompetitorChip = ({ name, domain, onRemove }: any) => (
   <div style={{
     display:'inline-flex', alignItems:'center', gap:8,
     background:'var(--bg)', borderRadius: 99,
@@ -1099,17 +1097,17 @@ const DirA_Step1_Brief = () => {
   const audience = (draft && draft.audience) || '';
   // Competitors are stored as a comma-separated string; edit them as chips.
   const competitors = ((draft && draft.competitors) || '')
-    .split(',').map((s) => s.trim()).filter(Boolean);
+    .split(',').map((s: any) => s.trim()).filter(Boolean);
   const [compInput, setCompInput] = React.useState('');
-  const addCompetitor = (raw) => {
+  const addCompetitor = (raw: any) => {
     const v = String(raw || '').trim().replace(/,+$/, '').trim();
     if (!v) return;
-    if (competitors.some((c) => c.toLowerCase() === v.toLowerCase())) { setCompInput(''); return; }
+    if (competitors.some((c: any) => c.toLowerCase() === v.toLowerCase())) { setCompInput(''); return; }
     setField('competitors', [...competitors, v].join(', '));
     setCompInput('');
   };
-  const removeCompetitor = (name) => {
-    setField('competitors', competitors.filter((c) => c !== name).join(', '));
+  const removeCompetitor = (name: any) => {
+    setField('competitors', competitors.filter((c: any) => c !== name).join(', '));
   };
 
   // Inline AI assists. `assisting` holds the task id currently running.
@@ -1117,7 +1115,7 @@ const DirA_Step1_Brief = () => {
   const hasBrief = !!String(brief).trim();
   const [assisting, setAssisting] = React.useState('');
   const [assistErr, setAssistErr] = React.useState('');
-  const runAssist = async (task) => {
+  const runAssist = async (task: any) => {
     if (!brandId || assisting) return;
     if (!hasBrief) { setAssistErr('Add a brand description first.'); return; }
     setAssisting(task); setAssistErr('');
@@ -1127,14 +1125,14 @@ const DirA_Step1_Brief = () => {
       if (task === 'audience' && result.text) setField('audience', result.text);
       else if (task === 'competitors' && result.items) {
         const merged = [...competitors];
-        result.items.forEach((it) => { if (it && !merged.some((c) => c.toLowerCase() === it.toLowerCase())) merged.push(it); });
+        result.items.forEach((it: any) => { if (it && !merged.some((c) => c.toLowerCase() === it.toLowerCase())) merged.push(it); });
         setField('competitors', merged.join(', '));
       } else if (result.text) setField('brief', result.text);
     }
     setAssisting('');
   };
   const pill = { padding:'5px 10px', borderRadius:8, background:'var(--bg-sunken)', color:'var(--fg-2)', fontSize:11, fontWeight:600, display:'inline-flex', alignItems:'center', gap:6, border:0, cursor:'pointer' };
-  const busy = (t) => assisting === t;
+  const busy = (t: any) => assisting === t;
 
   return (
   <AWizardLayout
@@ -1226,7 +1224,7 @@ const DirA_Step1_Brief = () => {
             minHeight: 124,
           }}>
             <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-              {competitors.map((c) => (
+              {competitors.map((c: any) => (
                 <ACompetitorChip key={c} name={c} onRemove={() => removeCompetitor(c)} />
               ))}
             </div>
@@ -1280,7 +1278,7 @@ const LOGO_STEPS = ['Brief', 'Style', 'Type', 'References', 'Concepts', 'Refine'
 // useLogoFlowNav — and this context is what tells them which world they are in.
 //
 // Null means standalone. Embedded supplies the phase machinery instead.
-const LogoFlowContext = React.createContext(null);
+const LogoFlowContext = React.createContext<any>(null);
 
 // The route each studio screen owns, in order. The embedded flow drops 'Brief':
 // the wizard already asked for the name, the description, the audience and the
@@ -1302,7 +1300,7 @@ const EMBEDDED_LOGO_ROUTES = LOGO_ROUTES.filter((r) => r !== 'logo-brief');
 const useLogoFlowNav = () => {
   const { navigate } = useRouter();
   const embed = React.useContext(LogoFlowContext);
-  return React.useCallback((target) => {
+  return React.useCallback((target: any) => {
     if (embed && EMBEDDED_LOGO_ROUTES.includes(target)) embed.setPhase(target);
     else navigate(target);
   }, [embed, navigate]);
@@ -1320,7 +1318,7 @@ const useLogoFlowNav = () => {
 const LogoStepShell = ({
   children, step, title, subtitle, dockCopy,
   nextLabel, onNext, onBack, nextDisabled,
-}) => {
+}: any) => {
   const embed = React.useContext(LogoFlowContext);
 
   // Embedded, the parent owns the page header and the dock, so it needs what
@@ -1355,7 +1353,7 @@ const LogoStepShell = ({
 // The sub-step rail shown inside wizard step 4. Steps already visited are
 // clickable so a client can go back and change a choice without walking the
 // whole flow forward again.
-const ALogoSubProgress = ({ activeStep, onPick, furthest = 1 }) => {
+const ALogoSubProgress = ({ activeStep, onPick, furthest = 1 }: any) => {
   const labels = LOGO_STEPS.slice(1); // 'Brief' belongs to the standalone flow
   return (
     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}
@@ -1422,7 +1420,7 @@ const ALogoWizardLayout = ({
   subtitle = 'Start with the name and the idea. Visual direction comes next.',
   dockCopy = 'Add a name and brief to shape the first directions.',
   nextLabel = 'Continue to direction', onNext, nextDisabled, onBack,
-}) => {
+}: any) => {
   const activity = useActivityLog();
   const [logOpen, setLogOpen] = React.useState(false);
   return (
@@ -1510,30 +1508,30 @@ const DirA_LogoBrief = () => {
   const nameMeaning = String(data.logo_name_meaning || '');
   const audience = (draft && draft.audience) || '';
   const competitors = ((draft && draft.competitors) || '')
-    .split(',').map((s) => s.trim()).filter(Boolean);
+    .split(',').map((s: any) => s.trim()).filter(Boolean);
   const [compInput, setCompInput] = React.useState('');
   const [assisting, setAssisting] = React.useState('');
   const [assistErr, setAssistErr] = React.useState('');
 
-  const setName = (value) => {
+  const setName = (value: any) => {
     setField('name_choice', value);
     setField('name', value);
   };
-  const setTagline = (value) => setData({ logo_tagline: value });
-  const setNameMeaning = (value) => setData({ logo_name_meaning: value });
-  const addCompetitor = (raw) => {
+  const setTagline = (value: any) => setData({ logo_tagline: value });
+  const setNameMeaning = (value: any) => setData({ logo_name_meaning: value });
+  const addCompetitor = (raw: any) => {
     const value = String(raw || '').trim().replace(/,+$/, '').trim();
     if (!value) return;
-    if (competitors.some((c) => c.toLowerCase() === value.toLowerCase())) { setCompInput(''); return; }
+    if (competitors.some((c: any) => c.toLowerCase() === value.toLowerCase())) { setCompInput(''); return; }
     setField('competitors', [...competitors, value].join(', '));
     setCompInput('');
   };
-  const removeCompetitor = (value) => {
-    setField('competitors', competitors.filter((c) => c !== value).join(', '));
+  const removeCompetitor = (value: any) => {
+    setField('competitors', competitors.filter((c: any) => c !== value).join(', '));
   };
 
   const brandId = draft && draft.id;
-  const runAssist = async (task) => {
+  const runAssist = async (task: any) => {
     if (!brandId || assisting) return;
     if (!String(brief).trim()) { setAssistErr('Add a brand description first.'); return; }
     setAssisting(task); setAssistErr('');
@@ -1542,7 +1540,7 @@ const DirA_LogoBrief = () => {
     else if (result) {
       if (task === 'competitors' && result.items) {
         const merged = [...competitors];
-        result.items.forEach((item) => {
+        result.items.forEach((item: any) => {
           if (item && !merged.some((c) => c.toLowerCase() === item.toLowerCase())) merged.push(item);
         });
         setField('competitors', merged.join(', '));
@@ -1557,12 +1555,12 @@ const DirA_LogoBrief = () => {
     padding:'5px 10px',borderRadius:8,background:'var(--bg-sunken)',color:'var(--fg-2)',
     fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,border:0,cursor:'pointer',
   };
-  const busy = (task) => assisting === task;
+  const busy = (task: any) => assisting === task;
   const canContinue = !!String(name).trim() && !!String(brief).trim();
   const continueToDirection = () => {
     if (canContinue) navigate('logo-direction');
   };
-  const shortcut = (event) => {
+  const shortcut = (event: any) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && canContinue) continueToDirection();
   };
 
@@ -1688,7 +1686,7 @@ const DirA_LogoBrief = () => {
               padding:14,display:'flex',flexDirection:'column',gap:12,minHeight:124,
             }}>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {competitors.map((competitor) => (
+                {competitors.map((competitor: any) => (
                   <ACompetitorChip key={competitor} name={competitor} onRemove={() => removeCompetitor(competitor)}/>
                 ))}
               </div>
@@ -1850,7 +1848,7 @@ const LOGO_TYPE_OPTIONS = [
   { id: 'ai', label: 'Let AI Choose', description: 'Fluid chooses the structures that best fit your brief.', ai: true },
 ];
 
-const ALogoTypeCard = ({ type, selected, onClick }) => {
+const ALogoTypeCard = ({ type, selected, onClick }: any) => {
   const [hot, setHot] = React.useState(false);
   const refs = logoReferencesFor(type.id);
   return (
@@ -1904,7 +1902,7 @@ const DirA_LogoDirection = () => {
   const fluidChooses = direction.mode === 'ai';
   const ready = selectedStyles.length > 0 || fluidChooses;
 
-  const chooseStyle = (styleId) => {
+  const chooseStyle = (styleId: any) => {
     const next = selectedStyles.includes(styleId)
       ? []
       : [styleId];
@@ -2021,7 +2019,7 @@ const DirA_LogoType = () => {
     ? data.logo_types.slice(0, 1)
     : (data.logo_type ? [data.logo_type] : []);
 
-  const chooseType = (typeId) => {
+  const chooseType = (typeId: any) => {
     if (typeId === 'ai') {
       setData({
         ...resetLogoDirectionWork(),
@@ -2091,13 +2089,13 @@ const AXIS_MIN_SAMPLES = 2;
 const AXIS_MAX_SPREAD = 0.30;
 const AXIS_REJECTION_PUSH = 0.5;
 
-function readRefinementAxes(liked, disliked) {
-  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const sd = (xs) => xs.length < 2 ? 0 : Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
-  const values = (rows, axis) => rows
-    .map((r) => Number((r.refinement || {})[axis]))
-    .filter((n) => Number.isFinite(n))
-    .map((n) => Math.min(1, Math.max(0, n)));
+function readRefinementAxes(liked: any, disliked: any) {
+  const mean = (xs: any) => xs.reduce((a: any, b: any) => a + b, 0) / xs.length;
+  const sd = (xs: any) => xs.length < 2 ? 0 : Math.sqrt(mean(xs.map((x: any) => (x - mean(xs)) ** 2)));
+  const values = (rows: any, axis: any) => rows
+    .map((r: any) => Number((r.refinement || {})[axis]))
+    .filter((n: any) => Number.isFinite(n))
+    .map((n: any) => Math.min(1, Math.max(0, n)));
 
   const out = [];
   for (const axis of Object.keys(AXIS_POLES)) {
@@ -2107,7 +2105,7 @@ function readRefinementAxes(liked, disliked) {
     const push = (D.length >= AXIS_MIN_SAMPLES && sd(D) <= AXIS_MAX_SPREAD)
       ? AXIS_REJECTION_PUSH * (preferred - mean(D)) : 0;
     const value = Math.min(1, Math.max(0, preferred + push));
-    const [low, high] = AXIS_POLES[axis];
+    const [low, high] = (AXIS_POLES as any)[axis];
     const label = value < 0.2 ? `very ${low}` : value < 0.4 ? `leaning ${low}`
       : value <= 0.6 ? 'balanced' : value <= 0.8 ? high : `very ${high}`;
     out.push({ axis, value, label, low, high });
@@ -2117,7 +2115,7 @@ function readRefinementAxes(liked, disliked) {
 
 // The readout. Axes the picks disagreed on are absent on purpose — silence
 // means "no view", so we say that rather than showing a misleading midpoint.
-const ARefinementReadout = ({ axes, sampled }) => {
+const ARefinementReadout = ({ axes, sampled }: any) => {
   if (!sampled) return null;
   return (
     <div style={{
@@ -2137,7 +2135,7 @@ const ARefinementReadout = ({ axes, sampled }) => {
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:9}}>
-          {axes.map(({ axis, value, label, low, high }) => (
+          {axes.map(({ axis, value, label, low, high }: any) => (
             <div key={axis} style={{display:'flex',alignItems:'center',gap:10}}>
               <span style={{flex:'0 0 92px',fontSize:11,color:'var(--fg-4)',fontFamily:'var(--font-mono)'}}>{low}</span>
               <div style={{flex:1,height:4,borderRadius:99,background:'var(--bg-sunken)',position:'relative'}}>
@@ -2157,7 +2155,7 @@ const ARefinementReadout = ({ axes, sampled }) => {
   );
 };
 
-const LogoReferenceContext = ({ label, value }) => (
+const LogoReferenceContext = ({ label, value }: any) => (
   <div style={{
     display:'inline-flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:8,
     background:'var(--bg-sunken)',boxShadow:'inset 0 0 0 1px var(--line)',
@@ -2168,7 +2166,7 @@ const LogoReferenceContext = ({ label, value }) => (
   </div>
 );
 
-const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) => (
+const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }: any) => (
   <article className="logo-reference-card" style={{
     background:'var(--bg-elev)',borderRadius:13,padding:8,
     boxShadow:liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : (disliked ? '0 0 0 2px var(--line-strong), var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)'),
@@ -2194,7 +2192,7 @@ const ALogoReferenceCard = ({ reference, liked, disliked, onLike, onDislike }) =
         direction. Keeps the gallery legible rather than arbitrary. */}
     {reference.matched && reference.matched.length > 0 && (
       <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
-        {reference.matched.slice(0, 2).map((attr) => (
+        {reference.matched.slice(0, 2).map((attr: any) => (
           <span key={attr} style={{
             fontFamily:'var(--font-mono)',fontSize:8.5,letterSpacing:'.02em',
             padding:'2px 5px',borderRadius:5,background:'rgba(253,121,71,.12)',color:'#B4441A',
@@ -2238,24 +2236,24 @@ const DirA_LogoReferences = () => {
   const aiChoosesType = data.logo_type_mode === 'ai';
   const direction = data.logo_direction || {};
   const selectedStyles = direction.mode === 'manual' ? (Array.isArray(direction.style_ids) ? direction.style_ids.slice(0, 1) : (direction.style_id ? [direction.style_id] : [])) : [];
-  const typeLabel = aiChoosesType ? 'Fluid chooses' : selectedTypes.map((id) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
-  const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
+  const typeLabel = aiChoosesType ? 'Fluid chooses' : selectedTypes.map((id: any) => (LOGO_TYPE_OPTIONS.find((type) => type.id === id) || {}).label).filter(Boolean).join(' · ') || 'Logo type';
+  const styleLabel = direction.mode === 'ai' ? 'Fluid chooses' : selectedStyles.map((id: any) => (LOGO_STYLE_PLACEHOLDERS.find((style) => style.id === id) || {}).label).filter(Boolean).join(' · ') || 'Visual style';
   const [likes, setLikes] = React.useState(data.logo_reference_likes || []);
   const [dislikes, setDislikes] = React.useState(data.logo_reference_dislikes || []);
-  const [references, setReferences] = React.useState(null);
+  const [references, setReferences] = React.useState<any>(null);
   const [loadError, setLoadError] = React.useState('');
 
   // What the picks imply, computed from the references already on screen so it
   // updates the instant something is liked — no round trip.
   const byId = React.useMemo(() => {
     const m = new Map();
-    (references || []).forEach((r) => m.set(r.id, r));
+    (references || []).forEach((r: any) => m.set(r.id, r));
     return m;
   }, [references]);
   const derivedAxes = React.useMemo(
     () => readRefinementAxes(
-      likes.map((id) => byId.get(id)).filter(Boolean),
-      dislikes.map((id) => byId.get(id)).filter(Boolean),
+      likes.map((id: any) => byId.get(id)).filter(Boolean),
+      dislikes.map((id: any) => byId.get(id)).filter(Boolean),
     ),
     [likes, dislikes, byId],
   );
@@ -2267,6 +2265,9 @@ const DirA_LogoReferences = () => {
   const stylesKey = direction.mode === 'ai' ? 'fluid-choice' : selectedStyles.join(',');
   React.useEffect(() => {
     let cancelled = false;
+    // Resetting to a loading state before the fetch below is the point —
+    // not a candidate for moving out of the effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReferences(null); setLoadError('');
     const params = new URLSearchParams({ limit: '16' });
     if (typesKey) params.set('types', typesKey);
@@ -2282,10 +2283,10 @@ const DirA_LogoReferences = () => {
     return () => { cancelled = true; };
   }, [typesKey, stylesKey]);
 
-  const toggleLike = (id) => {
+  const toggleLike = (id: any) => {
     const removing = likes.includes(id);
-    const next = removing ? likes.filter((item) => item !== id) : [...likes, id];
-    const nextDislikes = dislikes.filter((item) => item !== id);
+    const next = removing ? likes.filter((item: any) => item !== id) : [...likes, id];
+    const nextDislikes = dislikes.filter((item: any) => item !== id);
     setLikes(next);
     setDislikes(nextDislikes);
     setData({
@@ -2298,9 +2299,9 @@ const DirA_LogoReferences = () => {
       },
     });
   };
-  const toggleDislike = (id) => {
-    const next = dislikes.includes(id) ? dislikes.filter((item) => item !== id) : [...dislikes, id];
-    const nextLikes = likes.filter((item) => item !== id);
+  const toggleDislike = (id: any) => {
+    const next = dislikes.includes(id) ? dislikes.filter((item: any) => item !== id) : [...dislikes, id];
+    const nextLikes = likes.filter((item: any) => item !== id);
     setDislikes(next);
     setLikes(nextLikes);
     setData({
@@ -2361,7 +2362,7 @@ const DirA_LogoReferences = () => {
           </div>
         ) : (
           <div className="logo-references-grid">
-            {references.map((reference) => (
+            {references.map((reference: any) => (
               <ALogoReferenceCard
                 key={reference.id}
                 reference={reference}
@@ -2416,7 +2417,7 @@ const DirA_LogoSketches = () => {
     Math.max(0, referenceLikes.length - (Number.isInteger(initialBatchOffset) && initialBatchOffset > 0 ? initialBatchOffset : 0)),
   );
 
-  const persist = (nextBoard, nextLikes) => {
+  const persist = (nextBoard: any, nextLikes: any) => {
     setData({
       logo_board: nextBoard,
       logo_board_likes: nextLikes,
@@ -2441,7 +2442,7 @@ const DirA_LogoSketches = () => {
     if (res.error) {
       setError(res.error);
     } else {
-      const nextLikes = [];
+      const nextLikes: any[] = [];
       setBoard(res.board);
       setLikes(nextLikes);
       persist(res.board, nextLikes);
@@ -2475,8 +2476,8 @@ const DirA_LogoSketches = () => {
     setLoading(false);
   };
 
-  const toggleLike = (id) => {
-    const next = likes.includes(id) ? likes.filter((x) => x !== id) : [...likes, id];
+  const toggleLike = (id: any) => {
+    const next = likes.includes(id) ? likes.filter((x: any) => x !== id) : [...likes, id];
     setLikes(next);
     persist(board, next);
   };
@@ -2549,7 +2550,7 @@ const DirA_LogoSketches = () => {
         }}>
           <div style={{fontSize:11,color:'var(--fg-3)',lineHeight:1.5}}>
             Each batch uses the next {BOARD_SIZE} liked references in order. Every
-            sketch applies one reference's visual principles to an original mark;
+            sketch applies one reference&apos;s visual principles to an original mark;
             nothing copies the existing logo.
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -2631,7 +2632,7 @@ const DirA_LogoSketches = () => {
 
         {(board.length > 0 || loading) && (
           <div className="home-grid-3" style={{display:'grid',gap:12}}>
-            {board.map((s) => (
+            {board.map((s: any) => (
               <ASketchCard key={s.id} sketch={s} liked={likes.includes(s.id)} onLike={() => toggleLike(s.id)} onImageError={() => setAssetError(true)} />
             ))}
             {loading && Array.from({ length: BOARD_SIZE }).map((_, i) => (
@@ -2660,13 +2661,13 @@ const DirA_LogoSketches = () => {
 // One version's palette: the colours this version of the mark will be drawn in.
 // The first swatch is the primary — the studio is told so — which is why the
 // order is editable rather than a set.
-const AVersionPalette = ({ index, colors, onChange, disabled }) => {
-  const setColor = (i, value) => {
+const AVersionPalette = ({ index, colors, onChange, disabled }: any) => {
+  const setColor = (i: any, value: any) => {
     const next = [...colors];
     next[i] = value;
     onChange(next);
   };
-  const remove = (i) => onChange(colors.filter((_, j) => j !== i));
+  const remove = (i: any) => onChange(colors.filter((_: any, j: any) => j !== i));
   const add = () => onChange([...colors, '#000000']);
 
   return (
@@ -2690,7 +2691,7 @@ const AVersionPalette = ({ index, colors, onChange, disabled }) => {
       </div>
 
       <div style={{display:'flex',flexDirection:'column',gap:7}}>
-        {colors.map((c, i) => (
+        {colors.map((c: any, i: any) => (
           <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
             <input
               type="color"
@@ -2748,14 +2749,14 @@ const DirA_LogoRefine = () => {
 
   const board = Array.isArray(data.logo_board) ? data.logo_board : [];
   const likeIds = Array.isArray(data.logo_board_likes) ? data.logo_board_likes : [];
-  const liked = board.filter((s) => likeIds.includes(s.id));
+  const liked = board.filter((s: any) => likeIds.includes(s.id));
 
   // The brand's own colours seed the version palettes when it has any; with no
   // palette saved the defaults are obvious placeholders the client will replace.
   const brandColors = React.useMemo(() => {
     const p = data.palette;
     const fromPalette = Array.isArray(p && p.colors)
-      ? p.colors.map((c) => c && c.hex).filter(Boolean)
+      ? p.colors.map((c: any) => c && c.hex).filter(Boolean)
       : [];
     return fromPalette;
   }, [data.palette]);
@@ -2765,7 +2766,7 @@ const DirA_LogoRefine = () => {
   const [conceptId, setConceptId] = React.useState(
     data.logo_refine_concept || (liked.length === 1 ? liked[0].id : ''),
   );
-  const concept = liked.find((s) => s.id === conceptId) || null;
+  const concept = liked.find((s: any) => s.id === conceptId) || null;
 
   const [versions, setVersions] = React.useState(() => {
     const saved = Array.isArray(data.logo_refine_versions) ? data.logo_refine_versions : null;
@@ -2778,21 +2779,21 @@ const DirA_LogoRefine = () => {
   const [vectorizing, setVectorizing] = React.useState('');
   const chosen = (draft && draft.logo_choice) || null;
 
-  const persistBrief = (nextConceptId, nextVersions) => {
+  const persistBrief = (nextConceptId: any, nextVersions: any) => {
     setData({
       logo_refine_concept: nextConceptId,
       logo_refine_versions: nextVersions,
     });
   };
 
-  const pickConcept = (id) => {
+  const pickConcept = (id: any) => {
     setConceptId(id);
     persistBrief(id, versions);
   };
 
   // Changing the count keeps the palettes already set and only fills or trims
   // the tail, so raising it from 2 to 3 doesn't discard the two you tuned.
-  const setVersionCount = (n) => {
+  const setVersionCount = (n: any) => {
     const count = Math.min(MAX_REFINE_VERSIONS, Math.max(1, n));
     const filled = defaultVersionPalettes(count, brandColors);
     const next = Array.from({ length: count }, (_, i) => versions[i] || filled[i]);
@@ -2800,8 +2801,8 @@ const DirA_LogoRefine = () => {
     persistBrief(conceptId, next);
   };
 
-  const setVersionColors = (i, colors) => {
-    const next = versions.map((v, j) => (j === i ? { colors } : v));
+  const setVersionColors = (i: any, colors: any) => {
+    const next = versions.map((v: any, j: any) => (j === i ? { colors } : v));
     setVersions(next);
     persistBrief(conceptId, next);
   };
@@ -2811,14 +2812,14 @@ const DirA_LogoRefine = () => {
   // button rather than silently shipping a colour nobody chose.
   const briefReady = !!concept
     && versions.length > 0
-    && versions.every((v) => (v.colors || []).some((c) => !!normaliseHex(c)));
+    && versions.every((v: any) => (v.colors || []).some((c: any) => !!normaliseHex(c)));
 
   const refine = async () => {
     if (!brandId || loading || !briefReady) return;
     setLoading(true); setError('');
     // Send only the colours that parse, in order, so a stray keystroke in a
     // hex field can't reach the studio.
-    const clean = versions.map((v) => ({
+    const clean = versions.map((v: any) => ({
       colors: (v.colors || []).map(normaliseHex).filter(Boolean),
     }));
     const res = await apiRefineLogoSketches(brandId, concept.id, clean);
@@ -2833,7 +2834,7 @@ const DirA_LogoRefine = () => {
         logo_finalists: res.finalists,
         logo_refine_concept: concept.id,
         logo_refine_versions: clean,
-        logos: res.finalists.map((f) => ({
+        logos: res.finalists.map((f: any) => ({
           name: f.name, descriptor: f.idea, svg: f.svg || '', image_url: f.image_url,
         })),
       });
@@ -2843,7 +2844,7 @@ const DirA_LogoRefine = () => {
 
   // Choosing a mark is also what commissions the real vector. Cached
   // server-side, so re-picking one already traced costs nothing.
-  const choose = async (f) => {
+  const choose = async (f: any) => {
     setField('logo_choice', f.name);
     if (f.svg || vectorizing) return;
     setVectorizing(f.id); setError('');
@@ -2851,11 +2852,11 @@ const DirA_LogoRefine = () => {
     if (res.error) {
       setError(res.error);
     } else {
-      const next = finalists.map((x) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
+      const next = finalists.map((x: any) => (x.id === f.id ? { ...x, svg: res.svg, vector_url: res.url } : x));
       setFinalists(next);
       setData({
         logo_finalists: next,
-        logos: next.map((x) => ({
+        logos: next.map((x: any) => ({
           name: x.name, descriptor: x.idea, svg: x.svg || '', image_url: x.image_url,
         })),
       });
@@ -2965,7 +2966,7 @@ const DirA_LogoRefine = () => {
                   : 'This is the concept the studio will develop. Every mark that comes back is a resolution of it — nothing new is invented alongside it.'}
               </div>
               <div className="home-grid-3" style={{display:'grid',gap:12}}>
-                {liked.map((s) => {
+                {liked.map((s: any) => {
                   const sel = s.id === conceptId;
                   return (
                     <div
@@ -3038,13 +3039,13 @@ const DirA_LogoRefine = () => {
                 {brandColors.length === 0 && ' This brand has no palette saved yet, so these are starting points — change them to whatever you want.'}
               </div>
               <div className="home-grid-3" style={{display:'grid',gap:12}}>
-                {versions.map((v, i) => (
+                {versions.map((v: any, i: any) => (
                   <AVersionPalette
                     key={i}
                     index={i}
                     colors={v.colors || []}
                     disabled={loading}
-                    onChange={(colors) => setVersionColors(i, colors)}
+                    onChange={(colors: any) => setVersionColors(i, colors)}
                   />
                 ))}
               </div>
@@ -3054,7 +3055,7 @@ const DirA_LogoRefine = () => {
 
         {(done || loading) && (
           <div className="home-grid-3" style={{display:'grid',gap:12}}>
-            {finalists.map((f) => (
+            {finalists.map((f: any) => (
               <AFinalistCard key={f.id} f={f} sel={chosen === f.name}
                 busy={vectorizing === f.id} onClick={() => choose(f)} />
             ))}
@@ -3114,24 +3115,24 @@ const DirA_LogoExport = () => {
   const [note, setNote] = React.useState('');
 
   const suggested = React.useMemo(() => recommendedFormats(uses), [uses]);
-  const isOn = (id) => (id in overrides ? !!overrides[id] : suggested.includes(id));
+  const isOn = (id: any) => (id in overrides ? !!overrides[id] : suggested.includes(id));
   const selected = EXPORT_FORMATS.filter((f) => isOn(f.id)).map((f) => f.id);
 
-  const persist = (nextUses, nextOverrides) => {
+  const persist = (nextUses: any, nextOverrides: any) => {
     setData({
       logo_export_uses: nextUses,
       logo_export_formats: nextOverrides,
     });
   };
 
-  const toggleUse = (id) => {
-    const next = uses.includes(id) ? uses.filter((u) => u !== id) : [...uses, id];
+  const toggleUse = (id: any) => {
+    const next = uses.includes(id) ? uses.filter((u: any) => u !== id) : [...uses, id];
     setUses(next);
     persist(next, overrides);
     setNote('');
   };
 
-  const toggleFormat = (id) => {
+  const toggleFormat = (id: any) => {
     const next = { ...overrides, [id]: !isOn(id) };
     setOverrides(next);
     persist(uses, next);
@@ -3141,7 +3142,7 @@ const DirA_LogoExport = () => {
   // transparent artwork: the tracer lays a white plate under every mark, and a
   // favicon on an opaque white square is the classic giveaway of a logo that
   // was exported carelessly.
-  const pngBytesAt = async (source, size) => {
+  const pngBytesAt = async (source: any, size: any) => {
     const blob = await svgToPngBlob(source, size);
     return new Uint8Array(await blob.arrayBuffer());
   };
@@ -3190,7 +3191,7 @@ const DirA_LogoExport = () => {
             name: `${slug}/${slug}.pdf`,
             bytes: svgToPdfBytes(svg, marks && marks.length ? marks : undefined),
           });
-        } catch (e) {
+        } catch (e: any) {
           // One unconvertible artwork must not cost the client the other files.
           skipped.push(e && e.message ? e.message : 'The PDF could not be written.');
         }
@@ -3220,18 +3221,18 @@ const DirA_LogoExport = () => {
 
       setBusy('Zipping…');
       const zip = buildZip(files);
-      downloadBlob(`${slug}-logo-files.zip`, new Blob([zip], { type: 'application/zip' }));
+      downloadBlob(`${slug}-logo-files.zip`, new Blob([zip as any], { type: 'application/zip' }));
       setNote(
         `${files.length} file${files.length === 1 ? '' : 's'} downloaded.` +
         (skipped.length ? ` ${skipped.join(' ')}` : ''),
       );
-    } catch (e) {
+    } catch (e: any) {
       setError((e && e.message) || 'Something went wrong building the files.');
     }
     setBusy('');
   };
 
-  const cardStyle = (on) => ({
+  const cardStyle = (on: any): React.CSSProperties => ({
     textAlign:'left',padding:'12px 13px',borderRadius:12,cursor:'pointer',border:0,
     background:'var(--bg-elev)',fontFamily:'inherit',
     boxShadow: on ? '0 0 0 2px #000' : 'inset 0 0 0 1px var(--line)',
@@ -3384,7 +3385,7 @@ const DirA_LogoExport = () => {
 
 // Sparkle button — section-level "Let AI choose" affordance. Toggles the
 // delegation on and off; `active` means the studio owns this decision.
-const ALetAI = ({ onClick, active }) => (
+const ALetAI = ({ onClick, active }: any) => (
   <button onClick={onClick} style={{
     display:'inline-flex', alignItems:'center', gap:6,
     padding:'6px 12px', borderRadius: 99,
@@ -3400,7 +3401,7 @@ const ALetAI = ({ onClick, active }) => (
 
 // Shown under a section the client delegated. States plainly that the studio
 // will decide from the brief rather than leaving the choice blank.
-const ADelegatedNote = ({ what, onClear }) => (
+const ADelegatedNote = ({ what, onClear }: any) => (
   <div style={{
     display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
     padding:'10px 14px', borderRadius:12, marginBottom:12,
@@ -3420,7 +3421,7 @@ const ADelegatedNote = ({ what, onClear }) => (
 );
 
 // Section heading: number badge + title + meta + AI button
-const ASectionHead = ({ n, title, sub, count, ai, onAI, aiActive }) => (
+const ASectionHead = ({ n, title, sub, count, ai, onAI, aiActive }: any) => (
   <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:14}}>
     <div style={{display:'flex', alignItems:'center', gap:12, minWidth:0}}>
       {n && (
@@ -3482,7 +3483,7 @@ const FigmaLogo = ({ size = 26 }) => (
 );
 
 // Collaborative cursor pill — a Figma multiplayer trope.
-const FigmaCursor = ({ color, name, top, left, right, bottom }) => (
+const FigmaCursor = ({ color, name, top, left, right, bottom }: any) => (
   <div style={{position:'absolute', top, left, right, bottom, display:'flex', alignItems:'flex-start', gap: 3, pointerEvents:'none'}}>
     <svg width="12" height="14" viewBox="0 0 16 18" style={{filter:'drop-shadow(0 1px 1px rgba(0,0,0,.15))'}}>
       <path fill={color} stroke="#fff" strokeWidth="0.8" strokeLinejoin="round" d="M2 1.5L13.5 7.5L8.5 9.5L6 15L2 1.5Z"/>
@@ -3540,8 +3541,8 @@ const BRAND_LOGO_SRC = {
 };
 // `fill` mode: stretch to fill an overflow-hidden parent tile (parent owns
 // the radius). Otherwise renders a self-contained rounded square at `size`.
-const BrandLogoImg = ({ brand, size = 48, radius, fill = false, style }) => (
-  <img src={BRAND_LOGO_SRC[brand]} alt={brand} draggable={false}
+const BrandLogoImg = ({ brand, size = 48, radius, fill = false, style }: any) => (
+  <img src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false}
     style={fill
       ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }
       : { width: size, height: size, borderRadius: radius != null ? radius : Math.round(size * 0.22), objectFit: 'cover', display: 'block', ...style }} />
@@ -3754,7 +3755,7 @@ const PerplexityHero = () => {
           fontFamily: PERPLEXITY_DISPLAY, fontWeight: 400, fontStyle:'italic', fontSize: 12.5,
           letterSpacing: '-0.005em', color:'#1F4E47', textAlign:'center', maxWidth: 220, lineHeight: 1.35,
         }}>
-          "Where curiosity becomes&nbsp;understanding."
+          &ldquo;Where curiosity becomes&nbsp;understanding.&rdquo;
         </div>
       </div>
 
@@ -3878,7 +3879,7 @@ const TeslaHero = () => {
 // The footer carries only the brand-styled style pill + name + category;
 // the palette lives inside the hero so it is shown exactly once and stays
 // consistent with the rest of the brand sheet.
-const AInspirationCard = ({ name, category, style, hero, sel, onClick }) => (
+const AInspirationCard = ({ name, category, style, hero, sel, onClick }: any) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 18,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -3927,14 +3928,14 @@ const AInspirationCard = ({ name, category, style, hero, sel, onClick }) => (
 );
 
 // Visual style directions — full preview images for each register.
-const visualStyleImage = (id) => {
+const visualStyleImage = (id: any) => {
   const paths = {
     'modern-minimal': __assets['assets/min/visual-style-modern-minimal.jpg'],
     'bold-graphic': __assets['assets/min/visual-style-bold-graphic.jpg'],
     'premium-editorial': __assets['assets/min/visual-style-premium-editorial.jpg'],
     'futuristic-digital': __assets['assets/min/visual-style-futuristic-digital.jpg'],
   };
-  return paths[id];
+  return (paths as any)[id];
 };
 
 // "Let AI choose" writes this sentinel instead of resolving to one of the
@@ -3968,8 +3969,8 @@ const VISUAL_STYLE_OPTIONS = [
 
 // Bespoke style swatches — each a self-contained composition that telegraphs
 // its register through type, color, scale and density (no literal UI screenshots).
-const StyleSwatch = ({ id }) => {
-  const tag = (text, color) => (
+const StyleSwatch = ({ id }: any) => {
+  const tag = (text: any, color: any) => (
     <div style={{ position: 'absolute', top: 18, left: 24, fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.14em', color }}>{text}</div>
   );
   if (id === 'modern-minimal') {
@@ -4024,7 +4025,7 @@ const StyleSwatch = ({ id }) => {
   );
 };
 
-const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
+const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }: any) => (
   <div
     role="button"
     tabIndex={0}
@@ -4060,7 +4061,7 @@ const AVisualStyleCard = ({ id, name, descriptor, sel, onClick }) => (
 const useStep2 = () => {
   const { draft, setData } = useBrandDraft();
   const step2 = (draft && draft.data && draft.data.step2) || {};
-  const setStep2 = (patch) =>
+  const setStep2 = (patch: any) =>
     setData({ step2: { ...step2, ...patch } });
   return { step2, setStep2 };
 };
@@ -4075,7 +4076,7 @@ const AVisualStyleSection = () => {
   const delegated = selectedId === AI_CHOICE;
   const selected = VISUAL_STYLE_OPTIONS.find((o) => o.id === selectedId) || VISUAL_STYLE_OPTIONS[0];
   const refine = step2.refine || { bold: 50, modern: 50, cool: 50 };
-  const setRefine = (key, v) => setStep2({ refine: { ...refine, [key]: v } });
+  const setRefine = (key: any, v: any) => setStep2({ refine: { ...refine, [key]: v } });
   // Delegating is instant and free — no model call. The decision is made later
   // by the studio from the completed brief.
   const letAIChoose = () => {
@@ -4137,9 +4138,9 @@ const AVisualStyleSection = () => {
             <span style={{ fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}>3 attributes</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <ASlider left="Quiet" right="Bold" value={refine.bold} onChange={(v) => setRefine('bold', v)} />
-            <ASlider left="Classic" right="Modern" value={refine.modern} onChange={(v) => setRefine('modern', v)} />
-            <ASlider left="Warm" right="Cool" value={refine.cool} onChange={(v) => setRefine('cool', v)} />
+            <ASlider left="Quiet" right="Bold" value={refine.bold} onChange={(v: any) => setRefine('bold', v)} />
+            <ASlider left="Classic" right="Modern" value={refine.modern} onChange={(v: any) => setRefine('modern', v)} />
+            <ASlider left="Warm" right="Cool" value={refine.cool} onChange={(v: any) => setRefine('cool', v)} />
           </div>
         </div>
       )}
@@ -4148,7 +4149,7 @@ const AVisualStyleSection = () => {
 };
 
 // Draggable refinement slider (native range input for reliable interaction).
-const ASlider = ({ left, right, value, onChange }) => (
+const ASlider = ({ left, right, value, onChange }: any) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 12,
     boxShadow:'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4166,7 +4167,7 @@ const ASlider = ({ left, right, value, onChange }) => (
 );
 
 // Palette option — a labeled set of swatches
-const APaletteOption = ({ name, mood, palette, sel, onClick }) => (
+const APaletteOption = ({ name, mood, palette, sel, onClick }: any) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4179,7 +4180,7 @@ const APaletteOption = ({ name, mood, palette, sel, onClick }) => (
       </div>
     )}
     <div style={{display:'flex', gap: 4, height: 56}}>
-      {palette.map((c, i) => (
+      {palette.map((c: any, i: any) => (
         <div key={i} style={{flex: i === 0 ? 1.4 : 1, borderRadius: 6, background: c, boxShadow:'inset 0 0 0 1px rgba(0,0,0,0.06)'}}/>
       ))}
     </div>
@@ -4191,7 +4192,7 @@ const APaletteOption = ({ name, mood, palette, sel, onClick }) => (
 );
 
 // Font pair option — display + body sample
-const AFontPairOption = ({ name, mood, display, body, sel, onClick }) => (
+const AFontPairOption = ({ name, mood, display, body, sel, onClick }: any) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 14,
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4245,7 +4246,7 @@ const OPEN_SOURCE_FONT_PAIRS = [
   { id:'sora-plex', name:'Futuristic', mood:'digital · precise', display:{family:'Sora', category:'sans-serif', weight:700}, body:{family:'IBM Plex Sans', category:'sans-serif', weight:400} },
 ];
 
-const fontFamilyCss = (face) => '"' + face.family + '", ' + (FONT_FALLBACK[face.category] || 'sans-serif');
+const fontFamilyCss = (face: any) => '"' + face.family + '", ' + ((FONT_FALLBACK as any)[face.category] || 'sans-serif');
 
 const INSPIRATION_BRANDS = [
   { name:'Apple', category:'Consumer tech · Premium', hero:<AppleHero/>, style:{ label:'Minimal · Refined', pill:{ bg:'#FFFFFF', color:'#1D1D1F', font: APPLE_DISPLAY, weight: 500, tracking:'-0.005em', shadow:'inset 0 0 0 1px #D2D2D7', dot:'#1D1D1F' } } },
@@ -4255,7 +4256,7 @@ const INSPIRATION_BRANDS = [
 ];
 
 // A user-uploaded font, previewed in that font, selectable + removable.
-const ACustomFontCard = ({ family, sel, onClick, onRemove }) => (
+const ACustomFontCard = ({ family, sel, onClick, onRemove }: any) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 14, position:'relative',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-xs)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4283,8 +4284,8 @@ const ACustomFontCard = ({ family, sel, onClick, onRemove }) => (
 );
 
 // Dashed "upload your font" card.
-const AUploadFontCard = ({ onPick }) => {
-  const ref = React.useRef(null);
+const AUploadFontCard = ({ onPick }: any) => {
+  const ref = React.useRef<any>(null);
   return (
     <div onClick={() => ref.current && ref.current.click()} style={{
       borderRadius: 14, minHeight: 140, cursor:'pointer',
@@ -4312,14 +4313,14 @@ const ATypographySection = () => {
     OPEN_SOURCE_FONT_PAIRS.forEach((p) => { ensureGoogleFont(p.display.family); ensureGoogleFont(p.body.family); });
   }, []);
   React.useEffect(() => {
-    customFonts.forEach((cf) => registerCustomFont(cf.family, cf.dataUrl));
+    customFonts.forEach((cf: any) => registerCustomFont(cf.family, cf.dataUrl));
   }, [customFonts]);
 
   // Defer to the studio rather than picking from the list (see AI_CHOICE).
   const fontDelegated = step2.font === AI_CHOICE;
   const pickFont = () => setStep2({ font: fontDelegated ? null : AI_CHOICE });
 
-  const onUpload = async (file) => {
+  const onUpload = async (file: any) => {
     setUploadErr('');
     if (!file) return;
     if (!/\.(ttf|otf|woff2?|woff)$/i.test(file.name)) { setUploadErr('Use a .ttf, .otf, .woff or .woff2 file.'); return; }
@@ -4331,9 +4332,9 @@ const ATypographySection = () => {
     await registerCustomFont(family, dataUrl);
     setStep2({ custom_fonts: [...customFonts, { id, family, dataUrl }], font: 'custom:' + id });
   };
-  const removeCustom = (id) => {
+  const removeCustom = (id: any) => {
     setStep2({
-      custom_fonts: customFonts.filter((c) => c.id !== id),
+      custom_fonts: customFonts.filter((c: any) => c.id !== id),
       font: step2.font === 'custom:' + id ? null : step2.font,
     });
   };
@@ -4353,7 +4354,7 @@ const ATypographySection = () => {
             body={{ font: fontFamilyCss(p.body), name: p.body.family, weight: p.body.weight, sample: 'The quick brown fox jumps over the lazy dog.' }}
           />
         ))}
-        {customFonts.map((cf) => (
+        {customFonts.map((cf: any) => (
           <ACustomFontCard key={cf.id} family={cf.family}
             sel={step2.font === 'custom:' + cf.id}
             onClick={() => setStep2({ font: step2.font === 'custom:' + cf.id ? null : 'custom:' + cf.id })}
@@ -4480,7 +4481,7 @@ const DirA_Step3_Style = () => {
 // black ring; favorited cards get a coral heart.
 // =====================================================================
 // Compact name card — just the name, selectable, with a like (heart) toggle.
-const ANameCard = ({ n, sel, liked, onClick, onLike }) => (
+const ANameCard = ({ n, sel, liked, onClick, onLike }: any) => (
   <div onClick={onClick} style={{
     position:'relative', background:'var(--bg-elev)', borderRadius:12,
     padding:'16px 30px 16px 14px', minHeight:58,
@@ -4516,7 +4517,7 @@ const NAME_STYLE_OPTIONS = [
   { id: 'real_words', label: 'Real words', description: 'Apple, Amazon' },
 ];
 
-const ANameStyleOption = ({ option, selected, disabled, onClick }) => (
+const ANameStyleOption = ({ option, selected, disabled, onClick }: any) => (
   <button
     type="button"
     onClick={onClick}
@@ -4546,7 +4547,7 @@ const DirA_Step2_Name = () => {
   // `name` should still show that name selected here rather than looking as
   // though nothing was ever picked.
   const chosen = resolveBrandName(draft);
-  const chooseName = (name) => { setField('name_choice', name); setField('name', name); };
+  const chooseName = (name: any) => { setField('name_choice', name); setField('name', name); };
 
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
@@ -4567,7 +4568,7 @@ const DirA_Step2_Name = () => {
   // so a chosen custom name (unlike a chosen grid card) never appeared
   // anywhere in the UI and looked like it had done nothing.
   const [customName, setCustomName] = React.useState(
-    chosen && !names.some((o) => o.name === chosen) && !liked.includes(chosen) ? chosen : '',
+    chosen && !names.some((o: any) => o.name === chosen) && !liked.includes(chosen) ? chosen : '',
   );
   const customChosen = !!customName.trim() && chosen === customName.trim();
   const submitCustomName = () => {
@@ -4576,19 +4577,19 @@ const DirA_Step2_Name = () => {
   };
 
   // Persist names + liked together, merging onto whatever else is in data.
-  const persist = React.useCallback((nextNames, nextLiked) => {
+  const persist = React.useCallback((nextNames: any, nextLiked: any) => {
     setData({ names: nextNames, liked_names: nextLiked });
   }, [draft, setField]);
 
-  const toggleLike = (name) => {
-    const next = liked.includes(name) ? liked.filter((x) => x !== name) : [...liked, name];
+  const toggleLike = (name: any) => {
+    const next = liked.includes(name) ? liked.filter((x: any) => x !== name) : [...liked, name];
     setLiked(next);
     persist(names, next);
   };
 
-  const toggleNameStyle = (id) => {
+  const toggleNameStyle = (id: any) => {
     const next = selectedNameStyles.includes(id)
-      ? selectedNameStyles.filter((style) => style !== id)
+      ? selectedNameStyles.filter((style: any) => style !== id)
       : selectedNameStyles.length >= NAME_STYLE_LIMIT ? selectedNameStyles : [...selectedNameStyles, id];
     setData({
       name_generation_style_ids: next,
@@ -4603,6 +4604,11 @@ const DirA_Step2_Name = () => {
     });
   };
 
+  // The React Compiler can't statically verify this callback's memoization
+  // is safe to preserve (likely because of `persist`'s own definition
+  // further up); the dependency list itself is complete and correct, so
+  // this is a build-optimization compatibility note, not a runtime bug.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const generate = React.useCallback(async () => {
     if (!brandId) return;
     setLoading(true); setError('');
@@ -4727,7 +4733,7 @@ const DirA_Step2_Name = () => {
           <div style={{fontSize:12.5, color:'var(--fg-3)'}}>Tap the heart on any name to save it here.</div>
         ) : (
           <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
-            {liked.map((name) => {
+            {liked.map((name: any) => {
               const sel = chosen === name;
               return (
                 <div key={name} style={{
@@ -4782,7 +4788,7 @@ const DirA_Step2_Name = () => {
     {/* Name grid */}
     {names.length > 0 && (
       <div style={{display:'grid', gridTemplateColumns:NAME_GRID, gap:10, opacity: loading ? 0.5 : 1}}>
-        {names.map((o) => (
+        {names.map((o: any) => (
           <ANameCard key={o.name} n={o.name}
             sel={chosen === o.name} liked={liked.includes(o.name)}
             onClick={() => chooseName(o.name)} onLike={() => toggleLike(o.name)} />
@@ -4813,7 +4819,7 @@ const DirA_Step2_Name = () => {
 
 // A low-fi croquis card with a like control. The asset is presented directly
 // on the card so transparent sketches do not sit inside a second visual frame.
-const ASketchCard = ({ sketch, liked, onLike, onImageError }) => (
+const ASketchCard = ({ sketch, liked, onLike, onImageError }: any) => (
   <div style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12,
     boxShadow: liked ? '0 0 0 2px #FD7947, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4854,7 +4860,7 @@ const ASketchCard = ({ sketch, liked, onLike, onImageError }) => (
 
 // A high-fidelity finalist card: the finished mark plus the designer's
 // rationale and the creative director's verdict from the critique pass.
-const AFinalistCard = ({ f, sel, busy, onClick }) => (
+const AFinalistCard = ({ f, sel, busy, onClick }: any) => (
   <div onClick={onClick} style={{
     background:'var(--bg-elev)', borderRadius: 16, padding: 12, cursor:'pointer',
     boxShadow: sel ? '0 0 0 2px #000, var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -4866,7 +4872,7 @@ const AFinalistCard = ({ f, sel, busy, onClick }) => (
         {f.svg && ' · vector ready'}
         {/* The colours this version was briefed with, so a mark drawn in the
             wrong palette is visible without opening the art direction. */}
-        {Array.isArray(f.colors) && f.colors.map((c) => (
+        {Array.isArray(f.colors) && f.colors.map((c: any) => (
           <span key={c} title={c} style={{
             width:9, height:9, borderRadius:99, background:c,
             boxShadow:'inset 0 0 0 1px rgba(0,0,0,.18)', display:'inline-block',
@@ -5021,7 +5027,7 @@ const DESIGN_STYLE_PREVIEW = {
 //
 // Cycling is driven by `active`, which the card sets on hover AND on focus —
 // keyboard users get the same reference material as mouse users.
-const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }) => {
+const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }: any) => {
   const [i, setI] = React.useState(0);
   React.useEffect(() => {
     if (!active || refs.length < 2) return;
@@ -5031,7 +5037,7 @@ const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }) =
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {refs.map((r, n) => (
+      {refs.map((r: any, n: any) => (
         <img
           key={r.src}
           className="mark-ref-frame"
@@ -5056,7 +5062,7 @@ const AMarkReferenceReel = ({ refs, active, maxHeight = 28, showName = true }) =
   );
 };
 
-const AChoiceCard = ({ option, preview, refs, sel, onClick }) => {
+const AChoiceCard = ({ option, preview, refs, sel, onClick }: any) => {
   // Hover or keyboard focus both drive the reel.
   const [hot, setHot] = React.useState(false);
   const hasRefs = !!(refs && refs.length);
@@ -5114,7 +5120,7 @@ const EMBEDDED_LOGO_SCREENS = {
 // Where to drop someone back into the studio, read off what the brand already
 // has. Resuming at the start when a board is already drawn would look
 // like the work had been lost.
-function resumeLogoPhase(data) {
+function resumeLogoPhase(data: any) {
   const d = data || {};
   if ((d.logo_finalists || []).length) return 'logo-export';
   if ((d.logo_board || []).length) return 'logo-sketches';
@@ -5137,11 +5143,11 @@ const DirA_Step4_Logo = () => {
   // and only the text lives in state: a screen re-renders with fresh inline
   // callbacks constantly, and storing those in state would set state on every
   // render of the child, which is a render loop with extra steps.
-  const handlers = React.useRef({});
-  const [chrome, setChrome] = React.useState({});
-  const publishChrome = React.useCallback((next) => {
+  const handlers = React.useRef<any>({});
+  const [chrome, setChrome] = React.useState<any>({});
+  const publishChrome = React.useCallback((next: any) => {
     handlers.current = next;
-    setChrome((prev) => (
+    setChrome((prev: any) => (
       prev.title === next.title
       && prev.subtitle === next.subtitle
       && prev.dockCopy === next.dockCopy
@@ -5158,13 +5164,13 @@ const DirA_Step4_Logo = () => {
     ));
   }, []);
 
-  const goPhase = React.useCallback((next) => {
+  const goPhase = React.useCallback((next: any) => {
     setPhase(next);
     const n = EMBEDDED_LOGO_ROUTES.indexOf(next) + 2;
     setFurthest((f) => Math.max(f, n));
   }, []);
 
-  const goToStep = React.useCallback((n) => {
+  const goToStep = React.useCallback((n: any) => {
     goPhase(EMBEDDED_LOGO_ROUTES[n - 2]);
   }, [goPhase]);
 
@@ -5173,7 +5179,7 @@ const DirA_Step4_Logo = () => {
     [goPhase, publishChrome, goToStep, furthest],
   );
 
-  const Screen = EMBEDDED_LOGO_SCREENS[phase] || DirA_LogoDirection;
+  const Screen = (EMBEDDED_LOGO_SCREENS as any)[phase] || DirA_LogoDirection;
 
   // Back out of the first sub-step lands on step 2, not on the studio's own
   // brief screen — which this flow skipped, and which would strand the client
@@ -5208,7 +5214,7 @@ const DirA_Step4_Logo = () => {
 // =====================================================================
 
 // A single generated color swatch — block + name / hex / usage.
-const KitSwatch = ({ c }) => (
+const KitSwatch = ({ c }: any) => (
   <div style={{ flex: '1 1 140px', minWidth: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ height: 76, borderRadius: 12, background: c.hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)' }} />
     <div>
@@ -5224,14 +5230,14 @@ const KitSwatch = ({ c }) => (
 
 // Full-width palette section for the Brand Kit. Auto-generates on open when a
 // brief exists and no palette is cached yet; supports regenerate + retry.
-const KitPaletteSection = ({ draft }) => {
+const KitPaletteSection = ({ draft }: any) => {
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
   const cached = (draft && draft.data && draft.data.palette) || null;
   const [palette, setPalette] = React.useState(cached);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
+  const requestedFor = React.useRef<any>(null);
 
   const generate = React.useCallback(async () => {
     if (!brandId) return;
@@ -5288,7 +5294,7 @@ const KitPaletteSection = ({ draft }) => {
         {palette && (
           <>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', opacity: loading ? 0.5 : 1 }}>
-              {palette.colors.map((c, i) => <KitSwatch key={c.hex + i} c={c} />)}
+              {palette.colors.map((c: any, i: any) => <KitSwatch key={c.hex + i} c={c} />)}
             </div>
             {palette.rationale && (
               <p style={{ fontSize: 12.5, color: 'var(--fg-3)', lineHeight: 1.5, margin: '16px 0 0', maxWidth: 640 }}>{palette.rationale}</p>
@@ -5302,14 +5308,14 @@ const KitPaletteSection = ({ draft }) => {
 
 // Full-width typography section for the Brand Kit. Recommends a Google-Fonts
 // heading + body pairing and renders a live specimen. Auto-generates on open.
-const KitTypographySection = ({ draft }) => {
+const KitTypographySection = ({ draft }: any) => {
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
   const cached = (draft && draft.data && draft.data.typography) || null;
   const [type, setType] = React.useState(cached);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
+  const requestedFor = React.useRef<any>(null);
 
   // Load the web fonts whenever we have a pairing to show.
   React.useEffect(() => {
@@ -5333,7 +5339,7 @@ const KitTypographySection = ({ draft }) => {
   }, [brandId, hasBrief, type, generate]);
 
   const brandName = (draft && (draft.name_choice || draft.name)) || 'Your brand';
-  const ff = (face) => '"' + face.family + '", ' + (FONT_FALLBACK[face.category] || 'sans-serif');
+  const ff = (face: any) => '"' + face.family + '", ' + ((FONT_FALLBACK as any)[face.category] || 'sans-serif');
 
   return (
     <div>
@@ -5398,7 +5404,7 @@ const KitTypographySection = ({ draft }) => {
 
 // Full-width logo section for the Brand Kit. Generates SVG mark concepts and
 // lets the user pick one (saved to logo_choice). Auto-generates on open.
-const KitLogoSection = ({ draft }) => {
+const KitLogoSection = ({ draft }: any) => {
   const { setField } = useBrandDraft();
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
@@ -5407,7 +5413,7 @@ const KitLogoSection = ({ draft }) => {
   const [logos, setLogos] = React.useState(cached);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
-  const requestedFor = React.useRef(null);
+  const requestedFor = React.useRef<any>(null);
 
   const generate = React.useCallback(async () => {
     if (!brandId) return;
@@ -5460,7 +5466,7 @@ const KitLogoSection = ({ draft }) => {
 
       {logos.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, opacity: loading ? 0.5 : 1 }}>
-          {logos.map((c) => {
+          {logos.map((c: any) => {
             const sel = chosen === c.name;
             return (
               <div key={c.name} onClick={() => setField && setField('logo_choice', c.name)} style={{
@@ -5489,7 +5495,7 @@ const KitLogoSection = ({ draft }) => {
 };
 
 // A labelled block within the guidelines document.
-const GuideBlock = ({ label, children }) => (
+const GuideBlock = ({ label, children }: any) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</div>
     {children}
@@ -5499,7 +5505,7 @@ const GuideBlock = ({ label, children }) => (
 // Full-width brand-guidelines section — the capstone. Synthesizes a written
 // guide from the brief and the generated assets. Generated on explicit click so
 // it reads the palette / type / logo after they've been cached.
-const KitGuidelinesSection = ({ draft }) => {
+const KitGuidelinesSection = ({ draft }: any) => {
   const brandId = draft && draft.id;
   const hasBrief = !!(draft && String(draft.brief || '').trim());
   const cached = (draft && draft.data && draft.data.guidelines) || null;
@@ -5570,7 +5576,7 @@ const KitGuidelinesSection = ({ draft }) => {
               <GuideBlock label="Voice & tone">
                 {g.voice.traits.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                    {g.voice.traits.map((t) => (
+                    {g.voice.traits.map((t: any) => (
                       <span key={t} style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', padding: '4px 10px', borderRadius: 99, boxShadow: 'inset 0 0 0 1px var(--line)' }}>{t}</span>
                     ))}
                   </div>
@@ -5582,7 +5588,7 @@ const KitGuidelinesSection = ({ draft }) => {
             {g.messaging && g.messaging.pillars && g.messaging.pillars.length > 0 && (
               <GuideBlock label="Key messages">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {g.messaging.pillars.map((p, i) => (
+                  {g.messaging.pillars.map((p: any, i: any) => (
                     <div key={i} style={{ background: 'var(--bg)', borderRadius: 12, padding: 14, boxShadow: 'inset 0 0 0 1px var(--line)' }}>
                       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13.5, color: '#000', marginBottom: 4 }}>{p.title}</div>
                       <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.45 }}>{p.body}</div>
@@ -5596,7 +5602,7 @@ const KitGuidelinesSection = ({ draft }) => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                 <GuideBlock label="Do">
                   <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {g.dos.map((d, i) => (
+                    {g.dos.map((d: any, i: any) => (
                       <li key={i} style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.45, display: 'flex', gap: 8 }}>
                         <span style={{ color: '#0E6B5E', fontWeight: 700 }}>✓</span> {d}
                       </li>
@@ -5605,7 +5611,7 @@ const KitGuidelinesSection = ({ draft }) => {
                 </GuideBlock>
                 <GuideBlock label="Don't">
                   <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {g.donts.map((d, i) => (
+                    {g.donts.map((d: any, i: any) => (
                       <li key={i} style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.45, display: 'flex', gap: 8 }}>
                         <span style={{ color: '#A8421F', fontWeight: 700 }}>✕</span> {d}
                       </li>
@@ -5636,34 +5642,35 @@ const KitGuidelinesSection = ({ draft }) => {
 // (SVG/PNG), the palette as CSS variables, and a self-contained brand-sheet
 // HTML file that gathers everything (printable to PDF).
 // ══════════════════════════════════════════════════════════════════════
-function downloadBlob(filename, blob) {
+function downloadBlob(filename: any, blob: any) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
-function kitSlug(s) {
+export function kitSlug(s: any) {
   return String(s || 'brand').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'brand';
 }
-function escHtml(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+export function escHtml(s: any) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[m] || m);
 }
 // The user's chosen logo concept's SVG (or the first available).
-function pickLogoSvg(b) {
+function pickLogoSvg(b: any) {
   const logos = (b.data && b.data.logos) || [];
   if (!logos.length) return null;
-  const pick = logos.find((l) => l.name === b.logo_choice) || logos[0];
+  const pick = logos.find((l: any) => l.name === b.logo_choice) || logos[0];
   return pick ? pick.svg : null;
 }
 // Rasterize an SVG string to a PNG Blob at `size`px via an offscreen canvas.
-function svgToPngBlob(svg, size) {
-  return new Promise((resolve, reject) => {
+function svgToPngBlob(svg: any, size: any) {
+  return new Promise<Blob>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Canvas 2D context unavailable')); return; }
       ctx.clearRect(0, 0, size, size);
       ctx.drawImage(img, 0, 0, size, size);
       canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG export failed'))), 'image/png');
@@ -5672,24 +5679,24 @@ function svgToPngBlob(svg, size) {
     img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   });
 }
-function buildPaletteCss(b) {
+function buildPaletteCss(b: any) {
   const colors = ((b.data && b.data.palette && b.data.palette.colors) || []);
   let css = '/* ' + (b.name_choice || b.name || 'Brand') + ' — color palette */\n:root {\n';
-  colors.forEach((c, i) => {
+  colors.forEach((c: any, i: any) => {
     const key = kitSlug(c.name) || ('color-' + (i + 1));
     css += '  --brand-' + key + ': ' + c.hex + ';' + (c.role ? '  /* ' + c.role + ' */' : '') + '\n';
   });
   css += '}\n';
   return css;
 }
-function googleFontsHref(families) {
+function googleFontsHref(families: any) {
   const uniq = Array.from(new Set(families.filter(Boolean)));
   if (!uniq.length) return '';
   return 'https://fonts.googleapis.com/css2?' +
-    uniq.map((f) => 'family=' + encodeURIComponent(f).replace(/%20/g, '+')).join('&') + '&display=swap';
+    uniq.map((f: any) => 'family=' + encodeURIComponent(f).replace(/%20/g, '+')).join('&') + '&display=swap';
 }
 // Compose a single self-contained HTML brand sheet from everything generated.
-function buildBrandSheetHtml(b) {
+function buildBrandSheetHtml(b: any) {
   const data = b.data || {};
   const name = b.name_choice || b.name || 'Your brand';
   const pal = data.palette || {};
@@ -5700,16 +5707,16 @@ function buildBrandSheetHtml(b) {
   const headFam = type && type.heading && type.heading.family;
   const bodyFam = type && type.body && type.body.family;
   const fontsHref = googleFontsHref([headFam, bodyFam]);
-  const ff = (fam, fallback) => fam ? ('"' + fam + '", ' + fallback) : fallback;
+  const ff = (fam: any, fallback: any) => fam ? ('"' + fam + '", ' + fallback) : fallback;
 
-  const sec = (title, inner) => inner
+  const sec = (title: any, inner: any) => inner
     ? '<section><h2>' + escHtml(title) + '</h2>' + inner + '</section>' : '';
 
   const briefRows = [
     ['Brief', b.brief], ['Audience', b.audience], ['Logo direction', b.logo_choice],
   ].filter((r) => r[1]).map((r) => '<div class="row"><span>' + escHtml(r[0]) + '</span><p>' + escHtml(r[1]) + '</p></div>').join('');
 
-  const paletteHtml = colors.length ? '<div class="swatches">' + colors.map((c) =>
+  const paletteHtml = colors.length ? '<div class="swatches">' + colors.map((c: any) =>
     '<div class="sw"><div class="chip" style="background:' + escHtml(c.hex) + '"></div>' +
     '<b>' + escHtml(c.name) + '</b><code>' + escHtml((c.hex || '').toUpperCase()) + '</code>' +
     '<em>' + escHtml(c.role) + '</em>' + (c.usage ? '<span>' + escHtml(c.usage) + '</span>' : '') + '</div>').join('') +
@@ -5727,9 +5734,9 @@ function buildBrandSheetHtml(b) {
     (g.positioning ? '<h3>Positioning</h3><p>' + escHtml(g.positioning) + '</p>' : '') +
     (g.messaging && g.messaging.tagline ? '<h3>Tagline</h3><p class="tag">' + escHtml(g.messaging.tagline) + '</p>' : '') +
     (g.voice && (g.voice.traits || []).length ? '<h3>Voice &amp; tone</h3><p>' + (g.voice.traits || []).map(escHtml).join(' · ') + '</p>' + (g.voice.description ? '<p>' + escHtml(g.voice.description) + '</p>' : '') : '') +
-    (g.messaging && (g.messaging.pillars || []).length ? '<h3>Key messages</h3><ul>' + g.messaging.pillars.map((p) => '<li><b>' + escHtml(p.title) + '</b> — ' + escHtml(p.body) + '</li>').join('') + '</ul>' : '') +
-    ((g.dos || []).length ? '<h3>Do</h3><ul>' + g.dos.map((d) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
-    ((g.donts || []).length ? '<h3>Don’t</h3><ul>' + g.donts.map((d) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
+    (g.messaging && (g.messaging.pillars || []).length ? '<h3>Key messages</h3><ul>' + g.messaging.pillars.map((p: any) => '<li><b>' + escHtml(p.title) + '</b> — ' + escHtml(p.body) + '</li>').join('') + '</ul>' : '') +
+    ((g.dos || []).length ? '<h3>Do</h3><ul>' + g.dos.map((d: any) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
+    ((g.donts || []).length ? '<h3>Don’t</h3><ul>' + g.donts.map((d: any) => '<li>' + escHtml(d) + '</li>').join('') + '</ul>' : '') +
     (g.usage ? '<h3>Asset usage</h3>' + ['logo', 'color', 'type'].filter((k) => g.usage[k]).map((k) => '<p><b>' + k[0].toUpperCase() + k.slice(1) + '</b> — ' + escHtml(g.usage[k]) + '</p>').join('') : '')
   ) : '';
 
@@ -5762,7 +5769,7 @@ function buildBrandSheetHtml(b) {
     '</div></body></html>';
 }
 
-const KitExport = ({ b }) => {
+const KitExport = ({ b }: any) => {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const data = b.data || {};
@@ -5780,7 +5787,7 @@ const KitExport = ({ b }) => {
   };
   const dlCss = () => { downloadBlob(slug + '-palette.css', new Blob([buildPaletteCss(b)], { type: 'text/css' })); setOpen(false); };
 
-  const item = (label, onClick, enabled) => (
+  const item = (label: any, onClick: any, enabled: any) => (
     <button onClick={enabled ? onClick : undefined} disabled={!enabled} style={{
       display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
       background: 'transparent', border: 0, cursor: enabled ? 'pointer' : 'default',
@@ -5909,7 +5916,7 @@ const COL_2 = [1, 4, 7, 10, 13, 16, 19, 22].map((i) => COLLAGE_IMAGES[i]);
 const COL_3 = [2, 5, 8, 11, 14, 17, 20, 23].map((i) => COLLAGE_IMAGES[i]);
 
 // ---- A single brand card --------------------------------------------
-const BrandImgCard = ({ src }) => (
+const BrandImgCard = ({ src }: any) => (
   <img
     src={src}
     alt=""
@@ -5927,8 +5934,8 @@ const BrandImgCard = ({ src }) => (
 //   shift = (scrollHeight + gap) / 2
 // which lands copy 2 precisely where copy 1 began — a seamless loop.
 // `down` plays the keyframe in reverse so the stream travels downward.
-const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }) => {
-  const ref = React.useRef(null);
+const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }: any) => {
+  const ref = React.useRef<any>(null);
   const [shift, setShift] = React.useState(0);
   // Measure the loop distance exactly ONCE, after every image has loaded so
   // scrollHeight is final. We deliberately never re-measure afterwards —
@@ -5944,7 +5951,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 })
       const m = Math.round((el.scrollHeight + gap) / 2);
       if (m > 0) setShift(m);
     };
-    const waits = imgs.map((img) =>
+    const waits = imgs.map((img: any) =>
       img.complete && img.naturalWidth
         ? Promise.resolve()
         : new Promise((res) => { img.onload = img.onerror = res; })
@@ -5955,7 +5962,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 })
   const dur = shift ? shift / speed : 20;
   // Negative delay offsets each column's starting phase so they never align.
   const delay = shift ? -(phase * dur) : 0;
-  const cards = images.map((src, i) => <BrandImgCard key={i} src={src} />);
+  const cards = images.map((src: any, i: any) => <BrandImgCard key={i} src={src} />);
   return (
     <div
       ref={ref}
@@ -5967,7 +5974,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 })
         animation: shift
           ? `collageScroll ${dur}s linear ${delay}s infinite ${down ? 'reverse' : 'normal'}`
           : 'none',
-      }}
+      } as React.CSSProperties}
     >
       {cards}
       {cards}
@@ -6049,7 +6056,7 @@ const fmtTone = {
   ASE: { bg: 'rgba(165,120,255,.20)', fg: '#5B3F9E' },
   OTF: { bg: 'rgba(253,186,80,.22)',  fg: '#9A5A12' },
 };
-const FormatTag = ({ fmt }) => {
+const FormatTag = ({ fmt }: any) => {
   return (
     <span style={{
       fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 500, letterSpacing: '0.06em',
@@ -6100,12 +6107,12 @@ const BA_IcoPin = ({ s = 12 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M14 2l8 8-3 1-3 5-2 2-3-3-5 5-1-1 5-5-3-3 2-2 5-3z" /></svg>
 );
 
-const BA_StatusPill = ({ status }) => {
+const BA_StatusPill = ({ status }: any) => {
   const map = {
     live:  { dot: '#44D9C7', label: 'Live',  fg: '#0E6B5E', bg: 'rgba(68,217,199,.20)' },
     draft: { dot: 'var(--fg-4)', label: 'Draft', fg: 'var(--fg-3)', bg: 'var(--bg-sunken)' },
   };
-  const s = map[status] || map.draft;
+  const s = (map as any)[status] || map.draft;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -6120,7 +6127,7 @@ const BA_StatusPill = ({ status }) => {
 
 // ---- Brand showcase card ----------------------------------------------
 // Reusable empty state — shown when a screen has no real content yet.
-const AEmptyState = ({ title, body, ctaLabel, onCta }) => (
+const AEmptyState = ({ title, body, ctaLabel, onCta }: any) => (
   <div style={{
     border: '1px dashed var(--line-strong)', borderRadius: 20,
     padding: '56px 40px', display: 'flex', flexDirection: 'column',
@@ -6136,7 +6143,7 @@ const AEmptyState = ({ title, body, ctaLabel, onCta }) => (
   </div>
 );
 
-const BA_EmptyState = ({ onCreate }) => (
+const BA_EmptyState = ({ onCreate }: any) => (
   <AEmptyState
     title="No brands yet"
     body="Start your first brand and it'll live here — every name, logo, palette and guideline you build with Fluid."
@@ -6190,7 +6197,7 @@ const DirA_GuidesScreen = () => {
 };
 
 // Relative "time ago" for real saved-brand timestamps.
-function relTime(iso) {
+function relTime(iso: any) {
   if (!iso) return '';
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return 'Just now';
@@ -6214,7 +6221,7 @@ function relTime(iso) {
 // It can be trusted when it *differs* from that placeholder, which is what
 // rescues brands saved while a debounce race was dropping name_choice: for
 // those, `name` is the only surviving copy of the chosen name.
-function resolveBrandName(b) {
+export function resolveBrandName(b: any) {
   const chosen = ((b && b.name_choice) || '').trim();
   if (chosen && chosen.toLowerCase() !== 'untitled brand') return chosen;
   const name = ((b && b.name) || '').trim();
@@ -6222,7 +6229,7 @@ function resolveBrandName(b) {
   return name === deriveBrandName((b && b.brief) || '') ? null : name;
 }
 
-function brandDisplayName(b) {
+function brandDisplayName(b: any) {
   return resolveBrandName(b) || 'Untitled';
 }
 
@@ -6230,12 +6237,12 @@ function brandDisplayName(b) {
 // whether it's still mid-conversation (`brandkitDraft`) or finished
 // (`brandkit`) — both belong at the chat URL, never the legacy hash-router
 // wizard below, which doesn't know how to resume that flow's steps.
-function isBrandKitBrand(b) {
+function isBrandKitBrand(b: any) {
   return !!(b.data && (b.data.brandkit || b.data.brandkitDraft));
 }
 
 // #rrggbb / #rgb → "rgba(r,g,b,a)". Falls back to a neutral ink tint.
-function hexToRgba(hex, a) {
+function hexToRgba(hex: any, a: any) {
   let h = String(hex || '').trim().replace('#', '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');
   if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return 'rgba(20,20,20,' + a + ')';
@@ -6251,7 +6258,7 @@ function hexToRgba(hex, a) {
 //   • palette present → a thin swatch strip so colors always show
 //   • neither → a neutral surface (never the Fluid gradient — that's Fluid's
 //     mark, not the user's brand)
-const BA_CardVisual = ({ brand, height = 132 }) => {
+const BA_CardVisual = ({ brand, height = 132 }: any) => {
   // A one-shot brand-kit board is already a finished piece of art — show it
   // directly rather than falling back to the svg/palette/initial tile below.
   const boardImage = brand.data && brand.data.brandkit && brand.data.brandkit.imageUrl;
@@ -6281,7 +6288,7 @@ const BA_CardVisual = ({ brand, height = 132 }) => {
   if (svg) {
     background = hasColors ? hexToRgba(colors[0].hex, 0.14) : 'var(--bg-sunken)';
   } else if (hasColors) {
-    const stops = colors.slice(0, 3).map((c) => c.hex);
+    const stops = colors.slice(0, 3).map((c: any) => c.hex);
     background = stops.length >= 2 ? 'linear-gradient(135deg, ' + stops.join(', ') + ')' : stops[0];
   } else {
     background = 'var(--bg-sunken)';
@@ -6302,7 +6309,7 @@ const BA_CardVisual = ({ brand, height = 132 }) => {
       )}
       {svg && hasColors && (
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', height: stripH }}>
-          {colors.slice(0, 6).map((c, i) => (
+          {colors.slice(0, 6).map((c: any, i: any) => (
             <div key={i} style={{ flex: 1, background: c.hex }} />
           ))}
         </div>
@@ -6313,7 +6320,7 @@ const BA_CardVisual = ({ brand, height = 132 }) => {
 
 // Card for a real, user-saved brand. The top visual reflects the brand's own
 // generated identity (logo / palette) rather than a generic tile.
-const BA_RealBrandCard = ({ brand, onOpen, onDelete }) => (
+const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
   <div
     onClick={onOpen}
     style={{
@@ -6370,7 +6377,7 @@ const DirA_BrandsActive = () => {
   // some in-app webviews, automated/preview browsers), which made this
   // button silently do nothing — confirm() returns false and the delete
   // never fires.
-  const [pendingDelete, setPendingDelete] = useBAState(null);
+  const [pendingDelete, setPendingDelete] = useBAState<any>(null);
   const [deleting, setDeleting] = useBAState(false);
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -6382,10 +6389,10 @@ const DirA_BrandsActive = () => {
   };
   const filters = [
     { key: 'all', label: 'All', count: brands.length },
-    { key: 'live', label: 'Live', count: brands.filter((b) => b.status === 'live').length },
-    { key: 'draft', label: 'Drafts', count: brands.filter((b) => b.status === 'draft').length },
+    { key: 'live', label: 'Live', count: brands.filter((b: any) => b.status === 'live').length },
+    { key: 'draft', label: 'Drafts', count: brands.filter((b: any) => b.status === 'draft').length },
   ];
-  const shown = brands.filter((b) => (filter === 'all' ? true : b.status === filter));
+  const shown = brands.filter((b: any) => (filter === 'all' ? true : b.status === filter));
 
   return (
     <AShell activeNav="brands" breadcrumb={['Brands']}>
@@ -6400,7 +6407,7 @@ const DirA_BrandsActive = () => {
                 Your brands.
               </h1>
               <p style={{ fontSize: 16, color: 'var(--fg-2)', marginTop: 14, maxWidth: 560, lineHeight: 1.5 }}>
-                Every identity you've built with Fluid — logos, palettes, type and guidelines — kept in one place. Open one to keep editing, or export the whole kit.
+                Every identity you&apos;ve built with Fluid — logos, palettes, type and guidelines — kept in one place. Open one to keep editing, or export the whole kit.
               </p>
             </div>
             <button style={{ padding: '12px 18px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 1px 0 rgba(255,255,255,.1) inset, 0 8px 20px rgba(0,0,0,.18)', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: '0 0 auto' }}>
@@ -6438,7 +6445,7 @@ const DirA_BrandsActive = () => {
             <BA_EmptyState onCreate={() => location.assign(CHAT)} />
           ) : (
             <div className="bacard-grid">
-              {shown.map((b) => (
+              {shown.map((b: any) => (
                 <BA_RealBrandCard
                   key={b.id}
                   brand={b}
@@ -6505,7 +6512,7 @@ const DirA_BrandsActive = () => {
 // than a native window.confirm() — which several real embedding contexts
 // (sandboxed iframes, in-app webviews, automated browsers) suppress and
 // auto-resolve to `false`, silently breaking delete.
-const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }) => (
+const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => (
   <div
     onClick={onCancel}
     style={{
@@ -6631,7 +6638,7 @@ Object.assign(window, { DirA_BrandsActive });
 // =====================================================================
 
 // ---- Small brand mood tile reused in the resume row -------------------
-const HomeMark = ({ mood, mark, logo, w = 60, h = 60, radius = 12 }) =>
+const HomeMark = ({ mood, mark, logo, w = 60, h = 60, radius = 12 }: any) =>
 <div style={{
   width: w, height: h, flex: `0 0 ${w}px`, borderRadius: radius,
   background: mood.bg, color: mood.fg,
@@ -6645,7 +6652,7 @@ const HomeMark = ({ mood, mark, logo, w = 60, h = 60, radius = 12 }) =>
 
 
 // ---- Step progress dots (compact) -------------------------------------
-const StepDots = ({ step, total }) =>
+const StepDots = ({ step, total }: any) =>
 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
     {Array.from({ length: total }).map((_, i) =>
   <span key={i} style={{
@@ -6658,7 +6665,7 @@ const StepDots = ({ step, total }) =>
 
 
 // ---- Resume card — an in-progress brand --------------------------------
-const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, logo, featured, palette, typeFont, typeName }) =>
+const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, logo, featured, palette, typeFont, typeName }: any) =>
 <div style={{
   background: 'var(--bg-elev)', borderRadius: 18,
   boxShadow: featured ? 'var(--shadow-sm)' : 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -6686,7 +6693,7 @@ const ResumeCard = ({ name, kind, step, total, stepLabel, updated, mood, mark, l
         </div>
         <div style={{ width: 1, height: 30, background: 'var(--line)' }} />
         <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-          {palette.map((c, i) =>
+          {palette.map((c: any, i: any) =>
       <div key={i} style={{ flex: 1, height: 26, borderRadius: 5, background: c, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.07)' }} />
       )}
         </div>
@@ -6742,7 +6749,7 @@ const QUICK_VISUAL_MODES = [
 ];
 
 // ---- Quick path card — focus on one thing ------------------------------
-const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }) =>
+const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }: any) =>
 <div data-route={route} onClick={onClick} style={{
   background: 'var(--bg-elev)', borderRadius: 16,
   boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -6776,7 +6783,7 @@ const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPre
 
 
 // ---- Activity feed item ------------------------------------------------
-const ActivityItem = ({ icon, accent, lead, body, when }) =>
+const ActivityItem = ({ icon, accent, lead, body, when }: any) =>
 <div style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
     <div style={{
     width: 30, height: 30, flex: '0 0 30px', borderRadius: 8,
@@ -6796,7 +6803,7 @@ const ActivityItem = ({ icon, accent, lead, body, when }) =>
 const DirA_Home = () => {
   const { user, brands, loadBrand, billing } = useBrandDraft();
   const { navigate } = useRouter();
-  const drafts = brands.filter((b) => b.status === 'draft');
+  const drafts = brands.filter((b: any) => b.status === 'draft');
   const firstRun = brands.length === 0;
   const startBalance = (billing && typeof billing.balance === 'number') ? billing.balance : 20;
   const firstName = user && user.name ? user.name.trim().split(/\s+/)[0] : 'there';
@@ -6874,7 +6881,7 @@ const DirA_Home = () => {
           </button>
         </div>
         <div className="home-grid-4" style={{ display: 'grid', gap: 14 }}>
-          {drafts.slice(0, 4).map((b) => (
+          {drafts.slice(0, 4).map((b: any) => (
             <div key={b.id}
               onClick={() => {
                 // Same distinction as the Brands page: a brand-kit
@@ -6922,7 +6929,7 @@ const DirA_Home = () => {
             From idea to identity — instantly.
           </h2>
           <p style={{ fontSize: 15.5, color: 'var(--fg-2)', margin: '0 0 24px', maxWidth: 490, lineHeight: 1.5 }}>
-            Tell Fluid about your idea. We'll draft a strategy, name, logo, palette and type — in about 60&nbsp;seconds.
+            Tell Fluid about your idea. We&apos;ll draft a strategy, name, logo, palette and type — in about 60&nbsp;seconds.
           </p>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => location.assign(CHAT)} style={{ padding: '12px 20px', borderRadius: 12, background: '#000', color: '#fff', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
@@ -7018,7 +7025,7 @@ const Toggle = ({ defaultOn = false }) => {
 };
 
 // Segmented control — pill well with a white "selected" chip.
-const Segmented = ({ options, defaultValue, onChange, size = 'md' }) => {
+const Segmented = ({ options, defaultValue, onChange, size = 'md' }: any) => {
   const [val, setVal] = useSetState(defaultValue ?? options[0]);
   const pad = size === 'sm' ? '6px 12px' : '8px 16px';
   const fs = size === 'sm' ? 12 : 13;
@@ -7027,7 +7034,7 @@ const Segmented = ({ options, defaultValue, onChange, size = 'md' }) => {
       display: 'inline-flex', gap: 3, padding: 3, borderRadius: 999,
       background: 'var(--bg-sunken)', boxShadow: 'inset 0 0 0 1px var(--line)',
     }}>
-      {options.map((o) => {
+      {options.map((o: any) => {
         const active = o === val;
         return (
           <button key={o} onClick={() => { setVal(o); onChange && onChange(o); }} style={{
@@ -7045,7 +7052,7 @@ const Segmented = ({ options, defaultValue, onChange, size = 'md' }) => {
 };
 
 // Text-input look (read-only specimen — this is a static prototype).
-const Field = ({ label, value, sub, suffix, mono, wide }) => (
+const Field = ({ label, value, sub, suffix, mono, wide }: any) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: wide ? '1 1 100%' : '1 1 240px', minWidth: 0 }}>
     <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-2)' }}>{label}</span>
     <span style={{
@@ -7063,14 +7070,14 @@ const Field = ({ label, value, sub, suffix, mono, wide }) => (
 );
 
 // Select-look field (chevron on the right).
-const SelectField = ({ label, value, wide }) => (
+const SelectField = ({ label, value, wide }: any) => (
   <Field label={label} value={value} wide={wide} suffix={
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-4)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
   } />
 );
 
 // A control row: title + description on the left, control on the right.
-const Row = ({ title, desc, children, last }) => (
+const Row = ({ title, desc, children, last }: any) => (
   <div style={{
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 28,
     padding: '18px 0', borderBottom: last ? 'none' : '1px solid var(--line)',
@@ -7084,7 +7091,7 @@ const Row = ({ title, desc, children, last }) => (
 );
 
 // Card wrapper + optional header.
-const Card = ({ title, desc, children, pad = 24, accent }) => (
+const Card = ({ title, desc, children, pad = 24, accent }: any) => (
   <section style={{
     background: 'var(--bg-elev)', borderRadius: 20,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -7119,7 +7126,7 @@ const SaveBar = () => (
   </div>
 );
 
-const SectionHead = ({ eyebrow, title, desc }) => (
+const SectionHead = ({ eyebrow, title, desc }: any) => (
   <div style={{ marginBottom: 6 }}>
     <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>{eyebrow}</div>
     <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 38, letterSpacing: '-0.035em', lineHeight: 1, margin: 0, color: '#000' }}>{title}</h1>
@@ -7236,7 +7243,7 @@ const SecWorkspace = () => {
 // ---------------------------------------------------------------------
 // Section: Fluid AI  (the distinctive one)
 // ---------------------------------------------------------------------
-const StyleChip = ({ label, on }) => (
+const StyleChip = ({ label, on }: any) => (
   <button style={{
     padding: '8px 15px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer',
     background: on ? '#000' : 'var(--bg-elev)', color: on ? '#fff' : 'var(--fg-2)',
@@ -7290,7 +7297,7 @@ const SecFluid = () => (
 // ---------------------------------------------------------------------
 // Section: Notifications
 // ---------------------------------------------------------------------
-const NotifRow = ({ title, desc, email, app, last }) => (
+const NotifRow = ({ title, desc, email, app, last }: any) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '15px 0', borderBottom: last ? 'none' : '1px solid var(--line)' }}>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-1)' }}>{title}</div>
@@ -7333,7 +7340,7 @@ const BILLING_TIERS = [
 const TIER_LABEL = { free: 'Free', starter: 'Starter', pro: 'Pro' };
 
 const SecBilling = () => {
-  const [status, setStatus] = React.useState(null);
+  const [status, setStatus] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
@@ -7350,10 +7357,14 @@ const SecBilling = () => {
     // Keep the top-bar token pill in sync with what this page shows.
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('fluid:balance-changed'));
   }, []);
+  // Fetch-on-mount / fetch-on-change: load() sets state once its request
+  // resolves, not synchronously — this is the standard data-fetching effect
+  // shape, not the cascading-render pattern this rule targets.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => { load(); }, [load]);
 
   // POST a JSON body (checkout needs a tier); portal needs none.
-  const go = async (path, which, body) => {
+  const go = async (path: any, which: any, body?: any) => {
     setBusy(which); setError('');
     try {
       const r = await fetch(path, {
@@ -7368,7 +7379,7 @@ const SecBilling = () => {
     setBusy('');
   };
 
-  const tier = (status && status.tier) || 'free';
+  const tier: any = (status && status.tier) || 'free';
   const isSubscriber = tier === 'starter' || tier === 'pro';
   const balance = (status && typeof status.balance === 'number') ? status.balance : 0;
   const monthly = (status && status.monthlyTokens) || 0;
@@ -7392,7 +7403,7 @@ const SecBilling = () => {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 34, color: '#000', lineHeight: 1 }}>{loading ? '—' : balance}</span>
               <span style={{ fontSize: 13, color: 'var(--fg-3)' }}>tokens left</span>
-              <Chip tone={isSubscriber ? 'live' : 'neutral'}>{TIER_LABEL[tier] || 'Free'}</Chip>
+              <Chip tone={isSubscriber ? 'live' : 'neutral'}>{(TIER_LABEL as any)[tier] || 'Free'}</Chip>
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 6 }}>
               {loading ? 'Loading…'
@@ -7465,9 +7476,9 @@ const DirA_Settings = () => {
   // The top-bar token pill can request a specific tab (e.g. Billing) before
   // navigating here; honor it once, then clear the flag.
   const initialTab = (typeof window !== 'undefined' && window.__fluidSettingsTab) || 'fluid';
-  const [active, setActive] = useSetState(SECTIONS[initialTab] ? initialTab : 'fluid');
+  const [active, setActive] = useSetState((SECTIONS as any)[initialTab] ? initialTab : 'fluid');
   React.useEffect(() => { if (typeof window !== 'undefined') delete window.__fluidSettingsTab; }, []);
-  const ActiveSection = SECTIONS[active];
+  const ActiveSection = (SECTIONS as any)[active];
   return (
     <AShell activeNav="settings" breadcrumb={['Settings']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -7532,7 +7543,7 @@ Object.assign(window, { DirA_Settings });
 // This avoids rewriting any of the existing screens.
 // =====================================================================
 
-const PR = {};
+const PR: any = {};
 PR.useState = React.useState;
 PR.useEffect = React.useEffect;
 PR.useCallback = React.useCallback;
@@ -7603,7 +7614,7 @@ const CRUMB_TO_ROUTE = {
 // or null. Mutates `out` with a small hint so we can show a toast for
 // non-routing CTAs like "Export kit".
 // ---------------------------------------------------------------------
-function resolveClick(target, currentRoute, out) {
+function resolveClick(target: any, currentRoute: any, out: any) {
   // 0) Controls that navigate themselves. This delegate matches on button TEXT,
   //    which is fine for a prototype's one-way CTAs but wrong for a control
   //    whose destination depends on state the DOM cannot see — the wizard dock,
@@ -7628,7 +7639,7 @@ function resolveClick(target, currentRoute, out) {
   const crumb = target.closest && target.closest('header > nav > span');
   if (crumb) {
     const t = (crumb.textContent || '').trim();
-    if (CRUMB_TO_ROUTE[t]) return CRUMB_TO_ROUTE[t];
+    if ((CRUMB_TO_ROUTE as any)[t]) return (CRUMB_TO_ROUTE as any)[t];
   }
 
   // 3) Left-rail icons. Each ARailIcon is a direct child <div> of <aside>.
@@ -7638,7 +7649,7 @@ function resolveClick(target, currentRoute, out) {
       if (child.contains(target)) {
         const span = child.querySelector('span');
         const label = span && (span.textContent || '').trim();
-        if (label && RAIL_TO_ROUTE[label]) return RAIL_TO_ROUTE[label];
+        if (label && (RAIL_TO_ROUTE as any)[label]) return (RAIL_TO_ROUTE as any)[label];
       }
     }
   }
@@ -7666,16 +7677,16 @@ function resolveClick(target, currentRoute, out) {
   return null;
 }
 
-function matchCtaText(text, currentRoute, out) {
+function matchCtaText(text: any, currentRoute: any, out: any) {
   if (!text) return null;
 
   // Wizard dock — Back / Continue.
-  if (text === 'Back')                           return WIZARD_PREV[currentRoute] || null;
+  if (text === 'Back')                           return (WIZARD_PREV as any)[currentRoute] || null;
   if (/^Continue to Name$/.test(text))           return 'step2';
   if (/^Continue to Logo$/.test(text))           return 'step3';
   if (/^Continue to Style$/.test(text))          return 'step4';
   if (text === 'Assemble Brand Kit')             return 'step5';
-  if (/^Continue\b/.test(text))                  return WIZARD_NEXT[currentRoute] || null;
+  if (/^Continue\b/.test(text))                  return (WIZARD_NEXT as any)[currentRoute] || null;
 
   // Top-level CTAs from Home / Brands. Creating a brand is a conversation
   // now; the step wizard is only reached by resuming one that started there.
@@ -7710,7 +7721,7 @@ function matchCtaText(text, currentRoute, out) {
 // ---------------------------------------------------------------------
 // Tiny toast for non-routing CTAs.
 // ---------------------------------------------------------------------
-function makeToast(msg) {
+function makeToast(msg: any) {
   let host = document.getElementById('proto-toast-host');
   if (!host) {
     host = document.createElement('div');
@@ -7736,7 +7747,7 @@ function makeToast(msg) {
 const RouterCtx = PR.createContext(null);
 const useRouter = () => PR.useContext(RouterCtx);
 
-function RouterProvider({ children }) {
+function RouterProvider({ children }: any) {
   const [route, setRoute] = PR.useState(() => {
     const h = (location.hash || '').slice(1);
     return ROUTES.includes(h) ? h : 'home';
@@ -7747,7 +7758,7 @@ function RouterProvider({ children }) {
 
   const ORDER = ['home','brands','logo-brief','logo-direction','logo-type','logo-references','logo-sketches','logo-refine','logo-export','step1','step2','step3','step4','step5','assets','guides','settings','brands-empty'];
 
-  const navigate = PR.useCallback((next) => {
+  const navigate = PR.useCallback((next: any) => {
     if (!ROUTES.includes(next)) return;
     setDirection(ORDER.indexOf(next) >= ORDER.indexOf(routeRef.current) ? 'fwd' : 'back');
     setRoute(next);
@@ -7756,8 +7767,8 @@ function RouterProvider({ children }) {
 
   // Global click delegate
   PR.useEffect(() => {
-    function handler(e) {
-      const out = {};
+    function handler(e: any) {
+      const out: any = {};
       const dest = resolveClick(e.target, routeRef.current, out);
       if (dest) {
         e.preventDefault();
@@ -7790,9 +7801,9 @@ function RouterProvider({ children }) {
 
   // Keyboard: ESC to step back through the wizard.
   PR.useEffect(() => {
-    function onKey(e) {
+    function onKey(e: any) {
       if (e.key === 'Escape') {
-        const prev = WIZARD_PREV[routeRef.current];
+        const prev = (WIZARD_PREV as any)[routeRef.current];
         if (prev) navigate(prev);
       }
     }
@@ -7988,15 +7999,15 @@ const __TWEAKS_STYLE = `
 // ── useTweaks ───────────────────────────────────────────────────────────────
 // Single source of truth for tweak values. setTweak persists via the host
 // (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
-function useTweaks(defaults) {
+function useTweaks(defaults: any) {
   const [values, setValues] = React.useState(defaults);
   // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
   // useState-style call doesn't write a "[object Object]" key into the persisted
   // JSON block.
-  const setTweak = React.useCallback((keyOrEdits, val) => {
+  const setTweak = React.useCallback((keyOrEdits: any, val: any) => {
     const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
       ? keyOrEdits : { [keyOrEdits]: val };
-    setValues((prev) => ({ ...prev, ...edits }));
+    setValues((prev: any) => ({ ...prev, ...edits }));
     window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
     // Same-window signal so in-page listeners (deck-stage rail thumbnails)
     // can react — the parent message only reaches the host, not peers.
@@ -8012,9 +8023,9 @@ function useTweaks(defaults) {
 // The close button posts __edit_mode_dismissed so the host's toolbar toggle
 // flips off in lockstep; the host echoes __deactivate_edit_mode back which
 // is what actually hides the panel.
-function TweaksPanel({ title = 'Tweaks', children }) {
+function TweaksPanel({ title = 'Tweaks', children }: any) {
   const [open, setOpen] = React.useState(false);
-  const dragRef = React.useRef(null);
+  const dragRef = React.useRef<any>(null);
   const offsetRef = React.useRef({ x: 16, y: 16 });
   const PAD = 16;
 
@@ -8045,7 +8056,7 @@ function TweaksPanel({ title = 'Tweaks', children }) {
   }, [open, clampToViewport]);
 
   React.useEffect(() => {
-    const onMsg = (e) => {
+    const onMsg = (e: any) => {
       const t = e?.data?.type;
       if (t === '__activate_edit_mode') setOpen(true);
       else if (t === '__deactivate_edit_mode') setOpen(false);
@@ -8060,14 +8071,14 @@ function TweaksPanel({ title = 'Tweaks', children }) {
     window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
   };
 
-  const onDragStart = (e) => {
+  const onDragStart = (e: any) => {
     const panel = dragRef.current;
     if (!panel) return;
     const r = panel.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY;
     const startRight = window.innerWidth - r.right;
     const startBottom = window.innerHeight - r.bottom;
-    const move = (ev) => {
+    const move = (ev: any) => {
       offsetRef.current = {
         x: startRight - (ev.clientX - sx),
         y: startBottom - (ev.clientY - sy),
@@ -8086,7 +8097,13 @@ function TweaksPanel({ title = 'Tweaks', children }) {
   return (
     <>
       <style>{__TWEAKS_STYLE}</style>
+      {/* Initial position only — clampToViewport/onDragStart update the
+          panel's live position by mutating this DOM node's style directly
+          (see above), deliberately bypassing React so a drag stays smooth
+          at 60fps. This dev-only debug panel isn't worth the render-loop
+          risk of moving that to state. */}
       <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           /* eslint-disable-next-line react-hooks/refs -- initial position only, see above */
            style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
         <div className="twk-hd" onMouseDown={onDragStart}>
           <b>{title}</b>
@@ -8104,7 +8121,7 @@ function TweaksPanel({ title = 'Tweaks', children }) {
 
 // ── Layout helpers ──────────────────────────────────────────────────────────
 
-function TweakSection({ label, children }) {
+function TweakSection({ label, children }: any) {
   return (
     <>
       <div className="twk-sect">{label}</div>
@@ -8113,7 +8130,7 @@ function TweakSection({ label, children }) {
   );
 }
 
-function TweakRow({ label, value, children, inline = false }) {
+function TweakRow({ label, value, children, inline = false }: any) {
   return (
     <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
       <div className="twk-lbl">
@@ -8127,7 +8144,7 @@ function TweakRow({ label, value, children, inline = false }) {
 
 // ── Controls ────────────────────────────────────────────────────────────────
 
-function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }: any) {
   return (
     <TweakRow label={label} value={`${value}${unit}`}>
       <input type="range" className="twk-slider" min={min} max={max} step={step}
@@ -8136,7 +8153,7 @@ function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', on
   );
 }
 
-function TweakToggle({ label, value, onChange }) {
+function TweakToggle({ label, value, onChange }: any) {
   return (
     <div className="twk-row twk-row-h">
       <div className="twk-lbl"><span>{label}</span></div>
@@ -8147,48 +8164,48 @@ function TweakToggle({ label, value, onChange }) {
   );
 }
 
-function TweakRadio({ label, value, options, onChange }) {
-  const trackRef = React.useRef(null);
+function TweakRadio({ label, value, options, onChange }: any) {
+  const trackRef = React.useRef<any>(null);
   const [dragging, setDragging] = React.useState(false);
   // The active value is read by pointer-move handlers attached for the lifetime
   // of a drag — ref it so a stale closure doesn't fire onChange for every move.
   const valueRef = React.useRef(value);
-  valueRef.current = value;
+  React.useEffect(() => { valueRef.current = value; }, [value]);
 
   // Segments wrap mid-word once per-segment width runs out. The track is
   // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
   // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
   // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
   // back to a dropdown rather than wrap.
-  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
-  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
-  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  const labelLen = (o: any) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m: any, o: any) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= (({ 2: 16, 3: 10 } as any)[options.length] ?? 0);
   if (!fitsAsSegments) {
     // <select> emits strings — map back to the original option value so the
     // fallback stays type-preserving (numbers, booleans) like the segment path.
-    const resolve = (s) => {
-      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+    const resolve = (s: any) => {
+      const m = options.find((o: any) => String(typeof o === 'object' ? o.value : o) === s);
       return m === undefined ? s : typeof m === 'object' ? m.value : m;
     };
     return <TweakSelect label={label} value={value} options={options}
-                        onChange={(s) => onChange(resolve(s))} />;
+                        onChange={(s: any) => onChange(resolve(s))} />;
   }
-  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
-  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const opts = options.map((o: any) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o: any) => o.value === value));
   const n = opts.length;
 
-  const segAt = (clientX) => {
+  const segAt = (clientX: any) => {
     const r = trackRef.current.getBoundingClientRect();
     const inner = r.width - 4;
     const i = Math.floor(((clientX - r.left - 2) / inner) * n);
     return opts[Math.max(0, Math.min(n - 1, i))].value;
   };
 
-  const onPointerDown = (e) => {
+  const onPointerDown = (e: any) => {
     setDragging(true);
     const v0 = segAt(e.clientX);
     if (v0 !== valueRef.current) onChange(v0);
-    const move = (ev) => {
+    const move = (ev: any) => {
       if (!trackRef.current) return;
       const v = segAt(ev.clientX);
       if (v !== valueRef.current) onChange(v);
@@ -8209,7 +8226,7 @@ function TweakRadio({ label, value, options, onChange }) {
         <div className="twk-seg-thumb"
              style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
                       width: `calc((100% - 4px) / ${n})` }} />
-        {opts.map((o) => (
+        {opts.map((o: any) => (
           <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
             {o.label}
           </button>
@@ -8219,11 +8236,11 @@ function TweakRadio({ label, value, options, onChange }) {
   );
 }
 
-function TweakSelect({ label, value, options, onChange }) {
+function TweakSelect({ label, value, options, onChange }: any) {
   return (
     <TweakRow label={label}>
       <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => {
+        {options.map((o: any) => {
           const v = typeof o === 'object' ? o.value : o;
           const l = typeof o === 'object' ? o.label : o;
           return <option key={v} value={v}>{l}</option>;
@@ -8233,7 +8250,7 @@ function TweakSelect({ label, value, options, onChange }) {
   );
 }
 
-function TweakText({ label, value, placeholder, onChange }) {
+function TweakText({ label, value, placeholder, onChange }: any) {
   return (
     <TweakRow label={label}>
       <input className="twk-field" type="text" value={value} placeholder={placeholder}
@@ -8242,18 +8259,18 @@ function TweakText({ label, value, placeholder, onChange }) {
   );
 }
 
-function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
-  const clamp = (n) => {
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }: any) {
+  const clamp = (n: any) => {
     if (min != null && n < min) return min;
     if (max != null && n > max) return max;
     return n;
   };
   const startRef = React.useRef({ x: 0, val: 0 });
-  const onScrubStart = (e) => {
+  const onScrubStart = (e: any) => {
     e.preventDefault();
     startRef.current = { x: e.clientX, val: value };
     const decimals = (String(step).split('.')[1] || '').length;
-    const move = (ev) => {
+    const move = (ev: any) => {
       const dx = ev.clientX - startRef.current.x;
       const raw = startRef.current.val + dx * step;
       const snapped = Math.round(raw / step) * step;
@@ -8279,7 +8296,7 @@ function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) 
 // Relative-luminance contrast pick — checkmarks drawn over a swatch need to
 // read on both #111 and #fafafa without per-option configuration. Hex input
 // only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
-function __twkIsLight(hex) {
+function __twkIsLight(hex: any) {
   const h = String(hex).replace('#', '');
   const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
   const n = parseInt(x.slice(0, 6), 16);
@@ -8288,7 +8305,7 @@ function __twkIsLight(hex) {
   return r * 299 + g * 587 + b * 114 > 148000;
 }
 
-const __TwkCheck = ({ light }) => (
+const __TwkCheck = ({ light }: any) => (
   <svg viewBox="0 0 14 14" aria-hidden="true">
     <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
           strokeLinecap="round" strokeLinejoin="round"
@@ -8302,7 +8319,7 @@ const __TwkCheck = ({ light }) => (
 // rest stacked in a sharp column on the right. onChange emits the
 // option in the shape it was passed (string stays string, array stays array).
 // Without options it falls back to the native color input for back-compat.
-function TweakColor({ label, value, options, onChange }) {
+function TweakColor({ label, value, options, onChange }: any) {
   if (!options || !options.length) {
     return (
       <div className="twk-row twk-row-h">
@@ -8315,12 +8332,12 @@ function TweakColor({ label, value, options, onChange }) {
   // Native <input type=color> emits lowercase hex per the HTML spec, so
   // compare case-insensitively. String() guards JSON.stringify(undefined),
   // which returns the primitive undefined (no .toLowerCase).
-  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const key = (o: any) => String(JSON.stringify(o)).toLowerCase();
   const cur = key(value);
   return (
     <TweakRow label={label}>
       <div className="twk-chips" role="radiogroup">
-        {options.map((o, i) => {
+        {options.map((o: any, i: any) => {
           const colors = Array.isArray(o) ? o : [o];
           const [hero, ...rest] = colors;
           const sup = rest.slice(0, 4);
@@ -8345,7 +8362,7 @@ function TweakColor({ label, value, options, onChange }) {
   );
 }
 
-function TweakButton({ label, onClick, secondary = false }) {
+function TweakButton({ label, onClick, secondary = false }: any) {
   return (
     <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
             onClick={onClick}>{label}</button>
@@ -8401,7 +8418,7 @@ const SCREEN_FOR_ROUTE = {
 // keyed by route so the entrance animation re-runs on every change.
 function PrototypeFrame() {
   const { route } = useRouter();
-  const Screen = SCREEN_FOR_ROUTE[route] || SCREEN_FOR_ROUTE['home'];
+  const Screen = (SCREEN_FOR_ROUTE as any)[route] || SCREEN_FOR_ROUTE['home'];
   return (
     <div className="proto-screen" key={route}>
       <Screen />
@@ -8496,7 +8513,7 @@ async function apiListBrands() {
     return (await r.json()).brands || [];
   } catch { return []; }
 }
-async function apiCreateBrand(body) {
+async function apiCreateBrand(body: any) {
   try {
     const r = await fetch('/api/brands', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8506,7 +8523,7 @@ async function apiCreateBrand(body) {
     return (await r.json()).brand;
   } catch { return null; }
 }
-async function apiUpdateBrand(id, patch) {
+async function apiUpdateBrand(id: any, patch: any) {
   try {
     const r = await fetch('/api/brands/' + id, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -8516,7 +8533,7 @@ async function apiUpdateBrand(id, patch) {
     return (await r.json()).brand;
   } catch { return null; }
 }
-async function apiDeleteBrand(id) {
+async function apiDeleteBrand(id: any) {
   try {
     const r = await fetch('/api/brands/' + id, { method: 'DELETE' });
     return r.ok;
@@ -8526,7 +8543,7 @@ async function apiDeleteBrand(id) {
 // or hit zero on a 402). Nudge the provider to re-read it for the top-bar pill,
 // and raise a distinct signal when the request was refused for lack of tokens
 // so the app can surface a single actionable "top up" banner.
-function signalBalanceChanged(code) {
+function signalBalanceChanged(code: any) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new Event('fluid:balance-changed'));
   if (code === 'no_tokens') window.dispatchEvent(new Event('fluid:no-tokens'));
@@ -8534,7 +8551,7 @@ function signalBalanceChanged(code) {
 
 // Phase 3 — inline AI assists (rewrite brief, suggest audience/competitors,
 // pick a Step 2 option). Returns { result } or { error, code }.
-async function apiAssist(brandId, task, options) {
+async function apiAssist(brandId: any, task: any, options?: any) {
   try {
     const r = await fetch('/api/generate/assist', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8548,7 +8565,7 @@ async function apiAssist(brandId, task, options) {
 }
 // Phase 3 — ask OpenAI for name candidates for this brand. Resolves to
 // { names } on success or { error } so the caller can show a message.
-async function apiGenerateNames(brandId, guidance) {
+async function apiGenerateNames(brandId: any, guidance: any) {
   try {
     const r = await fetch('/api/generate/names', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8561,7 +8578,7 @@ async function apiGenerateNames(brandId, guidance) {
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask OpenAI for a color palette for this brand.
-async function apiGeneratePalette(brandId) {
+async function apiGeneratePalette(brandId: any) {
   try {
     const r = await fetch('/api/generate/palette', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8574,7 +8591,7 @@ async function apiGeneratePalette(brandId) {
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask OpenAI for a typography pairing for this brand.
-async function apiGenerateTypography(brandId) {
+async function apiGenerateTypography(brandId: any) {
   try {
     const r = await fetch('/api/generate/typography', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8587,7 +8604,7 @@ async function apiGenerateTypography(brandId) {
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask OpenAI for SVG logo concepts for this brand.
-async function apiGenerateLogos(brandId) {
+async function apiGenerateLogos(brandId: any) {
   try {
     const r = await fetch('/api/generate/logo', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8601,7 +8618,7 @@ async function apiGenerateLogos(brandId) {
 }
 // A function killed at its maxDuration returns no body at all, so there is no
 // j.error to show. Name that case rather than blaming it on generation.
-function describeFailure(r, j, fallback) {
+function describeFailure(r: any, j: any, fallback: any) {
   if (j && j.error) return j.error;
   if (r.status === 504 || r.status === 502) {
     return 'That took longer than the server allows. Your progress was saved — try again and it will pick up where it left off.';
@@ -8620,12 +8637,12 @@ function describeFailure(r, j, fallback) {
 // run and a status code says so better than an event does.
 const ACTIVITY_EVENT = 'fluid:activity';
 
-function pushActivity(kind, payload) {
+function pushActivity(kind: any, payload: any) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind, ...payload } }));
 }
 
-async function readActivityStream(response, label) {
+async function readActivityStream(response: any, label: any) {
   const type = response.headers.get('content-type') || '';
   if (!type.includes('text/event-stream')) {
     // A plain JSON refusal. Nothing streamed, so nothing to log.
@@ -8667,7 +8684,7 @@ async function readActivityStream(response, label) {
 }
 
 // Wraps one streamed run: opens the log, reports the outcome, closes it.
-async function runStreamed(name, request, fallback) {
+async function runStreamed(name: any, request: any, fallback: any) {
   pushActivity('start', { name });
   try {
     const response = await request();
@@ -8682,7 +8699,7 @@ async function runStreamed(name, request, fallback) {
 
 // Logo studio · divergence — six pencil croquis based on the next ordered
 // batch of references the client liked.
-async function apiGenerateLogoBoard(brandId, config, fresh) {
+async function apiGenerateLogoBoard(brandId: any, config: any, fresh: any) {
   const out = await runStreamed(
     'Sketching the board',
     () => fetch('/api/generate/logo/board', {
@@ -8697,7 +8714,7 @@ async function apiGenerateLogoBoard(brandId, config, fresh) {
   return { board: j.board || [], drawn: j.drawn || 0, requested: j.requested || 0, briefed: j.briefed || 0, remaining: j.remaining };
 }
 
-async function apiRepairLogoBoard(brandId) {
+async function apiRepairLogoBoard(brandId: any) {
   const out = await runStreamed(
     'Repairing concept images',
     () => fetch('/api/generate/logo/board/repair', {
@@ -8712,7 +8729,7 @@ async function apiRepairLogoBoard(brandId) {
 
 // Logo studio · Phase 2 — develop ONE chosen concept into the briefed versions,
 // each in the colours the client set for it.
-async function apiRefineLogoSketches(brandId, conceptId, versions) {
+async function apiRefineLogoSketches(brandId: any, conceptId: any, versions: any) {
   const out = await runStreamed(
     'Refining the concept',
     () => fetch('/api/generate/logo/refine', {
@@ -8726,7 +8743,7 @@ async function apiRefineLogoSketches(brandId, conceptId, versions) {
   return { finalists: (out.data || {}).finalists || [] };
 }
 // Logo studio · Phase 3 — trace the client's chosen concept into real vectors.
-async function apiVectorizeLogo(brandId, conceptId) {
+async function apiVectorizeLogo(brandId: any, conceptId: any) {
   try {
     const r = await fetch('/api/generate/logo/vectorize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8739,7 +8756,7 @@ async function apiVectorizeLogo(brandId, conceptId) {
   } catch { return { error: 'Network error.' }; }
 }
 // Phase 3 — ask OpenAI to synthesize written brand guidelines.
-async function apiGenerateGuidelines(brandId) {
+async function apiGenerateGuidelines(brandId: any) {
   try {
     const r = await fetch('/api/generate/guidelines', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8753,7 +8770,7 @@ async function apiGenerateGuidelines(brandId) {
 }
 // Render model-generated SVG safely: an <img> data-URI can't execute scripts,
 // unlike innerHTML. The SVG is also sanitized server-side (defense in depth).
-const SvgMark = ({ svg, size = 120, bg }) => (
+const SvgMark = ({ svg, size = 120, bg }: any) => (
   <img
     src={'data:image/svg+xml;utf8,' + encodeURIComponent(svg)}
     alt="Logo concept"
@@ -8764,7 +8781,7 @@ const SvgMark = ({ svg, size = 120, bg }) => (
 // Load a Google Fonts family once (idempotent by href). Weights are omitted so
 // the request never 400s on a family that lacks a requested weight; the browser
 // synthesizes bolder weights for the specimen.
-function ensureGoogleFont(family) {
+function ensureGoogleFont(family: any) {
   if (!family || typeof document === 'undefined') return;
   const href = 'https://fonts.googleapis.com/css2?family=' +
     encodeURIComponent(family).replace(/%20/g, '+') + '&display=swap';
@@ -8783,7 +8800,7 @@ const FONT_FALLBACK = {
 };
 
 // ── Custom (user-uploaded) fonts ──────────────────────────────────────
-function readFileAsDataURL(file) {
+function readFileAsDataURL(file: any) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
@@ -8794,7 +8811,7 @@ function readFileAsDataURL(file) {
 // Register an uploaded font with the browser via the FontFace API so previews
 // render in it. Idempotent per family+source.
 const _registeredFonts = new Set();
-async function registerCustomFont(family, dataUrl) {
+async function registerCustomFont(family: any, dataUrl: any) {
   if (typeof window === 'undefined' || typeof window.FontFace === 'undefined') return;
   const key = family + '|' + String(dataUrl).slice(0, 48);
   if (_registeredFonts.has(key)) return;
@@ -8808,15 +8825,33 @@ async function registerCustomFont(family, dataUrl) {
 
 // Until the name step is wired up, derive a readable brand name from the brief
 // so saved brands don't all read "Untitled brand".
-function deriveBrandName(brief) {
+export function deriveBrandName(brief: any) {
   const words = String(brief || '').trim().split(/\s+/).filter(Boolean).slice(0, 4);
   if (words.length === 0) return 'Untitled brand';
   const s = words.join(' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-const BrandDraftCtx = React.createContext(null);
-const useBrandDraft = () => React.useContext(BrandDraftCtx) || {};
+// Loosely typed on purpose: `draft`/`user`/`billing` carry whatever shape
+// the API returns for a brand/session/subscription record, which this
+// legacy module never validated at the boundary. `any` here documents that
+// honestly rather than asserting a precision the code never had — #175
+// gets a real chance to type this properly once brand state moves out of
+// this file into its own module.
+interface BrandDraftContextValue {
+  brands: any[];
+  draft: any;
+  user: any;
+  billing: any;
+  refreshBalance: () => Promise<void>;
+  setField: (key: any, value: any) => void;
+  setData: (patch: any) => void;
+  startNew: (input?: any) => Promise<any>;
+  loadBrand: (id: any) => any;
+  refresh: () => Promise<void>;
+}
+const BrandDraftCtx = React.createContext<BrandDraftContextValue | null>(null);
+const useBrandDraft = () => (React.useContext(BrandDraftCtx) || {}) as BrandDraftContextValue;
 window.useBrandDraft = useBrandDraft;
 
 async function apiGetMe() {
@@ -8827,20 +8862,29 @@ async function apiGetMe() {
   } catch { return null; }
 }
 
-function BrandDraftProvider({ children }) {
+function BrandDraftProvider({ children }: any) {
   const { route } = useRouter();
-  const [brands, setBrands] = React.useState([]);
-  const [draft, setDraft] = React.useState(null);
-  const [user, setUser] = React.useState(null);
-  const [billing, setBilling] = React.useState(null); // { tier, balance, monthlyTokens }
-  const draftRef = React.useRef(draft);
+  const [brands, setBrands] = React.useState<any[]>([]);
+  const [draft, setDraft] = React.useState<any>(null);
+  const [user, setUser] = React.useState<any>(null);
+  const [billing, setBilling] = React.useState<any>(null); // { tier, balance, monthlyTokens }
+  const draftRef = React.useRef<any>(draft);
+  // Deliberately synchronous, not a useEffect: setField's debounced save
+  // timer and the "load the right kind of draft" / "persist wizard
+  // progress" effects below all assume draftRef.current is already current
+  // by the time they run in this same commit. This is the app's core brand
+  // autosave path with no live-backend test coverage to safely verify a
+  // timing change against yet — deferring to #175, when this state moves
+  // out of this file into its own tested module.
+  // eslint-disable-next-line react-hooks/refs
   draftRef.current = draft;
-  const saveTimer = React.useRef(null);
-  const pendingPatch = React.useRef({});
+  const saveTimer = React.useRef<any>(null);
+  const pendingPatch = React.useRef<any>({});
 
   const refresh = React.useCallback(async () => {
     setBrands(await apiListBrands());
   }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount, see load() above
   React.useEffect(() => { refresh(); }, [refresh]);
   React.useEffect(() => { apiGetMe().then(setUser); }, []);
 
@@ -8851,6 +8895,7 @@ function BrandDraftProvider({ children }) {
       if (r.ok) setBilling(await r.json());
     } catch { /* keep the last known balance */ }
   }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount, see load() above
   React.useEffect(() => { refreshBalance(); }, [refreshBalance]);
   // Generation wrappers dispatch this after any token-spending request.
   React.useEffect(() => {
@@ -8892,7 +8937,7 @@ function BrandDraftProvider({ children }) {
   // the server. A single shared timer that resent only its own call's patch
   // silently dropped every key but the last one: the field still looked
   // chosen locally (setDraft merges), but only the final key was ever saved.
-  const setField = React.useCallback((key, value) => {
+  const setField = React.useCallback((key: any, value: any) => {
     // Editing the brief refreshes the derived brand name — but only while that
     // name is still the derived placeholder. Once a real name exists, the brief
     // must not overwrite it: for brands whose name_choice went missing, `name`
@@ -8902,7 +8947,7 @@ function BrandDraftProvider({ children }) {
     const patch = (key === 'brief' && nameIsPlaceholder)
       ? { brief: value, name: deriveBrandName(value) }
       : { [key]: value };
-    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+    setDraft((prev: any) => (prev ? { ...prev, ...patch } : prev));
     const d = draftRef.current;
     if (!d || !d.id) {
       // No draft to write to, so this click changed nothing and never will.
@@ -8944,18 +8989,18 @@ function BrandDraftProvider({ children }) {
    * writes a creative platform to the same brand, the screen then saves its stale copy.
    * Reading from the ref means the base is always the live draft.
    */
-  const setData = React.useCallback((patch) => {
+  const setData = React.useCallback((patch: any) => {
     const cur = (draftRef.current && draftRef.current.data) || {};
     setField('data', { ...cur, ...patch });
   }, [setField]);
 
-  const startNew = React.useCallback(async (input) => {
+  const startNew = React.useCallback(async (input?: any) => {
     const b = await apiCreateBrand(input || { step: 1 });
     if (b) { setDraft(b); refresh(); }
     return b;
   }, [refresh]);
 
-  const loadBrand = React.useCallback((id) => {
+  const loadBrand = React.useCallback((id: any) => {
     const b = brands.find((x) => x.id === id);
     if (b) setDraft(b);
     return b;
@@ -8964,6 +9009,9 @@ function BrandDraftProvider({ children }) {
   // Clear the draft whenever we leave a creation flow, so each new project
   // begins fresh (resume re-selects an explicit saved draft).
   React.useEffect(() => {
+    // Reacting to route changes by clearing state IS the intent here, not a
+    // side effect to hoist out.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!/^step[1-5]$/.test(route) && !['logo-brief', 'logo-direction', 'logo-type', 'logo-references', 'logo-sketches', 'logo-refine', 'logo-export'].includes(route)) setDraft(null);
   }, [route]);
 
@@ -8980,7 +9028,7 @@ function BrandDraftProvider({ children }) {
     const d = draftRef.current;
     if (!d || !d.id || !/^step[1-5]$/.test(route)) return;
     const step = Number(route.slice(4));
-    const patch = { step };
+    const patch: any = { step };
     if (route === 'step5') patch.status = 'live';
     apiUpdateBrand(d.id, patch).then((u) => { if (u) { setDraft(u); refresh(); } });
   }, [route]);
@@ -8999,7 +9047,7 @@ function App() {
   const [t, setTweak] = useTweaks(PROTO_DEFAULTS);
 
   useEffect(() => {
-    document.body.dataset.brand = BRAND_TO_ATTR[t.brand] || '';
+    document.body.dataset.brand = (BRAND_TO_ATTR as any)[t.brand] || '';
   }, [t.brand]);
 
   return (
@@ -9014,17 +9062,17 @@ function App() {
           label="Gradient use"
           value={t.brand}
           options={['Signature', 'Rare', 'Solid']}
-          onChange={(v) => setTweak('brand', v)}
+          onChange={(v: any) => setTweak('brand', v)}
         />
         <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8A8A90', padding: '2px 2px 6px' }}>
-          {BRAND_NOTE[t.brand]}
+          {(BRAND_NOTE as any)[t.brand]}
         </div>
 
         <TweakSection label="Prototype" />
         <TweakToggle
           label="Quick-jump pill"
           value={t.showQuickJump}
-          onChange={(v) => setTweak('showQuickJump', v)}
+          onChange={(v: any) => setTweak('showQuickJump', v)}
         />
         <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8A8A90', padding: '2px 2px 6px' }}>
           Always-visible route switcher in the bottom-right. Off → navigate purely through the in-product CTAs and the left rail.
