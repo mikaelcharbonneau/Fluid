@@ -3,18 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
-// The six chapters that used to be a 1500vh scroll-jack (#178).
+// The six chapters of the brand story, driven by scroll position.
 //
-// Same story, same artwork, told in one screen of normal flow: a tablist of
-// chapters over a single stage. Nothing here is driven by scroll position, so
-// the section costs one viewport instead of fifteen, works identically on a
-// trackpad, a keyboard, a touch screen and at 200% zoom, and cannot strand
-// anyone mid-sequence.
+// History: this was originally a `height:1500vh` track wrapping a sticky pin —
+// fifteen screens of hijacked scrolling before anyone reached pricing (#178).
+// That was replaced by an auto-advancing tablist, which read as a slideshow.
 //
-// The chapters advance on their own so the section still *demonstrates* rather
-// than just listing — but that stops permanently at the first interaction, is
-// skipped entirely under prefers-reduced-motion, and is never the only way to
-// reach a chapter.
+// This is the middle path. Scroll still drives the chapters and the section
+// still pins, so it *demonstrates* rather than lists — but the track is
+// TRACK_VH tall instead of 1500vh, the tabs remain a full, always-visible
+// control that jumps straight to any chapter, and under prefers-reduced-motion
+// the track collapses to normal flow (see marketing.css) so nothing depends on
+// scrolling at all. The conversion input stays in the hero either way.
 
 const SERVICE_MOSAIC = [
   [
@@ -79,7 +79,15 @@ const CHAPTERS = [
   { id: "kit", tab: "Brand kit", eyebrow: "06 · Brand system", title: "Lock the system.", desc: "Logo, palette, type, app icon, wordmark and guidelines assemble into one exportable brand kit." },
 ];
 
-const ADVANCE_MS = 5200;
+// Scroll distance each chapter occupies, in vh. The whole track is one
+// pinned viewport plus this per chapter, so the section costs
+// (100 + CHAPTER_SCROLL_VH * 6) / 100 viewports of page height.
+//
+// This is the dial that decides how the section *feels*: higher dwells longer
+// on each chapter and reads closer to the original, lower moves briskly. It is
+// bounded by the guardrails in e2e/homepage-conversion.spec.ts — no single
+// element may exceed 4 viewports and the page may not exceed 8.
+const CHAPTER_SCROLL_VH = 33;
 
 function ScopeStage() {
   return (
@@ -238,22 +246,59 @@ const STAGES = [ScopeStage, BriefStage, DirectionStage, NameStage, LogoStage, Ki
 
 export function BrandStory() {
   const [active, setActive] = useState(0);
-  const [interacted, setInteracted] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
 
-  // Auto-advance is a nicety, not the mechanism: it never runs under
-  // reduced-motion, and the first click or keypress ends it for good so it
-  // can never move the stage out from under someone reading it.
+  // Map scroll position over the track onto a chapter index. Runs on rAF so a
+  // fast trackpad flick doesn't queue a layout read per wheel event.
   useEffect(() => {
-    if (interacted) return;
+    const track = trackRef.current;
+    if (!track) return;
+    // Under reduced motion the track is `height: auto` and the pin is static,
+    // so there is no travel to read: the tabs are the only control.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = setInterval(() => setActive((i) => (i + 1) % CHAPTERS.length), ADVANCE_MS);
-    return () => clearInterval(timer);
-  }, [interacted]);
 
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const rect = track.getBoundingClientRect();
+      const travel = track.offsetHeight - window.innerHeight;
+      if (travel <= 0) return;
+      const p = Math.min(Math.max(-rect.top / travel, 0), 1);
+      const next = Math.min(Math.floor(p * CHAPTERS.length), CHAPTERS.length - 1);
+      setActive((cur) => (cur === next ? cur : next));
+    };
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(read);
+    };
+
+    read();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  // Selecting a tab sets the chapter immediately, then moves the scroll
+  // position to match so the two never disagree. The jump is instant rather
+  // than smooth: a smooth scroll would let the scroll handler walk the state
+  // through every intervening chapter on its way there.
   const select = (index: number) => {
-    setInteracted(true);
     setActive(index);
+    const track = trackRef.current;
+    if (!track) return;
+    const travel = track.offsetHeight - window.innerHeight;
+    if (travel <= 0) return;
+    // Aim at the middle of the chapter's band so it is unambiguously selected.
+    const p = (index + 0.5) / CHAPTERS.length;
+    // Not offsetTop: .story is a positioned offsetParent, so offsetTop is 0
+    // here. The document-absolute top is what the scroll position needs.
+    const trackTop = track.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: trackTop + travel * p, behavior: "auto" });
   };
 
   // Arrow-key traversal, per the ARIA tabs pattern.
@@ -275,50 +320,62 @@ export function BrandStory() {
 
   return (
     <section className="story" id="transform" data-dark="" aria-labelledby="story-heading">
-      <div className="story-inner">
-        <div className="story-head sec-head">
-          <span className="eyebrow sec-eyebrow">How it works</span>
-          <h2 id="story-heading" className="story-heading">One sentence in. A whole identity out.</h2>
-        </div>
+      <div
+        className="story-track"
+        ref={trackRef}
+        style={{ "--story-track": `${100 + CHAPTER_SCROLL_VH * CHAPTERS.length}vh` } as React.CSSProperties}
+      >
+        <div className="story-pin">
+          <div className="story-inner">
+            <div className="story-head sec-head">
+              <span className="eyebrow sec-eyebrow">How it works</span>
+              <h2 id="story-heading" className="story-heading">One sentence in. A whole identity out.</h2>
+            </div>
 
-        <div
-          className="story-tabs"
-          role="tablist"
-          aria-label="How Fluid builds a brand"
-          ref={tabsRef}
-          onKeyDown={onKeyDown}
-        >
-          {CHAPTERS.map((c, i) => (
-            <button
-              key={c.id}
-              role="tab"
-              id={`story-tab-${c.id}`}
-              aria-selected={i === active}
-              aria-controls={`story-panel-${c.id}`}
-              tabIndex={i === active ? 0 : -1}
-              className={`story-tab${i === active ? " is-active" : ""}`}
-              onClick={() => select(i)}
+            <div
+              className="story-tabs"
+              role="tablist"
+              aria-label="How Fluid builds a brand"
+              ref={tabsRef}
+              onKeyDown={onKeyDown}
             >
-              <span className="story-tab-n">{String(i + 1).padStart(2, "0")}</span>
-              <span className="story-tab-label">{c.tab}</span>
-            </button>
-          ))}
-        </div>
+              {CHAPTERS.map((c, i) => (
+                <button
+                  key={c.id}
+                  role="tab"
+                  id={`story-tab-${c.id}`}
+                  aria-selected={i === active}
+                  aria-controls={`story-panel-${c.id}`}
+                  tabIndex={i === active ? 0 : -1}
+                  className={`story-tab${i === active ? " is-active" : ""}`}
+                  onClick={() => select(i)}
+                >
+                  <span className="story-tab-n">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="story-tab-label">{c.tab}</span>
+                </button>
+              ))}
+            </div>
 
-        <div
-          className="story-panel"
-          role="tabpanel"
-          id={`story-panel-${chapter.id}`}
-          aria-labelledby={`story-tab-${chapter.id}`}
-          tabIndex={0}
-        >
-          <div className="story-copy">
-            <span className="story-eyebrow">{chapter.eyebrow}</span>
-            <h3 className="story-title">{chapter.title}</h3>
-            <p className="story-desc">{chapter.desc}</p>
-          </div>
-          <div className="story-stage">
-            <Stage />
+            <div
+              className="story-panel"
+              role="tabpanel"
+              id={`story-panel-${chapter.id}`}
+              aria-labelledby={`story-tab-${chapter.id}`}
+              tabIndex={0}
+            >
+              {/* Keyed on the chapter so React remounts it and the fade-in
+                  replays on every change, which is what reads as motion. */}
+              <div className="story-fade" key={chapter.id}>
+                <div className="story-copy">
+                  <span className="story-eyebrow">{chapter.eyebrow}</span>
+                  <h3 className="story-title">{chapter.title}</h3>
+                  <p className="story-desc">{chapter.desc}</p>
+                </div>
+                <div className="story-stage">
+                  <Stage />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
