@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runOneGenerationJob } from "@/lib/generation-jobs/worker";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     const job = await runOneGenerationJob();
     return NextResponse.json({ job });
   } catch (error) {
-    console.error("Generation worker failed:", error);
+    reportError("Generation worker failed", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Generation worker failed." },
       { status: 500 },

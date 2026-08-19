@@ -4,6 +4,7 @@ import { generateBrandLogos } from "@/lib/ai/logo";
 import { styleContext, getStep2, paletteBasis } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     p_patch: { logos },
   });
   if (saveError) {
-    console.error("Failed to cache generated logos:", saveError.message);
+    reportError("Failed to cache generated logos", saveError);
   }
 
   return NextResponse.json({ logos });

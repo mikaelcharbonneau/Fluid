@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { styleContext } from "@/lib/ai/step2";
+import { reportError } from "@/lib/monitoring/log";
 import { getPlatform, type CreativePlatform } from "@/lib/ai/platform";
 import type { BoardSketch } from "@/lib/ai/sketch-board";
 import {
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
           p_id: brandId,
           p_patch: { logo_finalist_plan: next },
         });
-        if (error) console.error("Failed to cache the finalist plan:", error.message);
+        if (error) reportError("Failed to cache the finalist plan", error);
       },
     });
 
@@ -211,7 +212,7 @@ export async function POST(request: Request) {
     };
     const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
-      console.error("Failed to cache logo finalists:", saveError.message);
+      reportError("Failed to cache logo finalists", saveError);
       activity.emit("warn", `The marks rendered but could not be saved: ${saveError.message}`);
     } else {
       activity.emit("note", `Saved — ${finalists.length} finished mark${finalists.length === 1 ? "" : "s"}`);

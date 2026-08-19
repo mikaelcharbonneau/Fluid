@@ -4,6 +4,7 @@ import { generateBrandTypography } from "@/lib/ai/typography";
 import { styleContext, getStep2, fontChoice } from "@/lib/ai/step2";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     p_patch: { typography },
   });
   if (saveError) {
-    console.error("Failed to cache generated typography:", saveError.message);
+    reportError("Failed to cache generated typography", saveError);
   }
 
   return NextResponse.json({ typography });

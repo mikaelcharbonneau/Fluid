@@ -7,6 +7,7 @@ import {
   rankReferences,
   type LogoReferenceRow,
 } from "@/lib/logo-reference-query";
+import { reportError } from "@/lib/monitoring/log";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
     // full-scan-plus-in-memory ranking rather than 500ing — slower, but
     // correct, and it stops happening the moment the migration lands. This
     // fallback path is uncached on purpose: a failure shouldn't get memoized.
-    console.error("logo_references_ranked RPC failed, falling back to in-memory ranking:", rpcError);
+    reportError("logo_references_ranked RPC failed, falling back to in-memory ranking", rpcError);
 
     let query = supabase
       .from("logo_references")

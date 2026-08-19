@@ -8,6 +8,7 @@ import { TRANSPARENT_IMAGE_MODEL } from "@/lib/ai/images";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
+import { reportError } from "@/lib/monitoring/log";
 import { streamActivity } from "@/lib/sse";
 import type { Activity } from "@/lib/ai/activity";
 import {
@@ -269,7 +270,7 @@ export async function POST(request: Request) {
     };
     const { error: saveError } = await supabase.rpc("brands_merge_data", { p_id: brandId, p_patch: nextPatch });
     if (saveError) {
-      console.error("Failed to save the sketch board:", saveError.message);
+      reportError("Failed to save the sketch board", saveError);
       activity.emit("warn", `The board rendered but could not be saved: ${saveError.message}`);
     } else {
       activity.emit("note", `Saved — ${board.length} concepts on the board`);

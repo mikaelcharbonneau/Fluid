@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/monitoring/log";
 import { generateReferenceCroquisBoard } from "@/lib/ai/sketch-board";
 import { chosenBrandName } from "@/lib/brands";
 import { startClock } from "@/lib/ai/budget";
@@ -171,7 +172,7 @@ export async function runOneGenerationJob() {
     await completeGenerationJob(job.id, result);
     return { id: job.id, status: "succeeded" };
   } catch (error) {
-    console.error(`Generation job ${job.id} failed:`, error);
+    reportError("Generation job failed", error, { jobId: job.id });
     const admin = createAdminClient();
     const { data: latest } = await admin
       .from("generation_jobs")

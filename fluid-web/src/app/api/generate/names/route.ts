@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandNames } from "@/lib/ai/names";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { reportError } from "@/lib/monitoring/log";
 
 const NAME_STYLE_LABELS: Record<string, string> = {
   evocative: "Evocative",
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
   });
   if (saveError) {
     // Non-fatal: the caller can still use the freshly generated names.
-    console.error("Failed to cache generated names:", saveError.message);
+    reportError("Failed to cache generated names", saveError);
   }
 
   return NextResponse.json({ names });
