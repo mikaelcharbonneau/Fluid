@@ -56,6 +56,12 @@ export function BrandChat() {
     return m && VISUAL_MODES.some((v) => v.id === m) ? (m as VisualMode) : null;
   });
 
+  // A sentence typed into the Home composer arrives as ?brief= and pre-fills
+  // the first step, so what the user already wrote is not asked for twice.
+  const [seedBrief] = useState(() =>
+    (new URLSearchParams(window.location.search).get("brief") || "").trim().slice(0, 600),
+  );
+
   const [phase, setPhase] = useState<Phase>(resumeId ? "loading" : "thread");
   const [brandId, setBrandId] = useState<string | null>(resumeId);
   const [result, setResult] = useState<BrandKitResult | null>(null);
@@ -230,8 +236,10 @@ export function BrandChat() {
       ...draft,
       ...(key === step ? (proposed ?? {}) : {}),
       ...(key === "visualMode" && presetMode && !draft.visualMode ? { visualMode: presetMode } : {}),
+      // Same rule for a brief carried in from the Home composer.
+      ...(key === "brief" && seedBrief && !draft.brief ? { brief: seedBrief } : {}),
     }),
-    [draft, proposed, step, presetMode],
+    [draft, proposed, step, presetMode, seedBrief],
   );
 
   // A composer-answered step shows its AI draft as the composer's starting
