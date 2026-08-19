@@ -347,10 +347,54 @@ body.custom-cursor .btn { cursor: none; }
    simply visible. */
 .story {
   background: #0a0a0b; color: #fff;
-  padding: clamp(76px, 10vh, 120px) 0 clamp(56px, 8vh, 96px);
   /* #transform is an anchor target and the nav is sticky, so without this the
      section's eyebrow lands underneath it. */
   scroll-margin-top: 72px;
+}
+
+/* The scroll track and its pin. The track is tall; the pin sticks to the
+   viewport for the length of it, and BrandStory reads the track's progress to
+   decide which chapter is showing. --story-track is set inline from
+   CHAPTER_SCROLL_VH so the height lives with the logic that consumes it. */
+.story-track { position: relative; height: var(--story-track, 300vh); }
+.story-pin {
+  position: sticky; top: 0;
+  min-height: 100svh;
+  display: flex; align-items: center;
+  padding: clamp(76px, 10vh, 120px) 0 clamp(56px, 8vh, 96px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.story-pin > .story-inner { width: min(1240px, 92vw); }
+
+/* The chapter body. This carries the two-column grid that .story-panel used to
+   own, because it is now the element that gets replaced on every change. */
+.story-fade {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 52px);
+  align-items: center;
+  animation: story-fade-in 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes story-fade-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Reduced motion, and the guarantee #178 asked for: no track, no pin, no
+   scroll dependency. The section becomes ordinary flow one screen tall and the
+   tabs are the only control — which is exactly what they already are. */
+@media (prefers-reduced-motion: reduce) {
+  .story-track { height: auto; }
+  .story-pin { position: static; min-height: 0; overflow: visible; }
+  .story-fade { animation: none; }
+}
+
+/* Short viewports can't afford a pin: at 200% zoom or on a phone in landscape
+   the chapter artwork would be clipped by the 100svh pin. Fall back to flow. */
+@media (max-height: 620px) {
+  .story-track { height: auto; }
+  .story-pin { position: static; min-height: 0; overflow: visible; }
 }
 .story-inner { width: min(1240px, 92vw); margin: 0 auto; display: flex; flex-direction: column; gap: clamp(24px, 3.4vh, 40px); }
 .story-head { margin: 0; }
@@ -381,7 +425,7 @@ body.custom-cursor .btn { cursor: none; }
 .story-tab.is-active .story-tab-n { color: rgba(10,10,11,0.62); }
 
 /* copy + stage */
-.story-panel { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: clamp(24px, 3vw, 52px); align-items: center; }
+.story-panel { display: block; }
 .story-panel:focus-visible { outline: 2px solid #fff; outline-offset: 6px; border-radius: var(--r-lg); }
 .story-copy { display: flex; flex-direction: column; gap: 10px; }
 .story-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.62); }
@@ -410,8 +454,12 @@ body.custom-cursor .btn { cursor: none; }
 .story-stage .bf-moods { transform: none; }
 
 @media (max-width: 900px) {
-  .story-panel { grid-template-columns: 1fr; }
+  .story-fade { grid-template-columns: 1fr; }
   .story-stage { min-height: 0; }
+  /* Narrow screens are tall and thin: a pinned two-viewport stage crowds out
+     the copy above it, so the section reverts to ordinary flow here too. */
+  .story-track { height: auto; }
+  .story-pin { position: static; min-height: 0; overflow: visible; }
 }
 
 /* Reduced motion: no cross-fade between chapters, and the auto-advance never
