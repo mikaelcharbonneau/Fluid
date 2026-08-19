@@ -11,15 +11,15 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { requireOpenAIApiKey, serverEnv } from "@/lib/env/server";
 
 const OPENAI_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_EDIT_URL = "https://api.openai.com/v1/images/edits";
 // Override with OPENAI_IMAGE_MODEL / OPENAI_TRANSPARENT_IMAGE_MODEL only for
 // experiments — both default to the same model now that GPT Image 2 covers
 // transparent output too.
-const MODEL = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
-export const TRANSPARENT_IMAGE_MODEL =
-  process.env.OPENAI_TRANSPARENT_IMAGE_MODEL?.trim() || "gpt-image-2";
+const MODEL = serverEnv.OPENAI_IMAGE_MODEL ?? "gpt-image-2";
+export const TRANSPARENT_IMAGE_MODEL = serverEnv.OPENAI_TRANSPARENT_IMAGE_MODEL ?? "gpt-image-2";
 const BUCKET = "brand-assets";
 
 /** Exported so a prompt preview can report which model would receive it. */
@@ -30,13 +30,9 @@ export interface RenderedImage {
   path: string; // storage path, for later deletion
 }
 
-function apiKey(): string {
-  // Trimmed: a trailing newline pasted into a dashboard silently breaks auth
-  // (this exact bug already cost us a day on Stripe).
-  const key = (process.env.OPENAI_API_KEY ?? "").trim();
-  if (!key) throw new Error("OPENAI_API_KEY is not configured.");
-  return key;
-}
+// Trimmed by the env schema: a trailing newline pasted into a dashboard
+// silently breaks auth (this exact bug already cost us a day on Stripe).
+const apiKey = requireOpenAIApiKey;
 
 // Wraps an art-direction prompt with the constraints that make the output a
 // LOGO rather than an illustration — and, critically, flat enough to vectorize

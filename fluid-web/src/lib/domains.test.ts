@@ -1,9 +1,18 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkDomainAvailability } from "./domains";
 
 const originalFetch = global.fetch;
 const originalToken = process.env.VERCEL_ACCESS_TOKEN;
 const originalTeam = process.env.VERCEL_TEAM_ID;
+
+// serverEnv (src/lib/env/server.ts) parses process.env once at import time —
+// correct for production code, but it means each test that wants a
+// different env configuration needs a fresh module instance. resetModules +
+// a dynamic re-import gives every test that.
+async function importFresh() {
+  vi.resetModules();
+  return import("./domains");
+}
 
 describe("checkDomainAvailability", () => {
   beforeEach(() => {
@@ -19,6 +28,7 @@ describe("checkDomainAvailability", () => {
   });
 
   it("returns an empty array for no domains without calling fetch", async () => {
+    const { checkDomainAvailability } = await importFresh();
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
     await expect(checkDomainAvailability([])).resolves.toEqual([]);
@@ -26,6 +36,7 @@ describe("checkDomainAvailability", () => {
   });
 
   it("dedupes, trims, and lowercases domains before calling the API", async () => {
+    const { checkDomainAvailability } = await importFresh();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ results: [{ domain: "acme.com", available: true }] }),
@@ -42,6 +53,7 @@ describe("checkDomainAvailability", () => {
   });
 
   it("marks a domain missing from the response as unknown (null), not unavailable", async () => {
+    const { checkDomainAvailability } = await importFresh();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ results: [] }),
@@ -53,6 +65,7 @@ describe("checkDomainAvailability", () => {
   });
 
   it("throws with the status and body when the API call fails", async () => {
+    const { checkDomainAvailability } = await importFresh();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
@@ -65,6 +78,7 @@ describe("checkDomainAvailability", () => {
 
   it("throws when VERCEL_ACCESS_TOKEN is not configured", async () => {
     delete process.env.VERCEL_ACCESS_TOKEN;
+    const { checkDomainAvailability } = await importFresh();
     await expect(checkDomainAvailability(["acme.com"])).rejects.toThrow(
       "VERCEL_ACCESS_TOKEN is not configured.",
     );
@@ -72,6 +86,7 @@ describe("checkDomainAvailability", () => {
 
   it("includes the team id as a query param when configured", async () => {
     process.env.VERCEL_TEAM_ID = "team_123";
+    const { checkDomainAvailability } = await importFresh();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ results: [] }),

@@ -10,6 +10,7 @@
 
 import { fetchImageBytes, storeImage } from "./images";
 import { vendorFetch } from "./vendor-fetch";
+import { requireRecraftApiKey } from "@/lib/env/server";
 
 const RECRAFT_URL = "https://external.api.recraft.ai/v1/images/vectorize";
 
@@ -34,11 +35,7 @@ const DOWNLOAD_TOTAL_TIMEOUT_MS = 30_000;
 // isn't the traced result at all) before spending time reading it.
 const MAX_DECLARED_BYTES = MAX_BYTES * 4;
 
-function apiKey(): string {
-  const key = (process.env.RECRAFT_API_KEY ?? "").trim();
-  if (!key) throw new Error("RECRAFT_API_KEY is not configured.");
-  return key;
-}
+const apiKey = requireRecraftApiKey;
 
 export interface VectorResult {
   svg: string; // the SVG markup itself

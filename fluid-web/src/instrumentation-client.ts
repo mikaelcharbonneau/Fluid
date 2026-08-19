@@ -4,15 +4,14 @@
 // initialized, no extra wiring needed.
 import * as Sentry from "@sentry/nextjs";
 import { redactEvent } from "@/lib/monitoring/redact";
+import { publicEnv } from "@/lib/env/public";
 
-const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-if (dsn) {
+if (publicEnv.SENTRY_DSN) {
   Sentry.init({
-    dsn,
-    environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
-    release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
-    tracesSampleRate: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT === "production" ? 0.1 : 1.0,
+    dsn: publicEnv.SENTRY_DSN,
+    environment: publicEnv.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+    release: publicEnv.VERCEL_GIT_COMMIT_SHA,
+    tracesSampleRate: publicEnv.SENTRY_ENVIRONMENT === "production" ? 0.1 : 1.0,
     sendDefaultPii: false,
     beforeSend: (event) => redactEvent(event),
     beforeSendTransaction: (event) => redactEvent(event),

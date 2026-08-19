@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueGenerationJob, type GenerationJob } from "@/lib/generation-jobs/queue";
+import { cronSecret } from "@/lib/env/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 function isAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET || process.env.GENERATION_JOBS_CRON_SECRET;
+  const secret = cronSecret();
   return !!secret && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 

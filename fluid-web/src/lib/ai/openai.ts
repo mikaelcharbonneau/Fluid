@@ -1,3 +1,5 @@
+import { requireOpenAIApiKey, serverEnv } from "@/lib/env/server";
+
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 type OpenAIResponse = {
@@ -8,11 +10,7 @@ type OpenAIResponse = {
   incomplete_details?: { reason?: string };
 };
 
-function apiKey(): string {
-  const key = (process.env.OPENAI_API_KEY ?? "").trim();
-  if (!key) throw new Error("OPENAI_API_KEY is not configured.");
-  return key;
-}
+const apiKey = requireOpenAIApiKey;
 
 function outputText(response: OpenAIResponse): string {
   if (response.output_text?.trim()) return response.output_text;
@@ -55,7 +53,7 @@ export async function generateOpenAIText({
   // standard code-managed calls retain the app's established defaults.
   const selectedModel = prompt
     ? model?.trim() || ""
-    : model?.trim() || process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5.6-luna";
+    : model?.trim() || serverEnv.OPENAI_TEXT_MODEL || "gpt-5.6-luna";
   // Reasoning is opt-in, not on by default: most calls here are single-pass
   // structured completions (pick one of these options, propose this JSON
   // shape) that don't need deliberation, and reasoning tokens cost real

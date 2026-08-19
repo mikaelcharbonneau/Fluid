@@ -8,6 +8,8 @@ export async function register() {
     await import("../sentry.edge.config");
   } else if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("../sentry.server.config");
+    const { assertRequiredEnv } = await import("@/lib/env/startup");
+    assertRequiredEnv();
   }
 }
 

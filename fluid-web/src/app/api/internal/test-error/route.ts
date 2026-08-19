@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reportError } from "@/lib/monitoring/log";
+import { serverEnv } from "@/lib/env/server";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  const secret = process.env.TEST_ERROR_SECRET;
+  const secret = serverEnv.TEST_ERROR_SECRET;
   if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

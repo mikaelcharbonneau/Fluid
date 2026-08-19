@@ -6,6 +6,7 @@ import { tagReferenceImage } from "@/lib/ai/tag-reference";
 import { captionReferenceImage } from "@/lib/ai/caption-reference";
 import { LOGO_REFERENCES_CACHE_TAG, referenceImageUrl } from "@/lib/logo-reference-query";
 import { aspectRatioFrom } from "@/lib/image-size";
+import { serverEnv } from "@/lib/env/server";
 
 export const runtime = "nodejs";
 // 300 is the hard ceiling on Vercel's Hobby plan, and asking for more is not
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const secret = (process.env.LOGO_TAGGING_SECRET ?? "").trim();
+  const secret = serverEnv.LOGO_TAGGING_SECRET;
   if (!secret) {
     return NextResponse.json(
       { error: "Tagging is not configured." },

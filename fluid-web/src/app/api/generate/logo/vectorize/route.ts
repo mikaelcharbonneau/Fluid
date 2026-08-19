@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { vectorizeImage } from "@/lib/ai/vectorize";
 import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
 import { reportError } from "@/lib/monitoring/log";
+import { capabilities } from "@/lib/env/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -13,6 +14,13 @@ export const maxDuration = 120;
 // Costs one small credit, not a full asset: this is a single trace, not a
 // generation, and the client has already paid for the concept itself.
 export async function POST(request: Request) {
+  if (!capabilities.recraftVectorize) {
+    return NextResponse.json(
+      { error: "Vector export isn't available right now.", code: "unavailable" },
+      { status: 503 },
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
