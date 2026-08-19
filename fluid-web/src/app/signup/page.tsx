@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { fragment } from "@/lib/fragment";
-import { bootstrapScript } from "@/lib/client-script";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { SignupCard } from "@/components/auth/SignupCard";
 import "../styles/marketing.css";
 import "../styles/auth.css";
 
@@ -9,15 +9,12 @@ export const metadata: Metadata = {
   description: "Create your Fluid account and turn ideas into brand identities.",
 };
 
+const PALETTE = ["#44D9C7", "#70DADA", "#B0D2E6", "#FDBBC0", "#FD7947", "#FD9940", "#FDBA50"];
+
 export default function SignupPage() {
   return (
-    <>
-      {/* signup.js tracks the cursor (.cursor-ring/.cursor-dot style.transform)
-          from the moment it loads, which usually wins the race against
-          hydration — an intentional, expected difference from the static
-          fragment; see src/app/page.tsx for the full explanation. */}
-      <div dangerouslySetInnerHTML={{ __html: fragment("signup") }} suppressHydrationWarning />
-      <script dangerouslySetInnerHTML={{ __html: bootstrapScript("/scripts/signup.js") }} />
-    </>
+    <AuthShell wordmarkSrc="/assets/uuid/a1be0beb-4f6a-4c7f-b98a-6d628d6d82c9.png" palette={PALETTE}>
+      <SignupCard />
+    </AuthShell>
   );
 }
