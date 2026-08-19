@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { fragment } from "@/lib/fragment";
+import { MarketingPage } from "@/components/marketing/MarketingPage";
 import "./styles/marketing.css";
 
 export const metadata: Metadata = {
@@ -8,31 +8,6 @@ export const metadata: Metadata = {
     "Your idea enters as a sentence. It leaves as a brand — strategy, naming, logo, palette, type, and guidelines, generated as one cohesive system.",
 };
 
-// Inline, so it runs on initial HTML load with no dependency on Next's client
-// runtime. Next's afterInteractive scripts don't fire until hydration completes,
-// and a single failed Next chunk (seen in Safari) stalls hydration — which left
-// marketing.js unrun and every scroll-driven section blank. So we:
-//   1. mark JS as available (enables the scroll-in animation states),
-//   2. load marketing.js ourselves, natively, once the DOM is ready, and
-//   3. fail-safe: reveal all static content after ~1.6s even if that fails.
-const BOOTSTRAP = `(function(){
-var d=document.documentElement;d.classList.add('js-reveal');
-function load(){var s=document.createElement('script');s.src='/scripts/marketing.js';document.body.appendChild(s);}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
-setTimeout(function(){var e=document.querySelectorAll('[data-reveal], .sec-head, .jstep, .board');for(var i=0;i<e.length;i++)e[i].classList.add('in');},1600);
-})();`;
-
-export default function MarketingPage() {
-  return (
-    <>
-      <script dangerouslySetInnerHTML={{ __html: BOOTSTRAP }} />
-      {/* marketing.js starts tracking the cursor (.cursor-ring/.cursor-dot
-          style.transform) the instant it loads, which usually wins the race
-          against hydration — React then finds this div's live innerHTML no
-          longer matches the static fragment.html it rendered. That's a real,
-          expected difference from an intentional pre-hydration script, not a
-          bug; suppressHydrationWarning here is the documented exception. */}
-      <div dangerouslySetInnerHTML={{ __html: fragment("marketing") }} suppressHydrationWarning />
-    </>
-  );
+export default function Home() {
+  return <MarketingPage />;
 }
