@@ -21,7 +21,11 @@ export default async function ResetPasswordPage() {
 
   return (
     <>
-      <div dangerouslySetInnerHTML={{ __html: fragment(frag) }} />
+      {/* reset-password.js tracks the cursor (.cursor-ring/.cursor-dot
+          style.transform) from the moment it loads, which usually wins the
+          race against hydration — an intentional, expected difference from
+          the static fragment; see src/app/page.tsx for the full explanation. */}
+      <div dangerouslySetInnerHTML={{ __html: fragment(frag) }} suppressHydrationWarning />
       <script dangerouslySetInnerHTML={{ __html: bootstrapScript("/scripts/reset-password.js") }} />
     </>
   );

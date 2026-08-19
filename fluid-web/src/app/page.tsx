@@ -26,7 +26,13 @@ export default function MarketingPage() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: BOOTSTRAP }} />
-      <div dangerouslySetInnerHTML={{ __html: fragment("marketing") }} />
+      {/* marketing.js starts tracking the cursor (.cursor-ring/.cursor-dot
+          style.transform) the instant it loads, which usually wins the race
+          against hydration — React then finds this div's live innerHTML no
+          longer matches the static fragment.html it rendered. That's a real,
+          expected difference from an intentional pre-hydration script, not a
+          bug; suppressHydrationWarning here is the documented exception. */}
+      <div dangerouslySetInnerHTML={{ __html: fragment("marketing") }} suppressHydrationWarning />
     </>
   );
 }

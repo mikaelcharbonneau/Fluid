@@ -12,7 +12,11 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <>
-      <div dangerouslySetInnerHTML={{ __html: fragment("login") }} />
+      {/* login.js tracks the cursor (.cursor-ring/.cursor-dot style.transform)
+          from the moment it loads, which usually wins the race against
+          hydration — an intentional, expected difference from the static
+          fragment; see src/app/page.tsx for the full explanation. */}
+      <div dangerouslySetInnerHTML={{ __html: fragment("login") }} suppressHydrationWarning />
       <script dangerouslySetInnerHTML={{ __html: bootstrapScript("/scripts/login.js") }} />
     </>
   );
