@@ -1,0 +1,18 @@
+    /* Contained specimen: the gradient runs at full saturation with nothing
+       scrimming it, and bleeds off the right edge so it still reads as a field
+       rather than a picture in a box. */
+    .specimen {
+      position: absolute; z-index: 1; top: 24px; right: 0; bottom: 24px;
+      width: 620px; border-radius: 28px 0 0 28px; overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.16);
+    }
+    .specimen i {
+      position: absolute; inset: 0; display: block;
+      background: url("field.jpg") 60% 45% / cover no-repeat;
+      filter: saturate(1.35) contrast(1.05);
+      transform: scale(1.06);
+    }
+    .specimen-grain {
+      position: absolute; inset: 0; opacity: 0.10;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    }

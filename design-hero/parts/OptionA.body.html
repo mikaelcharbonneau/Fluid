@@ -1,0 +1,89 @@
+<div class="stage" style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #0B0B10; color: #fff;">
+
+  <div class="field" aria-hidden="true"><i></i></div>
+  <span class="scrim" aria-hidden="true"></span>
+  <span class="grain" aria-hidden="true"></span>
+
+  <div style="position: absolute; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 18px 48px;">
+    <img src="wordmark.png" alt="Fluid" style="height: 22px; width: auto; display: block; filter: brightness(0) invert(1);">
+    <div style="display: flex; align-items: center; gap: 34px;">
+      <span style="font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: rgba(255,255,255,0.72);">How it works</span>
+      <span style="font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: rgba(255,255,255,0.72);">Pricing</span>
+      <span style="font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: rgba(255,255,255,0.72);">Log in</span>
+      <span style="display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Try Fluid for free <span>&#8594;</span></span>
+    </div>
+  </div>
+
+  <div style="position: relative; z-index: 10; height: 100%; display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); gap: 72px; align-items: center; padding: 0 96px;">
+
+    <!-- left: the sentence -->
+    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+      <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
+        <span class="dot"></span>
+        <span class="wf-label" style="color: rgba(255,255,255,0.62);">Brand systems, shaped by AI</span>
+      </span>
+
+      <h1 style="font-family: var(--font-display); font-size: 104px; line-height: 0.9; letter-spacing: -0.046em; font-weight: 900; color: #fff; margin: 26px 0 0;">From idea<br>to identity<span class="grad">.</span></h1>
+
+      <p style="font-size: 21px; color: rgba(255,255,255,0.74); max-width: 40ch; margin: 26px 0 0; line-height: 1.5; text-wrap: pretty;">One sentence in. Strategy, name, logo, palette, type and guidelines out &mdash; generated as one system.</p>
+
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 34px; width: 100%;">
+        <form style="display: flex; align-items: center; gap: 10px; width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.20); border-radius: 999px; padding: 8px 8px 8px 22px;">
+          <span style="flex: 1; color: rgba(255,255,255,0.52); font-size: 16px;">A productivity tool for founders who run on rituals&hellip;</span>
+          <span style="display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
+        </form>
+        <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.55);">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">See pricing</a>.</p>
+      </div>
+    </div>
+
+    <!-- right: what that sentence produced -->
+    <div style="display: flex; flex-direction: column; gap: 18px; align-self: center; padding-top: 40px;">
+      <span class="wf-label" style="color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 10px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h9"></path><path d="M8 4.5 11.5 8 8 11.5"></path><path d="M14 3v10"></path></svg>
+        Example output
+      </span>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+
+        <!-- mark -->
+        <div style="grid-column: span 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <span class="wf-label" style="color: rgba(255,255,255,0.45);">Mark</span>
+          <div style="width: 96px; height: 96px; border-radius: 24px; background: url('field.jpg') 40% 60% / cover no-repeat; display: grid; place-items: center;">
+            <svg width="44" height="44" viewBox="0 0 44 44" fill="none" stroke="#0B0B10" stroke-width="3" stroke-linecap="round"><path d="M22 6c7 6 11 10.5 11 16a11 11 0 0 1-22 0c0-5.5 4-10 11-16Z"></path></svg>
+          </div>
+        </div>
+
+        <!-- wordmark -->
+        <div style="grid-column: span 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 16px; justify-content: space-between;">
+          <span class="wf-label" style="color: rgba(255,255,255,0.45);">Wordmark</span>
+          <span style="font-family: var(--font-display); font-weight: 900; font-size: 40px; letter-spacing: -0.045em; color: #fff; line-height: 1;">Ritualist<span class="grad">.</span></span>
+        </div>
+
+        <!-- palette -->
+        <div style="grid-column: span 2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+          <span class="wf-label" style="color: rgba(255,255,255,0.45);">Palette</span>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="height: 44px; border-radius: 12px; background: #44D9C7;"></span><span class="wf-label" style="color: rgba(255,255,255,0.5);">44D9C7</span></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="height: 44px; border-radius: 12px; background: #B0D2E6;"></span><span class="wf-label" style="color: rgba(255,255,255,0.5);">B0D2E6</span></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="height: 44px; border-radius: 12px; background: #FDBBC0;"></span><span class="wf-label" style="color: rgba(255,255,255,0.5);">FDBBC0</span></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="height: 44px; border-radius: 12px; background: #FD7947;"></span><span class="wf-label" style="color: rgba(255,255,255,0.5);">FD7947</span></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="height: 44px; border-radius: 12px; background: #FDBA50;"></span><span class="wf-label" style="color: rgba(255,255,255,0.5);">FDBA50</span></div>
+          </div>
+        </div>
+
+        <!-- type -->
+        <div style="grid-column: span 2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span class="wf-label" style="color: rgba(255,255,255,0.45);">Typeface</span>
+            <span style="font-family: var(--font-display); font-weight: 900; font-size: 34px; letter-spacing: -0.04em; color: #fff; line-height: 1;">Aa</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; text-align: right;">
+            <span style="font-size: 15px; font-weight: 600; color: #fff;">Metropolis</span>
+            <span style="font-size: 13px; color: rgba(255,255,255,0.55);">Display 900 &middot; Body 400</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,31 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",    "title": "Current hero",              "x": 0,    "y": 0,    "w": 1440, "h": 900 },
+    { "file": "OptionA.dc.html", "title": "Option A — Show the output", "x": 1600, "y": 0,    "w": 1440, "h": 900 },
+    { "file": "OptionB.dc.html", "title": "Option B — Sentence first",  "x": 0,    "y": 1140, "w": 1440, "h": 900 },
+    { "file": "OptionC.dc.html", "title": "Option C — Editorial light", "x": 1600, "y": 1140, "w": 1440, "h": 900 }
+  ],
+  "annotations": [
+    {
+      "id": "note-current",
+      "x": 0, "y": -230, "w": 640,
+      "text": "CURRENT — recreated from src/components/marketing/Hero.tsx and marketing.css at 1440x900, real Metropolis and the real gradient JPG.\n\nWhat is working against it:\n• The 101deg scrim eats most of the field — the signature gradient reads as grey fog on the left two-thirds.\n• The gradient full stop after 'identity' is the only brand colour in the type, and at that size it is a dot.\n• Nothing in the frame shows what Fluid actually produces.\n• Sub, input and fine print are three greys at similar weight — the eye has no second stop after the headline."
+    },
+    {
+      "id": "note-a",
+      "x": 1600, "y": -230, "w": 640,
+      "text": "OPTION A — SHOW THE OUTPUT\nKeeps the dark field and the lockup you already have; spends the empty right two-thirds on the thing the sentence produced — mark, wordmark, palette, typeface. The scrim is rebalanced so colour runs as a diagonal band through the middle instead of dying on the left.\n\nWhy: a product that generates brand systems currently shows none. This is the cheapest large gain in belief.\n\nTradeoff: busier, and the gradient stops being the sole subject. The example brand shown ('Ritualist') is a placeholder — swap in a real generated output before shipping."
+    },
+    {
+      "id": "note-b",
+      "x": 0, "y": 910, "w": 640,
+      "text": "OPTION B — SENTENCE FIRST\nNear-black stage; the gradient is demoted from wallpaper to a bloom that exists only around the input, so colour appears to come out of the sentence. The control is the biggest element on the page (860px, 19px type), with the six deliverables named directly under it.\n\nWhy: the input is the one thing the page exists to get used, and right now it is the fourth element in the hierarchy.\n\nTradeoff: much less visual drama on first paint, and it leans on a centred composition, which is a bigger departure from the rest of your page."
+    },
+    {
+      "id": "note-c",
+      "x": 1600, "y": 910, "w": 640,
+      "text": "OPTION C — EDITORIAL LIGHT\nInverts the tone: --bg white, black display type, and the gradient contained as a full-saturation specimen bleeding off the right edge with nothing scrimming it. Unlocks the black --accent CTA, which the dark hero cannot use.\n\nWhy: the gradient finally looks like the asset it is, and the hero stops fighting the mostly-white page below it.\n\nTradeoff: loses the immersive full-bleed moment, and the nav's data-dark inversion and the hero's dark-glass input would both come out."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

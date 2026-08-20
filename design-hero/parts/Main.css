@@ -1,0 +1,20 @@
+    .field {
+      position: absolute; inset: -18%; z-index: 0;
+      filter: saturate(1.5) contrast(1.08);
+    }
+    .field i {
+      position: absolute; inset: 0; display: block;
+      background: url("field.jpg") 50% 18% / cover no-repeat;
+      transform: scaleX(-1) scale(1.10) translate3d(0.5%, 0.5%, 0);
+    }
+    .scrim {
+      position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background: linear-gradient(101deg,
+        rgba(9,9,13,0.97) 0%, rgba(9,9,13,0.93) 23%,
+        rgba(9,9,13,0.58) 39%, rgba(9,9,13,0.08) 60%, rgba(9,9,13,0) 74%);
+    }
+    .scrim-v {
+      position: absolute; inset: 0; z-index: 3; pointer-events: none;
+      background: linear-gradient(180deg, rgba(9,9,13,0.42) 0%, rgba(9,9,13,0) 24%,
+        rgba(9,9,13,0) 72%, rgba(9,9,13,0.30) 100%);
+    }

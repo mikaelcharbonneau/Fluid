@@ -1,0 +1,19 @@
+    .field {
+      position: absolute; inset: -14%; z-index: 0;
+      filter: saturate(1.6) contrast(1.10);
+    }
+    .field i {
+      position: absolute; inset: 0; display: block;
+      background: url("field.jpg") 50% 22% / cover no-repeat;
+      transform: scaleX(-1) scale(1.12);
+    }
+    /* Darker overall than the current scrim: the artifact cards need a quiet
+       ground, so the colour is pushed to a diagonal band through the middle. */
+    .scrim {
+      position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background:
+        linear-gradient(101deg, rgba(9,9,13,0.98) 0%, rgba(9,9,13,0.94) 26%,
+          rgba(9,9,13,0.66) 42%, rgba(9,9,13,0.52) 62%, rgba(9,9,13,0.74) 100%),
+        linear-gradient(180deg, rgba(9,9,13,0.55) 0%, rgba(9,9,13,0) 26%,
+          rgba(9,9,13,0) 70%, rgba(9,9,13,0.45) 100%);
+    }

@@ -1,0 +1,16 @@
+    /* The field is demoted to a bloom behind the control — the gradient stops
+       being wallpaper and becomes the thing the sentence emits. */
+    .bloom {
+      position: absolute; left: 50%; top: 62%; width: 1500px; height: 720px;
+      transform: translate(-50%, -50%);
+      background: url("field.jpg") center 40% / cover no-repeat;
+      filter: saturate(1.7) blur(38px);
+      opacity: 0.62; z-index: 0; pointer-events: none;
+      -webkit-mask-image: radial-gradient(58% 46% at 50% 50%, #000 0%, rgba(0,0,0,0.55) 46%, transparent 78%);
+      mask-image: radial-gradient(58% 46% at 50% 50%, #000 0%, rgba(0,0,0,0.55) 46%, transparent 78%);
+    }
+    .input-glow {
+      position: absolute; inset: -26px -34px; z-index: 0; border-radius: 999px;
+      background: url("field.jpg") center 45% / cover no-repeat;
+      filter: saturate(1.8) blur(26px); opacity: 0.85;
+    }

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import Velaris from "@/components/ui/velaris";
 import { IdeaInput } from "./IdeaInput";
+
+const HERO_COLORS = ["#5FD7D3", "#D9D2EE", "#FF7A4F", "#FFC95A"];
 
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
@@ -42,7 +45,14 @@ export function Hero() {
     // data-dark drives the nav's inverted state (see useMarketingEngine).
     <header className="hero" id="top" ref={heroRef} data-dark="">
       <div className="hero-field" ref={fieldRef} aria-hidden="true">
-        <i />
+        <Velaris
+          bg="#09090D"
+          colors={HERO_COLORS}
+          speed={1.15}
+          grain={0.18}
+          height="100%"
+          className="hero-field-shader"
+        />
       </div>
       <span className="hero-scrim" aria-hidden="true" />
       <span className="hero-scrim-v" aria-hidden="true" />

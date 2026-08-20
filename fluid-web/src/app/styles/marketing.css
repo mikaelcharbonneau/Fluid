@@ -193,21 +193,12 @@ body.custom-cursor .btn { cursor: none; }
 /* ---- the field ---- */
 .hero-field {
   position: absolute; inset: -18%; z-index: 0;
+  background: url("/assets/uuid/dccfeee5-b7cc-45c3-89b3-ef4db2191c23.jpg") 50% 18% / cover no-repeat;
   filter: saturate(1.5) contrast(1.08);
   will-change: transform;
   transition: transform 900ms var(--ease-out);
 }
-.hero-field i {
-  position: absolute; inset: 0; display: block;
-  /* mirrored so the gradient's cyan end lands on the open right-hand side —
-     under the scrim on the left it would never be seen */
-  background: url("/assets/uuid/dccfeee5-b7cc-45c3-89b3-ef4db2191c23.jpg") 50% 18% / cover no-repeat;
-  animation: heroSwim 34s ease-in-out infinite alternate;
-}
-@keyframes heroSwim {
-  from { transform: scaleX(-1) scale(1.04) translate3d(-1%, -2%, 0); }
-  to   { transform: scaleX(-1) scale(1.16) translate3d(2%, 3%, 0); }
-}
+.hero-field-shader { position: absolute; inset: 0; }
 .hero-scrim {
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
   background: linear-gradient(101deg,
@@ -293,7 +284,7 @@ body.custom-cursor .btn { cursor: none; }
 /* The field is decoration: hold it still when the visitor asks for less
    motion. Everything it sits behind is ordinary server-rendered markup. */
 @media (prefers-reduced-motion: reduce) {
-  .hero-field i, .hero-eyebrow .dot, .scroll-cue .bar { animation: none; }
+  .hero-eyebrow .dot, .scroll-cue .bar { animation: none; }
   .hero-field { transition: none; }
 }
 
