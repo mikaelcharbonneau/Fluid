@@ -132,6 +132,8 @@ body.custom-cursor .btn { cursor: none; }
 .btn:hover { box-shadow: var(--shadow-glow); }
 .btn:hover::before { opacity: 1; }
 .btn.btn-sm { padding: 10px 18px; font-size: 14px; }
+.btn.btn-invert { --bg-btn: #fff; --fg-btn: #000; }
+.btn .btn-label { white-space: nowrap; }
 .btn.btn-ghost {
   --bg-btn: transparent; --fg-btn: var(--fg-1);
   border: 1px solid var(--line-strong);
@@ -167,39 +169,74 @@ body.custom-cursor .btn { cursor: none; }
 .js-reveal .in .line-mask > span, .js-reveal [data-reveal].in .line-mask > span { transform: none; }
 
 /* =========================================================
-   HERO
+   HERO — "Liquid Field"
+   ---------------------------------------------------------
+   A dark, full-bleed hero: the brand gradient is the subject,
+   scaled up and drifting, with a raking scrim that keeps the
+   type side dark and lets the colour run on the other.
+
+   This replaced the old light hero along with ~80 lines of
+   `.canvas` / `.frag` rules for an "assembling identity"
+   collage that was never ported to React (see the note in
+   useMarketingEngine.ts) and had been dead since #186.
    ========================================================= */
 .hero {
   position: relative;
-}
-.hero-pin {
-  position: relative; min-height: 100svh;
-  display: flex; align-items: center;
-  padding: clamp(90px,12vh,120px) clamp(20px,4vw,48px) clamp(60px,9vh,80px);
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
   overflow: hidden;
-}
-.hero-grid {
-  width: min(1080px, 92vw); margin-inline: auto;
-  display: flex; flex-direction: column; align-items: center; text-align: center;
-}
-.hero-copy { display: flex; flex-direction: column; align-items: center; }
-/* On narrow OR short viewports the stacked copy + canvas is too tall to pin
-   without clipping — release the pin and scroll normally (assembly still runs). */
-@media (max-width: 940px), (max-height: 700px) {
-  .hero-pin {
-    position: static; min-height: 100svh;
-    overflow: visible;
-    padding: clamp(96px,14vh,128px) clamp(20px,4vw,48px) clamp(56px,9vh,80px);
-  }
-}
-@media (max-width: 940px) {
-  .canvas { height: min(52vh, 460px); }
+  background: #0B0B10;
+  color: #fff;
 }
 
+/* ---- the field ---- */
+.hero-field {
+  position: absolute; inset: -18%; z-index: 0;
+  filter: saturate(1.5) contrast(1.08);
+  will-change: transform;
+  transition: transform 900ms var(--ease-out);
+}
+.hero-field i {
+  position: absolute; inset: 0; display: block;
+  /* mirrored so the gradient's cyan end lands on the open right-hand side —
+     under the scrim on the left it would never be seen */
+  background: url("/assets/uuid/dccfeee5-b7cc-45c3-89b3-ef4db2191c23.jpg") 50% 18% / cover no-repeat;
+  animation: heroSwim 34s ease-in-out infinite alternate;
+}
+@keyframes heroSwim {
+  from { transform: scaleX(-1) scale(1.04) translate3d(-1%, -2%, 0); }
+  to   { transform: scaleX(-1) scale(1.16) translate3d(2%, 3%, 0); }
+}
+.hero-scrim {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(101deg,
+    rgba(9,9,13,0.97) 0%, rgba(9,9,13,0.93) 23%,
+    rgba(9,9,13,0.58) 39%, rgba(9,9,13,0.08) 60%, rgba(9,9,13,0) 74%);
+}
+.hero-scrim-v {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: linear-gradient(180deg, rgba(9,9,13,0.42) 0%, rgba(9,9,13,0) 24%,
+    rgba(9,9,13,0) 72%, rgba(9,9,13,0.30) 100%);
+}
+.hero-grain {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0.14;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- lockup ---- */
+.hero-lockup {
+  position: relative; z-index: 10;
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 0 clamp(20px, 6.7vw, 96px);
+  width: 100%;
+}
 .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 9px;
-  padding: 7px 13px; border: 1px solid var(--line); border-radius: var(--r-pill);
-  background: var(--bg-elev);
+  padding: 7px 13px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.16);
+  backdrop-filter: blur(8px);
 }
 .hero-eyebrow .dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -207,20 +244,59 @@ body.custom-cursor .btn { cursor: none; }
   animation: hueflow 6s linear infinite;
 }
 @keyframes hueflow { to { background-position: 200% 200%; } }
+.hero-eyebrow .wf-label { color: rgba(255,255,255,0.55); }
 
 .hero h1 {
-  font-size: clamp(52px, 9.6vw, 132px); line-height: 0.9;
-  letter-spacing: -0.046em; font-weight: 900; margin: 24px 0 0;
+  font-size: clamp(52px, 9.2vw, 132px);
+  line-height: 0.9; letter-spacing: -0.046em; font-weight: 900;
+  color: #fff; margin: 26px 0 0;
 }
-.hero h1 .grad { background: var(--fluid-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.hero h1 .grad {
+  background: var(--fluid-gradient);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
 .hero-sub {
-  font-size: clamp(17px, 1.45vw, 21px); color: var(--fg-2);
-  max-width: 52ch; margin: 30px auto 0; line-height: 1.55; text-wrap: balance;
+  font-size: clamp(17px, 1.45vw, 21px);
+  color: rgba(255,255,255,0.72);
+  max-width: 44ch; margin: 30px 0 0; line-height: 1.55; text-wrap: pretty;
 }
-.hero-cta { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 38px; }
+.hero-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; margin-top: 38px; width: 100%; }
+.hero-fine { margin: 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: left; }
+.hero-fine a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
 
-.hero-fine { margin: 0; font-size: 13px; color: var(--fg-3); text-align: center; }
-.hero-fine a { color: var(--fg-1); text-decoration: underline; text-underline-offset: 2px; }
+.scroll-cue {
+  position: absolute; z-index: 10;
+  left: clamp(20px, 6.7vw, 96px); bottom: 44px;
+  display: flex; align-items: center; gap: 12px;
+}
+.scroll-cue .bar {
+  width: 1px; height: 34px; transform-origin: top;
+  background: linear-gradient(rgba(255,255,255,0.6), transparent);
+  animation: cueDrop 1.8s var(--ease-in-out) infinite;
+}
+@keyframes cueDrop { 0%,100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+.scroll-cue .wf-label { color: rgba(255,255,255,0.55); }
+
+@media (max-width: 680px) {
+  .hero { min-height: 620px; padding: 92px 0 52px; align-items: flex-start; }
+  .hero h1 { font-size: clamp(44px, 13vw, 64px); letter-spacing: -0.04em; margin-top: 20px; }
+  .hero-sub { font-size: 16px; margin-top: 20px; }
+  .hero-cta { margin-top: 26px; }
+  .scroll-cue { display: none; }
+  .hero-scrim {
+    background: linear-gradient(176deg, rgba(9,9,13,0.94) 0%, rgba(9,9,13,0.86) 34%,
+      rgba(9,9,13,0.55) 66%, rgba(9,9,13,0.12) 100%);
+  }
+}
+
+/* The field is decoration: hold it still when the visitor asks for less
+   motion. Everything it sits behind is ordinary server-rendered markup. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-field i, .hero-eyebrow .dot, .scroll-cue .bar { animation: none; }
+  .hero-field { transition: none; }
+}
+
 
 /* Visible only to assistive tech — labels for inputs whose purpose is
    already obvious from their placement, and the skip link's own text. */
@@ -238,88 +314,6 @@ body.custom-cursor .btn { cursor: none; }
   text-decoration: none; transition: top .15s var(--ease-out);
 }
 .skip-link:focus-visible { top: 12px; }
-.hero-meta { display:flex; justify-content: center; gap: clamp(40px, 7vw, 96px); margin-top: 52px; padding-top: 34px; border-top: 1px solid var(--line); width: min(760px, 100%); flex-wrap: wrap; }
-.hero-meta .stat { text-align: center; }
-.hero-meta .stat .n { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.03em; }
-.hero-meta .stat .l { font-size: 12.5px; color: var(--fg-3); margin-top: 2px; }
-
-/* ---- identity-generation canvas (right side) ---- */
-.canvas {
-  position: relative; aspect-ratio: 1 / 0.92;
-  height: min(60vh, 580px); width: auto; max-width: 100%;
-  margin-inline: auto;
-  border-radius: var(--r-2xl);
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  opacity: 0; transform-origin: 50% 58%;
-  will-change: transform, opacity;
-}
-.canvas .grid-bg {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 34px 34px; opacity: 0.5;
-  mask-image: radial-gradient(120% 120% at 50% 30%, #000 40%, transparent 90%);
-}
-.canvas .topbar {
-  position: absolute; top: 0; left: 0; right: 0; height: 42px;
-  display: flex; align-items: center; gap: 8px; padding: 0 16px;
-  border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(6px); z-index: 5;
-}
-.canvas .topbar .t { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
-.canvas .dots { display: flex; gap: 5px; }
-.canvas .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); display:block; }
-
-.frag {
-  position: absolute; background: var(--bg-elev);
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  box-shadow: var(--shadow-md); padding: 12px 14px;
-  opacity: var(--o, 0);
-  transform:
-    translate(calc(var(--tx, 0px) + var(--cx, 0px)), calc(var(--ty, 0px) + var(--cy, 0px)))
-    scale(var(--sc, 0.86)) rotate(var(--rot, 0deg));
-  will-change: transform, opacity; z-index: 3;
-}
-.frag .cap { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-4); margin-bottom: 6px; display:block; }
-@keyframes blink { 50% { opacity: 0; } }
-
-/* resting positions — a balanced collage with the logo mark as focal centre */
-.frag-names { top: 12%; left: 5%; width: 44%; }
-.frag-names ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.frag-names li { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -0.02em; padding: 5px 8px; border-radius: 7px; color: var(--fg-3); transition: all .4s; }
-.frag-names li.sel { color: var(--fg-1); background: var(--bg-sunken); }
-
-.frag-graphics { top: 12%; right: 5%; width: 33%; }
-.frag-graphics .gfx { display: flex; gap: 9px; align-items: stretch; height: 42px; }
-.frag-graphics .gfx .ico { width: 42px; height: 42px; border-radius: 12px; background: var(--fluid-gradient); box-shadow: var(--shadow-xs); flex: none; }
-.frag-graphics .gfx .ribbon-sw { flex: 1; border-radius: 10px; background: var(--fluid-gradient); opacity: 0.9; }
-
-.frag-logo { top: 50%; left: 50%; width: 124px; height: 124px; margin: -62px 0 0 -62px; display: grid; place-items: center; z-index: 4; }
-.frag-logo img { width: 60%; height: 60%; object-fit: contain; }
-
-.frag-palette { bottom: 6%; left: 5%; width: 44%; }
-.frag-palette .row { display: flex; gap: 6px; }
-.frag-palette .sw { flex: 1; height: 30px; border-radius: 7px; }
-
-.frag-type { bottom: 6%; right: 5%; width: 38%; }
-.frag-type .big { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: -0.03em; }
-.frag-type .meta { font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-3); margin-top: 4px; }
-
-/* ribbon stroke that flows through hero canvas */
-.canvas .ribbon { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.canvas .ribbon path { fill: none; stroke-width: 16; stroke-linecap: round; }
-
-.scroll-cue {
-  position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  color: var(--fg-3);
-}
-.scroll-cue .bar { width: 1px; height: 36px; background: linear-gradient(var(--fg-3), transparent); animation: cueDrop 1.8s var(--ease-in-out) infinite; }
-@keyframes cueDrop { 0%,100%{transform:scaleY(.4);transform-origin:top} 50%{transform:scaleY(1);transform-origin:top} }
 
 /* =========================================================
    SECTION HEADERS
@@ -924,19 +918,12 @@ body.custom-cursor .btn { cursor: none; }
 }
 .idea-input input::placeholder { color: rgba(255,255,255,0.45); }
 
-/* #178: the conversion input now also sits in the hero, on light ground, so
-   it needs the inverse of the treatment above (which is tuned for #0a0a0b).
-   Declared after the base rules on purpose — same specificity, so source
-   order is what decides, and getting that backwards left the placeholder
-   white-on-white. */
+/* The hero is dark now, so the input keeps the base dark-glass treatment and
+   only its box changes. (It previously carried a light override here, for the
+   light hero that #178 introduced.) */
 .idea-input--hero {
-  margin: 0 auto; width: min(560px, 92vw);
-  background: var(--bg-elev); border-color: var(--line-strong);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: none;
+  margin: 0; width: min(600px, 100%);
 }
-.idea-input--hero input { color: var(--fg-1); }
-.idea-input--hero input::placeholder { color: var(--fg-3); }
 .final .sub { color: rgba(255,255,255,0.6); margin-top: 22px; font-size: 15px; }
 
 /* footer */
@@ -945,6 +932,40 @@ body.custom-cursor .btn { cursor: none; }
 .footer a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; }
 .footer a:hover { color: #fff; }
 .footer .fl-wordmark { filter: brightness(0) invert(1); height: 18px; }
+
+/* =========================================================
+   Metal CTA
+   ---------------------------------------------------------
+   metal-fx paints into a canvas laid over the button. The
+   radius clips its glow to the pill instead of letting it
+   square off at the corners; the canvas is transparent until
+   hover, and MetalCta keeps the shader paused until then.
+   ========================================================= */
+.metal-cta { position: relative; display: inline-flex; }
+.metal-cta-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; display: block; border-radius: var(--r-pill);
+  opacity: 0; transition: opacity .38s var(--ease-out);
+}
+.metal-cta:hover .metal-cta-canvas,
+.metal-cta:focus-within .metal-cta-canvas { opacity: 1; }
+.metal-cta .btn {
+  transition: background .38s var(--ease-out), color .38s var(--ease-out),
+              box-shadow .38s var(--ease-out);
+}
+.metal-cta:hover .btn,
+.metal-cta:focus-within .btn { background: #0B0B10; color: #fff; box-shadow: none; }
+/* the shared gradient sweep would fight the metal for the same surface */
+.metal-cta .btn::before { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .metal-cta .btn { transition: none; }
+}
+
+/* A black pill on the dark hero is invisible; invert it while the nav is over
+   a [data-dark] section. `.nav.on-dark` is set by useMarketingEngine. */
+.nav.on-dark .btn { background: #fff; color: #000; }
+.nav.on-dark .metal-cta:hover .btn,
+.nav.on-dark .metal-cta:focus-within .btn { background: #0B0B10; color: #fff; }
 
 /* =========================================================
    Pricing
