@@ -18,14 +18,18 @@
     "measure:js": "node scripts/measure-route-js.mjs"
   },
   "dependencies": {
+    "@paper-design/shaders": "^0.0.80",
     "@sentry/nextjs": "^10.70.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.33.0",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
     "stripe": "^22.3.2",
+    "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
