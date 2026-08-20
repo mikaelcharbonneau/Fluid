@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMagnetic } from "@/components/interaction/useMagnetic";
+import { MetalCta } from "./MetalCta";
 
 export function MarketingNav() {
-  const ctaRef = useMagnetic<HTMLAnchorElement>(0.35);
 
   return (
     <nav className="nav">
@@ -22,10 +21,12 @@ export function MarketingNav() {
         <Link className="nav-link" href="/login">
           Log in
         </Link>
-        <Link ref={ctaRef} className="btn btn-sm" href="/signup">
-          <span className="btn-label">Try Fluid for free</span>
-          <span className="arr">→</span>
-        </Link>
+        <MetalCta>
+          <Link className="btn btn-sm" href="/signup" data-metal-host="">
+            <span className="btn-label">Try Fluid for free</span>
+            <span className="arr">→</span>
+          </Link>
+        </MetalCta>
       </div>
     </nav>
   );
