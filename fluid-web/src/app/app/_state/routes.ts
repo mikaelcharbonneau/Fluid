@@ -12,31 +12,37 @@
 // All known routes. Determines whether a route string is valid.
 export const ROUTES = [
   'home', 'chat', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
-];
+] as const;
+
+export type AppRoute = (typeof ROUTES)[number];
+
+export function isAppRoute(value: string): value is AppRoute {
+  return (ROUTES as readonly string[]).includes(value);
+}
 
 // Navigation order. Drives the fwd/back entrance animation only — it is not
 // a flow, just the order screens were laid out in.
-export const ROUTE_ORDER = [
+export const ROUTE_ORDER: readonly AppRoute[] = [
   'home', 'chat', 'brands', 'brands-empty', 'assets', 'guides', 'settings',
 ];
 
-export const DEFAULT_ROUTE = 'home';
+export const DEFAULT_ROUTE: AppRoute = 'home';
 
 /** Build the URL for a known app route. */
-export function pathForRoute(route: string): string {
+export function pathForRoute(route: AppRoute): string {
   return `/app/${route}`;
 }
 
 /** Read the first `/app/<route>` segment, falling back for retired routes. */
-export function routeForPath(pathname: string | null): string {
+export function routeForPath(pathname: string | null): AppRoute {
   if (!pathname) return DEFAULT_ROUTE;
   const seg = pathname.replace(/^\/app\/?/, '').split('/')[0];
-  return ROUTES.includes(seg) ? seg : DEFAULT_ROUTE;
+  return isAppRoute(seg) ? seg : DEFAULT_ROUTE;
 }
 
 // Left rail label → route.  The rail labels are rendered by the existing
 // AShell, so we match by exact text.
-export const RAIL_TO_ROUTE = {
+export const RAIL_TO_ROUTE: Record<string, AppRoute> = {
   'Home':     'home',
   'Brands':   'brands',
   'Assets':   'assets',
@@ -45,7 +51,7 @@ export const RAIL_TO_ROUTE = {
 };
 
 // Each screen's matching activeNav highlight + breadcrumb override.
-export const ROUTE_META = {
+export const ROUTE_META: Record<AppRoute, { activeNav: string; breadcrumb: string[] }> = {
   'home':         { activeNav: 'home',     breadcrumb: ['Home'] },
   'chat':         { activeNav: 'brands',   breadcrumb: ['Brands', 'Brand kit'] },
   'brands':       { activeNav: 'brands',   breadcrumb: ['Brands'] },
@@ -67,7 +73,7 @@ export const ROUTE_TITLE: Record<string, string> = {
   'settings':        'Settings',
 };
 
-export const CRUMB_TO_ROUTE = {
+export const CRUMB_TO_ROUTE: Record<string, AppRoute> = {
   'Home':      'home',
   'Brands':    'brands',
   'Assets':    'assets',

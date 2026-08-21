@@ -4,8 +4,6 @@
 // route split. The code below is unchanged; only the import/export header
 // around it is new.
 
-import React from "react";
-
 // Asset resolver — logical bundle paths live under /public/assets/<path>.
 // Mirrors the original window.__assets Proxy (path -> inlined blob URL).
 export const __assets: Record<string, string> = new Proxy({} as Record<string, string>, {
@@ -13,4 +11,3 @@ export const __assets: Record<string, string> = new Proxy({} as Record<string, s
     return typeof key === "string" ? "/assets/" + key : undefined;
   },
 });
-

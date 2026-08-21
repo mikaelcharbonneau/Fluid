@@ -22,11 +22,16 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     document.body.dataset.brand = (BRAND_TO_ATTR as Record<string, string>)[t.brand] || "";
   }, [t.brand]);
 
+  const updateTweak = (key: string, value: unknown) => {
+    if (key === "brand" && typeof value === "string") setTweak("brand", value);
+    if (key === "showQuickJump" && typeof value === "boolean") setTweak("showQuickJump", value);
+  };
+
   return (
     <RouterProvider>
       <BrandDraftProvider>
         {children}
-        <DevTools tweaks={t} setTweak={setTweak} />
+        <DevTools tweaks={t} setTweak={updateTweak} />
       </BrandDraftProvider>
     </RouterProvider>
   );

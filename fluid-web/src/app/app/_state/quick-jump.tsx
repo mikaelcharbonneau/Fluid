@@ -6,16 +6,16 @@
 
 import React from "react";
 import { CARD_BUTTON_RESET } from "../_kit/a11y";
-import { useState } from "../_kit/react";
 import { useRouter } from "./router-context";
+import type { AppRoute } from "./routes";
 
 // Quick-jump pill — minimal in-prototype controller. Lets us land on any
 // screen for review without going through the click chain. The router
 // drives this; the existing CTAs still work as the primary navigation.
 export function QuickJump() {
   const { route, navigate } = useRouter();
-  const [open, setOpen] = useState(false);
-  const routes = [
+  const [open, setOpen] = React.useState(false);
+  const routes: Array<{ id: AppRoute; label: string }> = [
     { id: 'home',         label: 'Home' },
     { id: 'chat',         label: 'Brand kit' },
     { id: 'brands',       label: 'Brands' },

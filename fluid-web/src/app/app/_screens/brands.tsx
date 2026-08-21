@@ -11,9 +11,19 @@ import { BrandCollage, QUICK_VISUAL_MODES, QuickPath } from "../_kit/collage";
 import { AShell, CHAT, FluidWordmark } from "../_kit/shell";
 import { ArrowRight, Chip, PlusIcon, Sparkle } from "../_kit/ui";
 
+interface CommunityCardProps {
+  name: string;
+  author: string;
+  when: string;
+  mood: { bg: string; fg: string };
+  mark: { weight: number; size: number; tracking: string; text: string; dot?: boolean; dotColor?: string };
+  palette: string[];
+  type: string;
+}
+
 // Community card — a brand someone made with Fluid. Shows a thumbnail,
 // brand name + author, kit summary (3 swatches + type sample).
-const CommunityCard = ({ name, author, when, mood, mark, palette, type }: any) => (
+const CommunityCard = ({ name, author, when, mood, mark, palette, type }: CommunityCardProps) => (
   <div style={{
     background: 'var(--bg-elev)', borderRadius: 16,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -35,7 +45,7 @@ const CommunityCard = ({ name, author, when, mood, mark, palette, type }: any) =
         <span style={{fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)', whiteSpace:'nowrap'}}>{type}</span>
       </div>
       <div style={{display:'flex', gap: 3}}>
-        {palette.map((c: any, i: any) => (
+        {palette.map((c, i) => (
           <div key={i} style={{flex: 1, height: 8, borderRadius: 99, background: c}}/>
         ))}
       </div>
@@ -267,4 +277,3 @@ export const DirA_Brands = () => (
     </div>
   </AShell>
 );
-

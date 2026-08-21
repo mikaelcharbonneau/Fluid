@@ -10,6 +10,7 @@ import { BA_CardVisual, brandDisplayName } from "../_kit/brand";
 import { AShell, CHAT } from "../_kit/shell";
 import { AEmptyState, PlusIcon, Sparkle, Thinking } from "../_kit/ui";
 import { useBrandDraft } from "../_state/brand-draft-context";
+import type { DashboardBrand } from "../_state/types";
 
 // =====================================================================
 // Brand definitions — surfaces, type, palette, marks
@@ -42,12 +43,12 @@ const BA_IcoChevDown = ({ s = 13 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
 );
 
-const BA_StatusPill = ({ status }: any) => {
+const BA_StatusPill = ({ status }: { status: DashboardBrand['status'] }) => {
   const map = {
     live:  { dot: '#44D9C7', label: 'Live',  fg: '#0E6B5E', bg: 'rgba(68,217,199,.20)' },
     draft: { dot: 'var(--fg-4)', label: 'Draft', fg: 'var(--fg-3)', bg: 'var(--bg-sunken)' },
   };
-  const s = (map as any)[status] || map.draft;
+  const s = status === 'live' ? map.live : map.draft;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -60,7 +61,7 @@ const BA_StatusPill = ({ status }: any) => {
   );
 };
 
-const BA_EmptyState = ({ onCreate }: any) => (
+const BA_EmptyState = ({ onCreate }: { onCreate: () => void }) => (
   <AEmptyState
     title="No brands yet"
     body="Start your first brand and it'll live here — every name, logo, palette and guideline you build with Fluid."
@@ -70,7 +71,7 @@ const BA_EmptyState = ({ onCreate }: any) => (
 );
 
 // Relative "time ago" for real saved-brand timestamps.
-function relTime(iso: any) {
+function relTime(iso: string | null | undefined) {
   if (!iso) return '';
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return 'Just now';
@@ -86,7 +87,13 @@ function relTime(iso: any) {
 // (nested interactive elements are invalid and unreachable by keyboard).
 // The open action is a real button covering the card's body instead, with
 // Delete as its sibling — #171.
-const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
+interface RealBrandCardProps {
+  brand: DashboardBrand;
+  onOpen: () => void;
+  onDelete: () => void;
+}
+
+const BA_RealBrandCard = ({ brand, onOpen, onDelete }: RealBrandCardProps) => (
   <div
     style={{
       borderRadius: 16, overflow: 'hidden', background: 'var(--bg-elev)',
@@ -138,13 +145,13 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
 // =====================================================================
 export const DirA_BrandsActive = () => {
   const { brands, refresh } = useBrandDraft();
-  const [filter, setFilter] = useBAState('all');
+  const [filter, setFilter] = useBAState<'all' | 'live' | 'draft'>('all');
   // In-app confirm dialog, not window.confirm(): native dialogs are blocked
   // or auto-dismissed in several real embedding contexts (sandboxed iframes,
   // some in-app webviews, automated/preview browsers), which made this
   // button silently do nothing — confirm() returns false and the delete
   // never fires.
-  const [pendingDelete, setPendingDelete] = useBAState<any>(null);
+  const [pendingDelete, setPendingDelete] = useBAState<DashboardBrand | null>(null);
   const [deleting, setDeleting] = useBAState(false);
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -155,11 +162,11 @@ export const DirA_BrandsActive = () => {
     if (ok) refresh();
   };
   const filters = [
-    { key: 'all', label: 'All', count: brands.length },
-    { key: 'live', label: 'Live', count: brands.filter((b: any) => b.status === 'live').length },
-    { key: 'draft', label: 'Drafts', count: brands.filter((b: any) => b.status === 'draft').length },
+    { key: 'all' as const, label: 'All', count: brands.length },
+    { key: 'live' as const, label: 'Live', count: brands.filter((b) => b.status === 'live').length },
+    { key: 'draft' as const, label: 'Drafts', count: brands.filter((b) => b.status === 'draft').length },
   ];
-  const shown = brands.filter((b: any) => (filter === 'all' ? true : b.status === filter));
+  const shown = brands.filter((b) => (filter === 'all' ? true : b.status === filter));
 
   return (
     <AShell activeNav="brands" breadcrumb={['Brands']}>
@@ -212,7 +219,7 @@ export const DirA_BrandsActive = () => {
             <BA_EmptyState onCreate={() => location.assign(CHAT)} />
           ) : (
             <div className="bacard-grid">
-              {shown.map((b: any) => (
+              {shown.map((b) => (
                 <BA_RealBrandCard
                   key={b.id}
                   brand={b}
@@ -271,7 +278,14 @@ export const DirA_BrandsActive = () => {
 // than a native window.confirm() — which several real embedding contexts
 // (sandboxed iframes, in-app webviews, automated browsers) suppress and
 // auto-resolve to `false`, silently breaking delete.
-const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => {
+interface DeleteConfirmDialogProps {
+  name: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: DeleteConfirmDialogProps) => {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
   const titleId = React.useId();
   const descId = React.useId();
@@ -370,7 +384,7 @@ const BA_DeleteConfirmDialog = ({ name, busy, onCancel, onConfirm }: any) => {
   );
 };
 
-async function apiDeleteBrand(id: any) {
+async function apiDeleteBrand(id: string): Promise<boolean> {
   try {
     const r = await fetch('/api/brands/' + id, { method: 'DELETE' });
     return r.ok;

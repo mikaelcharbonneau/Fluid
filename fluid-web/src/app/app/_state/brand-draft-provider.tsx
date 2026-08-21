@@ -3,6 +3,43 @@
 import React from "react";
 import { BrandDraftCtx } from "./brand-draft-context";
 import { useRouter } from "./router-context";
+import type { AppUser, BillingStatus, DashboardBrand } from "./types";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isDashboardBrand(value: unknown): value is DashboardBrand {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function parseUser(value: unknown): AppUser | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.id !== "string" ||
+    typeof value.email !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.initial !== "string"
+  ) return null;
+  return { id: value.id, email: value.email, name: value.name, initial: value.initial };
+}
+
+function parseBilling(value: unknown): BillingStatus | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.tier !== "string" ||
+    typeof value.status !== "string" ||
+    typeof value.balance !== "number" ||
+    typeof value.monthlyTokens !== "number"
+  ) return null;
+  return {
+    tier: value.tier,
+    status: value.status,
+    balance: value.balance,
+    monthlyTokens: value.monthlyTokens,
+    current_period_end: typeof value.current_period_end === "string" ? value.current_period_end : null,
+  };
+}
 
 // Raised when a generation is refused for lack of tokens. A single fixed
 // banner with a direct path to top up.
@@ -27,21 +64,23 @@ const NoTokensBanner = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-async function apiListBrands() {
+async function apiListBrands(): Promise<DashboardBrand[]> {
   try {
     const response = await fetch("/api/brands", { cache: "no-store" });
     if (!response.ok) return [];
-    return (await response.json()).brands || [];
+    const body: unknown = await response.json();
+    if (!isRecord(body) || !Array.isArray(body.brands)) return [];
+    return body.brands.filter(isDashboardBrand);
   } catch {
     return [];
   }
 }
 
-async function apiGetMe() {
+async function apiGetMe(): Promise<AppUser | null> {
   try {
     const response = await fetch("/api/me", { cache: "no-store" });
     if (!response.ok) return null;
-    return await response.json();
+    return parseUser(await response.json());
   } catch {
     return null;
   }
@@ -55,9 +94,9 @@ async function apiGetMe() {
  * library, account, and billing data needed by the surrounding app shell.
  */
 export function BrandDraftProvider({ children }: { children: React.ReactNode }) {
-  const [brands, setBrands] = React.useState<any[]>([]);
-  const [user, setUser] = React.useState<any>(null);
-  const [billing, setBilling] = React.useState<any>(null);
+  const [brands, setBrands] = React.useState<DashboardBrand[]>([]);
+  const [user, setUser] = React.useState<AppUser | null>(null);
+  const [billing, setBilling] = React.useState<BillingStatus | null>(null);
 
   const refresh = React.useCallback(async () => {
     setBrands(await apiListBrands());
@@ -71,7 +110,7 @@ export function BrandDraftProvider({ children }: { children: React.ReactNode }) 
   const refreshBalance = React.useCallback(async () => {
     try {
       const response = await fetch("/api/billing/status", { cache: "no-store" });
-      if (response.ok) setBilling(await response.json());
+      if (response.ok) setBilling(parseBilling(await response.json()));
     } catch {
       // Keep the last known balance when the status request is unavailable.
     }
@@ -100,8 +139,10 @@ export function BrandDraftProvider({ children }: { children: React.ReactNode }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tier: plan }),
         });
-        const result = await response.json().catch(() => ({}));
-        if (response.ok && result.url) window.location.assign(result.url);
+        const result: unknown = await response.json().catch(() => ({}));
+        if (response.ok && isRecord(result) && typeof result.url === "string") {
+          window.location.assign(result.url);
+        }
       } catch {
         // The user can subscribe from Settings → Billing instead.
       }

@@ -1,9 +1,10 @@
 # Fluid — web app
 
-Next.js application for Fluid, an AI brand agent that takes a one-sentence
-brief and drafts a full brand identity: name, logo, color palette,
-typography, and written guidelines. See the [repo root README](../README.md)
-for the product overview.
+Next.js application for Fluid, an AI brand agent that turns a one-sentence
+brief into a full brand identity: name, logo, color palette, typography, and
+written guidelines. The active creation experience is a conversational
+brand-kit thread at `/app/chat`, backed by `POST /api/brand-kit/turn`. See the
+[repo root README](../README.md) for the product overview.
 
 > **Note for coding agents:** read [`AGENTS.md`](AGENTS.md) before making
 > changes — this project runs a Next.js version with breaking changes from
@@ -53,33 +54,38 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```
 src/app/
-  page.tsx              marketing site (HTML fragment injected from _fragments/)
-  login/ signup/ ...     auth pages
-  app/Prototype.tsx      the wizard + dashboard UI — single-file, all screens
-                          in one module scope (ported from the original
-                          original design export; see AGENTS.md)
-  api/
-    generate/            one route per AI generation: names, logo, palette,
-                          typography, guidelines, inline assist
-    brands/               CRUD for brand drafts (autosaved as the wizard is filled in)
-    billing/ stripe/       Stripe checkout, portal, and webhook
-    auth/                 Supabase auth endpoints
+  page.tsx              marketing site
+  login/ signup/ ...     auth and account pages
+  app/chat/              conversational brand-kit UI and widgets
+  app/_screens/          shared dashboard surfaces (home, brands, assets, etc.)
+  app/_state/            route, account, billing, and shared app state
+  app/*/page.tsx         real authenticated App Router segments
+  api/brand-kit/turn/     the conversational turn endpoint
+  api/brands/             brand record CRUD and resume support
+  api/billing/ stripe/    Stripe checkout, portal, status, and webhook
+  api/auth/               Supabase auth endpoints
 
 src/lib/
-  ai/                    one module per generation type — prompt + OpenAI
-                          call + response parsing for each (logo.ts, names.ts,
-                          palette.ts, typography.ts, guidelines.ts, assist.ts)
-  supabase/              server / admin Supabase clients
-  credits.ts             token balance: cost table, spend/grant/check
-  stripe.ts              Stripe client + plan config
+  brand-kit/              step script, draft context, generators, and types
+  ai/                     shared activity, image, OpenAI, and vendor helpers
+  supabase/               server and admin Supabase clients
+  credits.ts              atomic token reservation, refund, and balance logic
+  env/                    validated environment schema and startup checks
+  stripe.ts               Stripe client and plan configuration
 ```
 
-Each `api/generate/*` route follows the same shape: load the brand record,
-check token balance, call the matching `lib/ai/*` generator with whatever
-prior-step context it needs (brief, chosen name, style, palette), spend
-tokens on success, cache the result on the brand's `data` column, return it.
-The wizard auto-triggers generation when a step is opened with no cached
-result yet, and every generated asset is regenerable on demand.
+`POST /api/brand-kit/turn` accepts a brand id, an optional step/value pair, or
+an explicit regenerate/review action. It resumes the first unanswered step,
+applies an answer and drafts what comes next, or renders the final board after
+review. AI work reserves tokens atomically before provider calls and refunds
+the reservation when the provider fails. The client keeps the conversation
+addressable by `?brand=<id>` so reloads and resumes do not depend on in-memory
+conversation state.
+
+The old step-wizard and standalone logo implementations are archived locally
+under `archive/legacy-workflows/` and excluded from lint, TypeScript, and
+production deployment. Their UI paths remain as thin redirects to `/app/chat`
+for bookmark compatibility; the old API paths are retired.
 
 ## Scripts
 
@@ -91,6 +97,8 @@ npm test                 # unit tests (src/lib) — Vitest
 npm run test:integration # API route tests (src/app) — Vitest, external services mocked
 npm run test:e2e          # browser tests — Playwright, runs a production build
 npm run test:e2e:hydration # hydration-warning check — Playwright, runs against `next dev`
+npm run skills:check      # verify vendored brand skills match generated TypeScript
+npm run measure:js        # enforce initial JavaScript budgets for active routes
 ```
 
 ## Testing
@@ -133,4 +141,5 @@ so flakes get tracked rather than silently re-run away.
 
 Hosted on Vercel. Every push gets a preview deployment; merging to `main`
 deploys to production. CI (`.github/workflows/ci.yml`) runs lint, build,
-tests, and browser tests on every push and PR.
+tests, and browser tests on every push and PR. The ignored local archive is
+never included in the production repository or deployment.

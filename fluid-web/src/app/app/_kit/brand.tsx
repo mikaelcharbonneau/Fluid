@@ -6,13 +6,40 @@
 
 import React from "react";
 import Image from "next/image";
+import type { BrandColor, BrandKitImage, BrandLogoRecord } from "../_state/types";
+
+export interface BrandLike {
+  name?: string | null;
+  brief?: string | null;
+  name_choice?: string | null;
+  logo_choice?: string | null;
+  data?: Record<string, unknown> | null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
+}
+
+function asLogo(value: unknown): BrandLogoRecord | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    name: typeof record.name === "string" ? record.name : null,
+    svg: typeof record.svg === "string" ? record.svg : null,
+  };
+}
+
+function asColor(value: unknown): BrandColor | null {
+  const record = asRecord(value);
+  return record && typeof record.hex === "string" ? { hex: record.hex } : null;
+}
 
 // ══════════════════════════════════════════════════════════════════════
 // Brand-kit export — all client-side, no dependencies. Downloads the logo
 // (SVG/PNG), the palette as CSS variables, and a self-contained brand-sheet
 // HTML file that gathers everything (printable to PDF).
 // ══════════════════════════════════════════════════════════════════════
-export function downloadBlob(filename: any, blob: any) {
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
@@ -20,24 +47,28 @@ export function downloadBlob(filename: any, blob: any) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-export function kitSlug(s: any) {
+export function kitSlug(s: unknown) {
   return String(s || 'brand').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'brand';
 }
 
-export function escHtml(s: any) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[m] || m);
+export function escHtml(s: unknown) {
+  const escaped: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (m) => escaped[m] || m);
 }
 
 // The user's chosen logo concept's SVG (or the first available).
-export function pickLogoSvg(b: any) {
-  const logos = (b.data && b.data.logos) || [];
+export function pickLogoSvg(b: BrandLike | null | undefined): string | null {
+  const logosValue = asRecord(b?.data)?.logos;
+  const logos = Array.isArray(logosValue)
+    ? logosValue.map(asLogo).filter((logo): logo is BrandLogoRecord => !!logo)
+    : [];
   if (!logos.length) return null;
-  const pick = logos.find((l: any) => l.name === b.logo_choice) || logos[0];
-  return pick ? pick.svg : null;
+  const pick = logos.find((logo) => logo.name === b?.logo_choice) || logos[0];
+  return pick.svg || null;
 }
 
 // Rasterize an SVG string to a PNG Blob at `size`px via an offscreen canvas.
-export function svgToPngBlob(svg: any, size: any) {
+export function svgToPngBlob(svg: string, size: number) {
   return new Promise<Blob>((resolve, reject) => {
     // `window.Image` explicitly: this module also imports next/image as
     // `Image`, and the bare `new Image()` would resolve to that component.
@@ -70,28 +101,28 @@ export function svgToPngBlob(svg: any, size: any) {
 // It can be trusted when it *differs* from that placeholder, which is what
 // rescues brands saved while a debounce race was dropping name_choice: for
 // those, `name` is the only surviving copy of the chosen name.
-export function resolveBrandName(b: any) {
-  const chosen = ((b && b.name_choice) || '').trim();
+export function resolveBrandName(b: BrandLike | null | undefined) {
+  const chosen = (b?.name_choice || '').trim();
   if (chosen && chosen.toLowerCase() !== 'untitled brand') return chosen;
-  const name = ((b && b.name) || '').trim();
+  const name = (b?.name || '').trim();
   if (!name || name.toLowerCase() === 'untitled brand') return null;
-  return name === deriveBrandName((b && b.brief) || '') ? null : name;
+  return name === deriveBrandName(b?.brief || '') ? null : name;
 }
 
-export function brandDisplayName(b: any) {
+export function brandDisplayName(b: BrandLike | null | undefined) {
   return resolveBrandName(b) || 'Untitled';
 }
 
 // True for any brand built with the brand-kit conversation (src/app/app/chat),
 // whether it's still mid-conversation (`brandkitDraft`) or finished
-// (`brandkit`) — both belong at the chat URL, never the legacy hash-router
-// wizard below, which doesn't know how to resume that flow's steps.
-export function isBrandKitBrand(b: any) {
-  return !!(b.data && (b.data.brandkit || b.data.brandkitDraft));
+// (`brandkit`) — both belong at the chat URL.
+export function isBrandKitBrand(b: BrandLike | null | undefined) {
+  const data = asRecord(b?.data);
+  return !!(data?.brandkit || data?.brandkitDraft);
 }
 
 // #rrggbb / #rgb → "rgba(r,g,b,a)". Falls back to a neutral ink tint.
-function hexToRgba(hex: any, a: any) {
+function hexToRgba(hex: unknown, a: number) {
   let h = String(hex || '').trim().replace('#', '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');
   if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return 'rgba(20,20,20,' + a + ')';
@@ -107,12 +138,22 @@ function hexToRgba(hex: any, a: any) {
 //   • palette present → a thin swatch strip so colors always show
 //   • neither → a neutral surface (never the Fluid gradient — that's Fluid's
 //     mark, not the user's brand)
-export const BA_CardVisual = ({ brand, height = 132 }: any) => {
+interface CardVisualProps {
+  brand: BrandLike;
+  height?: number;
+}
+
+export const BA_CardVisual = ({ brand, height = 132 }: CardVisualProps) => {
   // A one-shot brand-kit board is already a finished piece of art — show it
   // directly rather than falling back to the svg/palette/initial tile below.
-  const boardImage = brand.data && brand.data.brandkit && brand.data.brandkit.imageUrl;
+  const data = asRecord(brand.data);
+  const brandkit = asRecord(data?.brandkit) as BrandKitImage | null;
+  const boardImage = typeof brandkit?.imageUrl === 'string' ? brandkit.imageUrl : null;
   const svg = pickLogoSvg(brand);
-  const colors = (((brand.data || {}).palette || {}).colors) || [];
+  const palette = asRecord(data?.palette);
+  const colors = Array.isArray(palette?.colors)
+    ? palette.colors.map(asColor).filter((color): color is BrandColor => !!color)
+    : [];
   const hasColors = colors.length > 0;
   const initial = brandDisplayName(brand).charAt(0).toUpperCase();
   // Scale the mark tile and initial with the header height so the same visual
@@ -141,7 +182,7 @@ export const BA_CardVisual = ({ brand, height = 132 }: any) => {
   if (svg) {
     background = hasColors ? hexToRgba(colors[0].hex, 0.14) : 'var(--bg-sunken)';
   } else if (hasColors) {
-    const stops = colors.slice(0, 3).map((c: any) => c.hex);
+    const stops = colors.slice(0, 3).map((c) => c.hex);
     background = stops.length >= 2 ? 'linear-gradient(135deg, ' + stops.join(', ') + ')' : stops[0];
   } else {
     background = 'var(--bg-sunken)';
@@ -162,7 +203,7 @@ export const BA_CardVisual = ({ brand, height = 132 }: any) => {
       )}
       {svg && hasColors && (
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', height: stripH }}>
-          {colors.slice(0, 6).map((c: any, i: any) => (
+          {colors.slice(0, 6).map((c, i) => (
             <div key={i} style={{ flex: 1, background: c.hex }} />
           ))}
         </div>
@@ -181,7 +222,13 @@ export const BA_CardVisual = ({ brand, height = 132 }: any) => {
 // square size, already resolution-independent, and it is a data URI, so
 // there is no network fetch to optimize. Width and height are set, so it
 // still reserves its box.
-export const SvgMark = ({ svg, size = 120, bg }: any) => (
+interface SvgMarkProps {
+  svg: string;
+  size?: number;
+  bg?: string;
+}
+
+export const SvgMark = ({ svg, size = 120, bg }: SvgMarkProps) => (
   // eslint-disable-next-line @next/next/no-img-element
   <img
     src={'data:image/svg+xml;utf8,' + encodeURIComponent(svg)}
@@ -194,8 +241,8 @@ export const SvgMark = ({ svg, size = 120, bg }: any) => (
 // Load a Google Fonts family once (idempotent by href). Weights are omitted so
 // the request never 400s on a family that lacks a requested weight; the browser
 // synthesizes bolder weights for the specimen.
-export function ensureGoogleFont(family: any) {
-  if (!family || typeof document === 'undefined') return;
+export function ensureGoogleFont(family: unknown) {
+  if (typeof family !== 'string' || !family || typeof document === 'undefined') return;
   const href = 'https://fonts.googleapis.com/css2?family=' +
     encodeURIComponent(family).replace(/%20/g, '+') + '&display=swap';
   if (document.querySelector('link[data-gfont="' + family + '"]')) return;
@@ -215,10 +262,9 @@ export const FONT_FALLBACK = {
 
 // Until the name step is wired up, derive a readable brand name from the brief
 // so saved brands don't all read "Untitled brand".
-export function deriveBrandName(brief: any) {
+export function deriveBrandName(brief: unknown) {
   const words = String(brief || '').trim().split(/\s+/).filter(Boolean).slice(0, 4);
   if (words.length === 0) return 'Untitled brand';
   const s = words.join(' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
-

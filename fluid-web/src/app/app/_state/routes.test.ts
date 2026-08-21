@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ROUTE,
+  isAppRoute,
   ROUTES,
   ROUTE_META,
   ROUTE_ORDER,
@@ -78,8 +79,8 @@ describe("legacy /app#<hash> compatibility", () => {
       'logo-brief', 'logo-direction', 'logo-type', 'logo-references',
       'logo-sketches', 'logo-refine', 'logo-export',
     ]) {
-      expect(ROUTES.includes(hash)).toBe(false);
-      expect(pathForRoute(ROUTES.includes(hash) ? hash : DEFAULT_ROUTE)).toBe('/app/home');
+      expect(isAppRoute(hash)).toBe(false);
+      expect(pathForRoute(isAppRoute(hash) ? hash : DEFAULT_ROUTE)).toBe('/app/home');
     }
   });
 
@@ -87,7 +88,7 @@ describe("legacy /app#<hash> compatibility", () => {
     // e.g. the Stripe return URL used to be /app#account, which the old hash
     // router silently resolved to home; it now points at /app/settings.
     const hash = "account";
-    expect(ROUTES.includes(hash)).toBe(false);
-    expect(pathForRoute(ROUTES.includes(hash) ? hash : DEFAULT_ROUTE)).toBe("/app/home");
+    expect(isAppRoute(hash)).toBe(false);
+    expect(pathForRoute(isAppRoute(hash) ? hash : DEFAULT_ROUTE)).toBe("/app/home");
   });
 });

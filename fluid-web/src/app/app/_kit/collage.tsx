@@ -11,6 +11,12 @@ import { CARD_BUTTON_RESET } from "./a11y";
 import { __assets } from "./assets";
 import { ArrowRight } from "./ui";
 
+interface CollageImage {
+  src: string;
+  width: number;
+  height: number;
+}
+
 // ------------------------------------------------------------------
 // 03-collage
 // ------------------------------------------------------------------
@@ -41,7 +47,7 @@ const COL_2 = [1, 4, 7, 10, 13, 16, 19, 22].map((i) => COLLAGE_IMAGES[i]);
 const COL_3 = [2, 5, 8, 11, 14, 17, 20, 23].map((i) => COLLAGE_IMAGES[i]);
 
 // ---- A single brand card --------------------------------------------
-const BrandImgCard = ({ image }: any) => (
+const BrandImgCard = ({ image }: { image: CollageImage }) => (
   <Image
     src={image.src}
     alt=""
@@ -61,8 +67,16 @@ const BrandImgCard = ({ image }: any) => (
 //   shift = (scrollHeight + gap) / 2
 // which lands copy 2 precisely where copy 1 began — a seamless loop.
 // `down` plays the keyframe in reverse so the stream travels downward.
-const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }: any) => {
-  const ref = React.useRef<any>(null);
+interface ScrollColumnProps {
+  images: CollageImage[];
+  gap?: number;
+  speed?: number;
+  down?: boolean;
+  phase?: number;
+}
+
+const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }: ScrollColumnProps) => {
+  const ref = React.useRef<HTMLDivElement>(null);
   const [shift, setShift] = React.useState(0);
   // Measure the loop distance exactly ONCE, after every image has loaded so
   // scrollHeight is final. We deliberately never re-measure afterwards —
@@ -78,7 +92,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }:
       const m = Math.round((el.scrollHeight + gap) / 2);
       if (m > 0) setShift(m);
     };
-    const waits = imgs.map((img: any) =>
+    const waits = imgs.map((img) =>
       img.complete && img.naturalWidth
         ? Promise.resolve()
         : new Promise((res) => { img.onload = img.onerror = res; })
@@ -89,7 +103,7 @@ const ScrollColumn = ({ images, gap = 12, speed = 24, down = false, phase = 0 }:
   const dur = shift ? shift / speed : 20;
   // Negative delay offsets each column's starting phase so they never align.
   const delay = shift ? -(phase * dur) : 0;
-  const cards = images.map((image: any, i: any) => <BrandImgCard key={i} image={image} />);
+  const cards = images.map((image, i) => <BrandImgCard key={i} image={image} />);
   return (
     <div
       ref={ref}
@@ -169,7 +183,19 @@ export const QUICK_VISUAL_MODES = [
 ];
 
 // ---- Quick path card — focus on one thing ------------------------------
-export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }: any) =>
+interface QuickPathProps {
+  title: string;
+  sub: string;
+  icon: React.ReactNode;
+  preview: string;
+  previewBg?: string;
+  previewPos?: string;
+  customPreview?: React.ReactNode;
+  route: string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+}
+
+export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, customPreview, route, onClick }: QuickPathProps) =>
 <button type="button" data-route={route} onClick={onClick} style={{
   ...CARD_BUTTON_RESET,
   background: 'var(--bg-elev)', borderRadius: 16,
@@ -201,4 +227,3 @@ export const QuickPath = ({ title, sub, icon, preview, previewBg, previewPos, cu
       </div>
     </div>
   </button>;
-

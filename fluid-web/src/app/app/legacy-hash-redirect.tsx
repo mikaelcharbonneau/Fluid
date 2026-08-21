@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ROUTES, DEFAULT_ROUTE, pathForRoute } from "./_state/routes";
+import { DEFAULT_ROUTE, isAppRoute, pathForRoute } from "./_state/routes";
 
 // Before #175 every screen lived at /app#<route>. Those URLs are in people's
 // history, bookmarks and anything they shared, so /app keeps answering them:
@@ -14,7 +14,7 @@ export function LegacyHashRedirect() {
 
   useEffect(() => {
     const hash = window.location.hash.slice(1);
-    const route = ROUTES.includes(hash) ? hash : DEFAULT_ROUTE;
+    const route = isAppRoute(hash) ? hash : DEFAULT_ROUTE;
     router.replace(pathForRoute(route));
   }, [router]);
 

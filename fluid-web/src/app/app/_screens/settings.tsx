@@ -9,6 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { AShell } from "../_kit/shell";
 import { Chip } from "../_kit/ui";
 import { useBrandDraft } from "../_state/brand-draft-context";
+import type { BillingStatus } from "../_state/types";
 
 // ------------------------------------------------------------------
 // 09-settings
@@ -36,11 +37,16 @@ const { useState: useSetState } = React;
 // `label` is not optional in practice: the control is a bare pill with no
 // text of its own, so without it a screen reader announces just "button"
 // (#171 — axe flagged exactly this). Call sites pass their Row's title.
-const Toggle = ({ defaultOn = false, label }: any) => {
+interface ToggleProps {
+  defaultOn?: boolean;
+  label: string;
+}
+
+const Toggle = ({ defaultOn = false, label }: ToggleProps) => {
   const [on, setOn] = useSetState(defaultOn);
   return (
     <button
-      onClick={() => setOn((v: any) => !v)}
+      onClick={() => setOn((v) => !v)}
       aria-pressed={on}
       aria-label={label}
       style={{
@@ -62,7 +68,14 @@ const Toggle = ({ defaultOn = false, label }: any) => {
 };
 
 // Segmented control — pill well with a white "selected" chip.
-const Segmented = ({ options, defaultValue, onChange, size = 'md' }: any) => {
+interface SegmentedProps<T extends string> {
+  options: readonly T[];
+  defaultValue?: T;
+  onChange?: (value: T) => void;
+  size?: 'sm' | 'md';
+}
+
+const Segmented = <T extends string>({ options, defaultValue, onChange, size = 'md' }: SegmentedProps<T>) => {
   const [val, setVal] = useSetState(defaultValue ?? options[0]);
   const pad = size === 'sm' ? '6px 12px' : '8px 16px';
   const fs = size === 'sm' ? 12 : 13;
@@ -71,10 +84,10 @@ const Segmented = ({ options, defaultValue, onChange, size = 'md' }: any) => {
       display: 'inline-flex', gap: 3, padding: 3, borderRadius: 999,
       background: 'var(--bg-sunken)', boxShadow: 'inset 0 0 0 1px var(--line)',
     }}>
-      {options.map((o: any) => {
+      {options.map((o) => {
         const active = o === val;
         return (
-          <button key={o} onClick={() => { setVal(o); onChange && onChange(o); }} style={{
+          <button key={o} onClick={() => { setVal(o); onChange?.(o); }} style={{
             padding: pad, borderRadius: 999, fontSize: fs, fontWeight: 600,
             letterSpacing: '-0.005em', cursor: 'pointer', whiteSpace: 'nowrap',
             background: active ? 'var(--bg-elev)' : 'transparent',
@@ -89,7 +102,16 @@ const Segmented = ({ options, defaultValue, onChange, size = 'md' }: any) => {
 };
 
 // Text-input look (read-only specimen — this is a static prototype).
-const Field = ({ label, value, sub, suffix, mono, wide }: any) => (
+interface FieldProps {
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+  suffix?: React.ReactNode;
+  mono?: boolean;
+  wide?: boolean;
+}
+
+const Field = ({ label, value, sub, suffix, mono, wide }: FieldProps) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: wide ? '1 1 100%' : '1 1 240px', minWidth: 0 }}>
     <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-2)' }}>{label}</span>
     <span style={{
@@ -107,14 +129,21 @@ const Field = ({ label, value, sub, suffix, mono, wide }: any) => (
 );
 
 // Select-look field (chevron on the right).
-const SelectField = ({ label, value, wide }: any) => (
+const SelectField = ({ label, value, wide }: Pick<FieldProps, 'label' | 'value' | 'wide'>) => (
   <Field label={label} value={value} wide={wide} suffix={
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-4)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
   } />
 );
 
 // A control row: title + description on the left, control on the right.
-const Row = ({ title, desc, children, last }: any) => (
+interface RowProps {
+  title: string;
+  desc?: string;
+  children: React.ReactNode;
+  last?: boolean;
+}
+
+const Row = ({ title, desc, children, last }: RowProps) => (
   <div style={{
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 28,
     padding: '18px 0', borderBottom: last ? 'none' : '1px solid var(--line)',
@@ -128,7 +157,15 @@ const Row = ({ title, desc, children, last }: any) => (
 );
 
 // Card wrapper + optional header.
-const Card = ({ title, desc, children, pad = 24, accent }: any) => (
+interface CardProps {
+  title?: string;
+  desc?: string;
+  children: React.ReactNode;
+  pad?: number;
+  accent?: boolean;
+}
+
+const Card = ({ title, desc, children, pad = 24, accent }: CardProps) => (
   <section style={{
     background: 'var(--bg-elev)', borderRadius: 20,
     boxShadow: 'var(--shadow-xs), inset 0 0 0 1px var(--line)',
@@ -163,7 +200,13 @@ const SaveBar = () => (
   </div>
 );
 
-const SectionHead = ({ eyebrow, title, desc }: any) => (
+interface SectionHeadProps {
+  eyebrow: string;
+  title: string;
+  desc?: string;
+}
+
+const SectionHead = ({ eyebrow, title, desc }: SectionHeadProps) => (
   <div style={{ marginBottom: 6 }}>
     <div className="eyebrow" style={{ color: 'var(--fg-3)', marginBottom: 12 }}>{eyebrow}</div>
     <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 38, letterSpacing: '-0.035em', lineHeight: 1, margin: 0, color: '#000' }}>{title}</h1>
@@ -280,7 +323,7 @@ const SecWorkspace = () => {
 // ---------------------------------------------------------------------
 // Section: Fluid AI  (the distinctive one)
 // ---------------------------------------------------------------------
-const StyleChip = ({ label, on }: any) => (
+const StyleChip = ({ label, on }: { label: string; on?: boolean }) => (
   <button style={{
     padding: '8px 15px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer',
     background: on ? '#000' : 'var(--bg-elev)', color: on ? '#fff' : 'var(--fg-2)',
@@ -334,7 +377,15 @@ const SecFluid = () => (
 // ---------------------------------------------------------------------
 // Section: Notifications
 // ---------------------------------------------------------------------
-const NotifRow = ({ title, desc, email, app, last }: any) => (
+interface NotificationRowProps {
+  title: string;
+  desc?: string;
+  email?: boolean;
+  app?: boolean;
+  last?: boolean;
+}
+
+const NotifRow = ({ title, desc, email, app, last }: NotificationRowProps) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '15px 0', borderBottom: last ? 'none' : '1px solid var(--line)' }}>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-1)' }}>{title}</div>
@@ -379,8 +430,33 @@ const BILLING_TIERS = [
 
 const TIER_LABEL = { free: 'Free', starter: 'Starter', pro: 'Pro' };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isBillingTier(value: unknown): value is keyof typeof TIER_LABEL {
+  return value === 'free' || value === 'starter' || value === 'pro';
+}
+
+function parseBillingStatus(value: unknown): BillingStatus | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.tier !== 'string' ||
+    typeof value.status !== 'string' ||
+    typeof value.balance !== 'number' ||
+    typeof value.monthlyTokens !== 'number'
+  ) return null;
+  return {
+    tier: value.tier,
+    status: value.status,
+    balance: value.balance,
+    monthlyTokens: value.monthlyTokens,
+    current_period_end: typeof value.current_period_end === 'string' ? value.current_period_end : null,
+  };
+}
+
 const SecBilling = () => {
-  const [status, setStatus] = React.useState<any>(null);
+  const [status, setStatus] = React.useState<BillingStatus | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
@@ -390,8 +466,8 @@ const SecBilling = () => {
     setLoading(true);
     try {
       const r = await fetch('/api/billing/status', { cache: 'no-store' });
-      const j = await r.json().catch(() => ({}));
-      setStatus(r.ok ? j : null);
+      const j: unknown = await r.json().catch(() => ({}));
+      setStatus(r.ok ? parseBillingStatus(j) : null);
     } catch { setStatus(null); }
     setLoading(false);
     // Keep the top-bar token pill in sync with what this page shows.
@@ -404,7 +480,7 @@ const SecBilling = () => {
   React.useEffect(() => { load(); }, [load]);
 
   // POST a JSON body (checkout needs a tier); portal needs none.
-  const go = async (path: any, which: any, body?: any) => {
+  const go = async (path: string, which: string, body?: Record<string, string>) => {
     setBusy(which); setError('');
     try {
       const r = await fetch(path, {
@@ -412,14 +488,14 @@ const SecBilling = () => {
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.url) { window.location.assign(j.url); return; }
-      setError(j.error || "Couldn't continue. Please try again.");
+      const j: unknown = await r.json().catch(() => ({}));
+      if (r.ok && isRecord(j) && typeof j.url === 'string') { window.location.assign(j.url); return; }
+      setError(isRecord(j) && typeof j.error === 'string' ? j.error : "Couldn't continue. Please try again.");
     } catch { setError('Network error. Check your connection and try again.'); }
     setBusy('');
   };
 
-  const tier: any = (status && status.tier) || 'free';
+  const tier: BillingTier = isBillingTier(status?.tier) ? status.tier : 'free';
   const isSubscriber = tier === 'starter' || tier === 'pro';
   const balance = (status && typeof status.balance === 'number') ? status.balance : 0;
   const monthly = (status && status.monthlyTokens) || 0;
@@ -443,7 +519,7 @@ const SecBilling = () => {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 34, color: '#000', lineHeight: 1 }}>{loading ? '—' : balance}</span>
               <span style={{ fontSize: 13, color: 'var(--fg-3)' }}>tokens left</span>
-              <Chip tone={isSubscriber ? 'live' : 'neutral'}>{(TIER_LABEL as any)[tier] || 'Free'}</Chip>
+              <Chip tone={isSubscriber ? 'live' : 'neutral'}>{TIER_LABEL[tier]}</Chip>
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 6 }}>
               {loading ? 'Loading…'
@@ -493,7 +569,7 @@ const SecBilling = () => {
   );
 };
 
-const SETTINGS_NAV = [
+const SETTINGS_NAV: Array<{ id: SettingsSection; label: string; d: React.ReactNode }> = [
   { id: 'account',      label: 'Account',         d: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></> },
   { id: 'billing',      label: 'Billing',         d: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></> },
   { id: 'workspace',    label: 'Workspace',       d: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></> },
@@ -504,13 +580,20 @@ const SETTINGS_NAV = [
   { id: 'notifications',label: 'Notifications',   d: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></> },
 ];
 
-const SECTIONS = {
+type SettingsSection = 'account' | 'billing' | 'workspace' | 'fluid' | 'notifications';
+type BillingTier = keyof typeof TIER_LABEL;
+
+const SECTIONS: Record<SettingsSection, React.ComponentType> = {
   account: SecAccount,
   billing: SecBilling,
   workspace: SecWorkspace,
   fluid: SecFluid,
   notifications: SecNotifications,
 };
+
+function isSettingsSection(value: string): value is SettingsSection {
+  return value in SECTIONS;
+}
 
 export const DirA_Settings = () => {
   // The open tab comes from the URL (?tab=billing), so the top-bar token pill
@@ -519,8 +602,8 @@ export const DirA_Settings = () => {
   // `window.__fluidSettingsTab` global because /app#settings had nowhere to
   // put it.
   const requestedTab = useSearchParams().get('tab') || 'fluid';
-  const [active, setActive] = useSetState((SECTIONS as any)[requestedTab] ? requestedTab : 'fluid');
-  const ActiveSection = (SECTIONS as any)[active];
+  const [active, setActive] = useSetState<SettingsSection>(isSettingsSection(requestedTab) ? requestedTab : 'fluid');
+  const ActiveSection = SECTIONS[active];
   return (
     <AShell activeNav="settings" breadcrumb={['Settings']}>
       <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -561,4 +644,3 @@ export const DirA_Settings = () => {
     </AShell>
   );
 };
-

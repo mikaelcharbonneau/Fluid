@@ -13,11 +13,12 @@ import { AShell, CHAT } from "../_kit/shell";
 import { ArrowRight } from "../_kit/ui";
 import { useBrandDraft } from "../_state/brand-draft-context";
 import { useRouter } from "../_state/router-context";
+import type { DashboardBrand } from "../_state/types";
 
 export const DirA_Home = () => {
   const { user, brands, billing } = useBrandDraft();
   const { navigate } = useRouter();
-  const drafts = brands.filter((b: any) => b.status === 'draft');
+  const drafts = brands.filter((b) => b.status === 'draft');
   const firstRun = brands.length === 0;
   // The card row is "what you were last working on". Unfinished brands are the
   // point of it, but a user whose brands are all finished should still land on
@@ -45,9 +46,9 @@ export const DirA_Home = () => {
     location.assign(params.length ? CHAT + '?' + params.join('&') : CHAT);
   };
 
-  // Only the five-step wizard has a step count to show. Brand-kit conversations
-  // and the logo-only path get their stage as a label, with no invented ratio.
-  const cardProgress = (b: any): { label: string; pct: number | null } => {
+  // Conversations show a stage label rather than an invented numeric ratio;
+  // records from retired workflows stay visibly marked as archived.
+  const cardProgress = (b: DashboardBrand): { label: string; pct: number | null } => {
     if (b.status !== 'draft') return { label: 'Complete', pct: 100 };
     if (isBrandKitBrand(b)) return { label: 'In progress', pct: null };
     return { label: 'Archived workflow', pct: null };
@@ -212,14 +213,16 @@ export const DirA_Home = () => {
         </div>
 
         <div className="home-grid-3" style={{ display: 'grid', gap: 18 }}>
-          {recent.slice(0, 3).map((b: any) => {
+          {recent.slice(0, 3).map((b) => {
             const prog = cardProgress(b);
-            const brief = (b.data && b.data.brief) || '';
+            const brief = typeof b.data?.brief === 'string' ? b.data.brief : '';
             // A finished kit board already carries the wordmark. Overlaying the
             // name on top doubles the identity and buries it in artwork, so
             // those cards name themselves in the body instead and drop the
             // scrim, which exists only to keep an overlaid name legible.
-            const hasBoard = !!(b.data && b.data.brandkit && b.data.brandkit.imageUrl);
+            const brandkit = b.data?.brandkit;
+            const hasBoard = typeof brandkit === 'object' && brandkit !== null
+              && 'imageUrl' in brandkit && typeof brandkit.imageUrl === 'string';
             return (
             // #171: a real button, so the card is reachable by keyboard and
             // announced. CARD_BUTTON_RESET strips the UA styling first.

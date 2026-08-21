@@ -1,8 +1,7 @@
 // Six logo concept renders: one planning call, then six concurrent images.
 //
-// Mirrors src/lib/ai/sketch-board.ts's two-phase shape (that module drives
-// the older, separate standalone-logo wizard and doesn't fit this module's
-// draft/step model, so the *shape* is reused here rather than the code):
+// Keeps the useful two-phase planning shape from the retired logo pipeline
+// without coupling the conversational draft to that old implementation:
 // one text call plans all 6 constructions together — seeing the whole set
 // is what keeps them genuinely distinct — then all 6 render concurrently
 // via Promise.allSettled so one failed render doesn't take the rest down

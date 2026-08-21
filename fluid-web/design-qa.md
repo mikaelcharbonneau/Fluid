@@ -1,3 +1,9 @@
+# Historical design QA
+
+> This file records visual QA for the retired standalone logo workflow. It is
+> retained as historical evidence; the active production creation experience
+> is the conversational brand kit at `/app/chat`.
+
 **Comparison Target**
 
 - Source visual truth: `/Users/mikael/.codex/visualizations/2026/07/29/019fb034-281d-79b0-be1f-2f58654e011d/fluid-logo-brief-desktop.png`
