@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { streamActivity } from "@/lib/sse";
-import { hasTokens, spendTokens, TOKEN_COST } from "@/lib/credits";
+import { hasTokens, TOKEN_COST, tokenErrorDetails, withTokenReservation } from "@/lib/credits";
 import { generateBrandKit } from "@/lib/brand-kit/generate";
 import { generateStepDraft, inferStrategySignals } from "@/lib/brand-kit/draft";
 import { generateLogoConcepts } from "@/lib/brand-kit/logo-concepts";
@@ -51,8 +51,10 @@ async function proposeLogoConcepts(
 //                              confirmed draft. This is the one step that
 //                              spends a full `asset` token, not `small`.
 //
-// The answer (or the render) is always saved/charged only after it
-// succeeds — same ordering the old brand-chat used.
+// The answer (or the render) is saved only after it succeeds. Generation
+// credits are reserved atomically before provider work and refunded if that
+// work fails, so a successful run commits its reservation without the old
+// check-then-work-then-charge race.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -210,20 +212,26 @@ export async function POST(request: Request) {
 
     return streamActivity(
       async (activity: Activity) => {
-        const enrichedDraft = await ensureStrategySignals(draft, activity);
-        let finalized: ReturnType<typeof finalizeDraft>;
-        try {
-          finalized = finalizeDraft(enrichedDraft);
-        } catch (err) {
-          throw err instanceof Error ? err : new Error("The brand isn't fully answered yet.");
-        }
-        const result = await generateBrandKit({
-          brandId: finalBrandId,
-          brief: finalized.brief,
-          strategy: finalized.strategy,
-          activity,
-        });
-        await spendTokens(user.id, TOKEN_COST.asset);
+        const { result } = await withTokenReservation(
+          user.id,
+          TOKEN_COST.asset,
+          async () => {
+            const enrichedDraft = await ensureStrategySignals(draft, activity);
+            let finalized: ReturnType<typeof finalizeDraft>;
+            try {
+              finalized = finalizeDraft(enrichedDraft);
+            } catch (err) {
+              throw err instanceof Error ? err : new Error("The brand isn't fully answered yet.");
+            }
+            const result = await generateBrandKit({
+              brandId: finalBrandId,
+              brief: finalized.brief,
+              strategy: finalized.strategy,
+              activity,
+            });
+            return { enrichedDraft, result };
+          },
+        );
 
         const { error: saveError } = await supabase.rpc("brands_merge_data", {
           p_id: finalBrandId,
@@ -237,7 +245,7 @@ export async function POST(request: Request) {
 
         return { done: true, brandId: finalBrandId, brandkit: result };
       },
-      { onError: (err) => ({ message: err instanceof Error ? err.message : "The board could not be generated." }) },
+      { onError: (err) => tokenErrorDetails(err) ?? ({ message: err instanceof Error ? err.message : "The board could not be generated." }) },
     );
   }
 
@@ -272,24 +280,30 @@ export async function POST(request: Request) {
 
     return streamActivity(
       async (activity: Activity) => {
-        const enrichedDraft = await ensureStrategySignals(draft, activity);
-        const proposed =
-          step.key === "logoConcepts"
-            ? {
-                logoConcepts: await proposeLogoConcepts(
-                  existingConcepts.length ? existingConcepts : (enrichedDraft.logoConcepts ?? []),
-                  enrichedDraft,
-                  finalBrandId,
-                  activity,
-                ),
-              }
-            : step.key === "name"
-              ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
-              : await generateStepDraft(step.key, enrichedDraft, activity);
-        await spendTokens(user.id, cost);
+        const { enrichedDraft, proposed } = await withTokenReservation(
+          user.id,
+          cost,
+          async () => {
+            const enrichedDraft = await ensureStrategySignals(draft, activity);
+            const proposed =
+              step.key === "logoConcepts"
+                ? {
+                    logoConcepts: await proposeLogoConcepts(
+                      existingConcepts.length ? existingConcepts : (enrichedDraft.logoConcepts ?? []),
+                      enrichedDraft,
+                      finalBrandId,
+                      activity,
+                    ),
+                  }
+                : step.key === "name"
+                  ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
+                  : await generateStepDraft(step.key, enrichedDraft, activity);
+            return { enrichedDraft, proposed };
+          },
+        );
         return { done: false, brandId: finalBrandId, step: step.key, draft: enrichedDraft, proposed };
       },
-      { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be redrafted." }) },
+      { onError: (err) => tokenErrorDetails(err) ?? ({ message: err instanceof Error ? err.message : "That step could not be redrafted." }) },
     );
   }
 
@@ -327,16 +341,22 @@ export async function POST(request: Request) {
 
   return streamActivity(
     async (activity: Activity) => {
-      const enrichedDraft = await ensureStrategySignals(draft, activity);
-      const proposed =
-        target.key === "logoConcepts"
-          ? { logoConcepts: await proposeLogoConcepts(enrichedDraft.logoConcepts ?? [], enrichedDraft, finalBrandId, activity) }
-          : target.key === "name"
-            ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
-            : await generateStepDraft(target.key, enrichedDraft, activity);
-      await spendTokens(user.id, cost);
+      const { enrichedDraft, proposed } = await withTokenReservation(
+        user.id,
+        cost,
+        async () => {
+          const enrichedDraft = await ensureStrategySignals(draft, activity);
+          const proposed =
+            target.key === "logoConcepts"
+              ? { logoConcepts: await proposeLogoConcepts(enrichedDraft.logoConcepts ?? [], enrichedDraft, finalBrandId, activity) }
+              : target.key === "name"
+                ? { nameCandidates: await generateNameCandidates(enrichedDraft, activity) }
+                : await generateStepDraft(target.key, enrichedDraft, activity);
+          return { enrichedDraft, proposed };
+        },
+      );
       return { done: false, brandId: finalBrandId, step: target.key, draft: enrichedDraft, proposed };
     },
-    { onError: (err) => ({ message: err instanceof Error ? err.message : "That step could not be generated." }) },
+    { onError: (err) => tokenErrorDetails(err) ?? ({ message: err instanceof Error ? err.message : "That step could not be generated." }) },
   );
 }

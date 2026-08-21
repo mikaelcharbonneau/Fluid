@@ -9,8 +9,6 @@ const ENV_KEYS = [
   "STRIPE_WEBHOOK_SECRET",
   "STRIPE_PRICE_STARTER",
   "STRIPE_PRICE_PRO",
-  "CRON_SECRET",
-  "GENERATION_JOBS_CRON_SECRET",
   "VERCEL_ACCESS_TOKEN",
   "VERCEL_TEAM_ID",
 ] as const;
@@ -26,7 +24,6 @@ const FULLY_CONFIGURED = {
   STRIPE_WEBHOOK_SECRET: "whsec_abcdefghij",
   STRIPE_PRICE_STARTER: "price_starter",
   STRIPE_PRICE_PRO: "price_pro",
-  CRON_SECRET: "a".repeat(20),
 };
 
 async function importFresh() {
@@ -84,7 +81,6 @@ describe("assertRequiredEnv", () => {
         "STRIPE_WEBHOOK_SECRET",
         "STRIPE_PRICE_STARTER",
         "STRIPE_PRICE_PRO",
-        "CRON_SECRET",
       ]),
     );
   });

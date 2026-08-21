@@ -75,13 +75,13 @@ export const SERVER_ENV_VARS: EnvVarMeta[] = [
     name: "SUPABASE_SERVICE_ROLE_KEY",
     scope: "server",
     requirement: "production",
-    description: "Service-role Supabase key — required for the Stripe webhook, credits, and generation jobs.",
+    description: "Service-role Supabase key — required for the Stripe webhook, credits, and brand-kit persistence.",
   },
   {
     name: "OPENAI_API_KEY",
     scope: "server",
     requirement: "production",
-    description: "Required for every AI generation feature (names, logos, palette, typography, guidelines).",
+    description: "Required for the conversational brand-kit generation flow.",
   },
   {
     name: "OPENAI_TEXT_MODEL",
@@ -154,24 +154,6 @@ export const SERVER_ENV_VARS: EnvVarMeta[] = [
     scope: "server",
     requirement: "optional",
     description: "Only needed if VERCEL_ACCESS_TOKEN is a team-scoped token.",
-  },
-  {
-    name: "CRON_SECRET",
-    scope: "server",
-    requirement: "production",
-    description: "Bearer secret Vercel Cron sends to the generation-jobs worker. (Or set GENERATION_JOBS_CRON_SECRET.)",
-  },
-  {
-    name: "GENERATION_JOBS_CRON_SECRET",
-    scope: "server",
-    requirement: "optional",
-    description: "Alternate name for CRON_SECRET, checked first if both are set.",
-  },
-  {
-    name: "LOGO_TAGGING_SECRET",
-    scope: "server",
-    requirement: "feature",
-    description: "Enables POST /api/logo-references/tag. Unset means the route responds 503.",
   },
   {
     name: "TEST_ERROR_SECRET",
@@ -271,9 +253,6 @@ export const ServerEnvSchema = z.object({
   }),
   VERCEL_ACCESS_TOKEN: secret(10),
   VERCEL_TEAM_ID: trimmedOptional(),
-  CRON_SECRET: secret(16),
-  GENERATION_JOBS_CRON_SECRET: secret(16),
-  LOGO_TAGGING_SECRET: secret(8),
   TEST_ERROR_SECRET: secret(8),
   SENTRY_DSN: z.preprocess(
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),

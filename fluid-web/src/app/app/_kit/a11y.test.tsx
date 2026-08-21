@@ -2,7 +2,6 @@ import axe from "axe-core";
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AInspirationCard } from "./brand-showcase";
-import { AFinalistCard } from "./logo-flow";
 import { QuickPath } from "./collage";
 
 // #171: axe coverage for the controls the issue named — the selection cards,
@@ -65,38 +64,25 @@ describe("selection controls are accessible", () => {
     expect(await violations(container)).toEqual([]);
   });
 
-  it("AFinalistCard is a button and announces busy while it traces", async () => {
-    const finalist = { name: "Nomos", version: 2, image_url: "/x.png", idea: "A calm mark" };
-    const { container, getByRole } = render(
-      <AFinalistCard f={finalist} sel busy onClick={() => {}} />,
-    );
-    const button = getByRole("button", { name: /Nomos/ });
-    expect(button.tagName).toBe("BUTTON");
-    expect(button).toHaveAttribute("aria-pressed", "true");
-    expect(button).toHaveAttribute("aria-busy", "true");
-    expect(await violations(container)).toEqual([]);
-  });
-
   it("QuickPath is a button, not a clickable div", async () => {
     const { container, getByRole } = render(
       <QuickPath
-        title="Start a logo"
-        sub="Just the mark"
+        title="Start a brand kit"
+        sub="Build the whole system"
         icon={<span />}
         preview="/p.png"
-        route="logo-brief"
+        route="chat"
         onClick={() => {}}
       />,
     );
-    expect(getByRole("button", { name: /Start a logo/ }).tagName).toBe("BUTTON");
+    expect(getByRole("button", { name: /Start a brand kit/ }).tagName).toBe("BUTTON");
     expect(await violations(container)).toEqual([]);
   });
 
   it("every control rendered here is keyboard-focusable", async () => {
     const { container } = render(
       <>
-        <QuickPath title="Start a logo" sub="Just the mark" icon={<span />} preview="/p.png" route="logo-brief" onClick={() => {}} />
-        <AFinalistCard f={{ name: "Nomos", image_url: "/x.png" }} sel={false} busy={false} onClick={() => {}} />
+        <QuickPath title="Start a brand kit" sub="Build the whole system" icon={<span />} preview="/p.png" route="chat" onClick={() => {}} />
       </>,
     );
     // A negative tabIndex, or a non-interactive element carrying a click

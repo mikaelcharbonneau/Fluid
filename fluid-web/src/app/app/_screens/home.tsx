@@ -15,7 +15,7 @@ import { useBrandDraft } from "../_state/brand-draft-context";
 import { useRouter } from "../_state/router-context";
 
 export const DirA_Home = () => {
-  const { user, brands, loadBrand, billing } = useBrandDraft();
+  const { user, brands, billing } = useBrandDraft();
   const { navigate } = useRouter();
   const drafts = brands.filter((b: any) => b.status === 'draft');
   const firstRun = brands.length === 0;
@@ -50,9 +50,7 @@ export const DirA_Home = () => {
   const cardProgress = (b: any): { label: string; pct: number | null } => {
     if (b.status !== 'draft') return { label: 'Complete', pct: 100 };
     if (isBrandKitBrand(b)) return { label: 'In progress', pct: null };
-    if (b.data && b.data.workflow === 'logo') return { label: 'Logo · Brief', pct: null };
-    const step = Math.min(5, Math.max(1, b.step || 1));
-    return { label: step + '/5', pct: (step / 5) * 100 };
+    return { label: 'Archived workflow', pct: null };
   };
 
   return (
@@ -229,12 +227,7 @@ export const DirA_Home = () => {
               onClick={() => {
                 // Same distinction as the Brands page: a brand-kit
                 // conversation resumes at its own URL, not the legacy wizard.
-                if (isBrandKitBrand(b)) {
-                  location.assign(CHAT + '?brand=' + b.id);
-                  return;
-                }
-                loadBrand(b.id);
-                navigate(b.data && b.data.workflow === 'logo' ? 'logo-brief' : 'step' + (b.step || 1));
+                location.assign(CHAT + '?brand=' + b.id);
               }}
               style={{ ...CARD_BUTTON_RESET, borderRadius: 18, overflow: 'hidden', cursor: 'pointer', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.06), inset 0 0 0 1px rgba(0,0,0,.10)' }}>
 

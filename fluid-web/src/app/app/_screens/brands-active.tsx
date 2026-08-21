@@ -6,11 +6,10 @@
 
 import React from "react";
 import { CARD_BUTTON_RESET } from "../_kit/a11y";
-import { BA_CardVisual, brandDisplayName, isBrandKitBrand } from "../_kit/brand";
+import { BA_CardVisual, brandDisplayName } from "../_kit/brand";
 import { AShell, CHAT } from "../_kit/shell";
 import { AEmptyState, PlusIcon, Sparkle, Thinking } from "../_kit/ui";
 import { useBrandDraft } from "../_state/brand-draft-context";
-import { useRouter } from "../_state/router-context";
 
 // =====================================================================
 // Brand definitions — surfaces, type, palette, marks
@@ -138,8 +137,7 @@ const BA_RealBrandCard = ({ brand, onOpen, onDelete }: any) => (
 // The screen
 // =====================================================================
 export const DirA_BrandsActive = () => {
-  const { brands, loadBrand, refresh } = useBrandDraft();
-  const { navigate } = useRouter();
+  const { brands, refresh } = useBrandDraft();
   const [filter, setFilter] = useBAState('all');
   // In-app confirm dialog, not window.confirm(): native dialogs are blocked
   // or auto-dismissed in several real embedding contexts (sandboxed iframes,
@@ -219,18 +217,10 @@ export const DirA_BrandsActive = () => {
                   key={b.id}
                   brand={b}
                   onOpen={() => {
-                    // A brand-kit conversation lives at its own URL, not in
-                    // this hash router — resume it there (finished or not)
-                    // rather than dropping it into the legacy step wizard below.
-                    if (isBrandKitBrand(b)) {
-                      location.assign(CHAT + '?brand=' + b.id);
-                      return;
-                    }
-                    loadBrand(b.id);
-                    const step = b.data && b.data.workflow === 'logo'
-                      ? 'logo-brief'
-                      : (b.status === 'live' ? 'step5' : ('step' + (b.step || 1)));
-                    navigate(step);
+                    // Every brand now resumes in the conversational kit. Old
+                    // wizard/logo records remain visible but are labeled as
+                    // archived until the conversation rehydrates them.
+                    location.assign(CHAT + '?brand=' + b.id);
                   }}
                   onDelete={() => setPendingDelete(b)}
                 />

@@ -11,9 +11,6 @@ const ENV_KEYS = [
   "STRIPE_PRICE_PRO",
   "VERCEL_ACCESS_TOKEN",
   "VERCEL_TEAM_ID",
-  "CRON_SECRET",
-  "GENERATION_JOBS_CRON_SECRET",
-  "LOGO_TAGGING_SECRET",
   "SENTRY_DSN",
 ] as const;
 
@@ -41,10 +38,8 @@ describe("serverEnv / capabilities", () => {
     expect(capabilities).toEqual({
       recraftVectorize: false,
       domainAvailability: false,
-      logoTagging: false,
       billing: false,
       errorMonitoring: false,
-      generationCron: false,
     });
   });
 
@@ -64,25 +59,6 @@ describe("serverEnv / capabilities", () => {
     process.env.STRIPE_PRICE_PRO = "price_pro";
     const { capabilities: full } = await importFresh();
     expect(full.billing).toBe(true);
-  });
-
-  it("generationCron is true with either CRON_SECRET or GENERATION_JOBS_CRON_SECRET", async () => {
-    process.env.GENERATION_JOBS_CRON_SECRET = "a".repeat(20);
-    const { capabilities } = await importFresh();
-    expect(capabilities.generationCron).toBe(true);
-  });
-
-  it("cronSecret() prefers CRON_SECRET when both are set", async () => {
-    process.env.CRON_SECRET = "a".repeat(20);
-    process.env.GENERATION_JOBS_CRON_SECRET = "b".repeat(20);
-    const { cronSecret } = await importFresh();
-    expect(cronSecret()).toBe("a".repeat(20));
-  });
-
-  it("cronSecret() falls back to GENERATION_JOBS_CRON_SECRET", async () => {
-    process.env.GENERATION_JOBS_CRON_SECRET = "b".repeat(20);
-    const { cronSecret } = await importFresh();
-    expect(cronSecret()).toBe("b".repeat(20));
   });
 
   it("requireOpenAIApiKey throws a 'not configured' error naming the variable, never a value", async () => {

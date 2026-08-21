@@ -1,5 +1,50 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export const NO_TOKENS_MESSAGE = "You're out of tokens. Top up in Settings → Billing.";
+
+export class InsufficientTokensError extends Error {
+  readonly code = "no_tokens";
+  readonly status = 402;
+
+  constructor() {
+    super(NO_TOKENS_MESSAGE);
+    this.name = "InsufficientTokensError";
+  }
+}
+
+export class TokenRefundError extends Error {
+  readonly code = "billing_refund_failed";
+  readonly status = 500;
+  readonly originalError: unknown;
+  readonly refundError: unknown;
+
+  constructor(originalError: unknown, refundError: unknown) {
+    super("Generation failed and your tokens could not be refunded. Please contact support.", {
+      cause: originalError,
+    });
+    this.name = "TokenRefundError";
+    this.originalError = originalError;
+    this.refundError = refundError;
+  }
+}
+
+export type TokenErrorDetails = {
+  message: string;
+  code: string;
+  status: number;
+};
+
+export function tokenErrorDetails(error: unknown): TokenErrorDetails | null {
+  if (error instanceof InsufficientTokensError || error instanceof TokenRefundError) {
+    return {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    };
+  }
+  return null;
+}
+
 // Token costs per action.
 export const TOKEN_COST = {
   small: 1, // inline "AI suggest" / "Let AI choose" helpers
@@ -44,4 +89,34 @@ export async function grantTokens(userId: string, amount: number): Promise<numbe
   });
   if (error) throw new Error(error.message);
   return typeof data === "number" ? data : null;
+}
+
+/**
+ * Reserve credits before provider work and refund them if that work fails.
+ *
+ * `spend_tokens` is the authority here: the balance read above is only an
+ * optional fast-fail check for callers. Concurrent requests can both pass a
+ * balance read, but only one can reserve the final credits atomically.
+ */
+export async function withTokenReservation<T>(
+  userId: string,
+  amount: number,
+  work: () => Promise<T>,
+): Promise<T> {
+  const remaining = await spendTokens(userId, amount);
+  if (remaining === null) throw new InsufficientTokensError();
+
+  try {
+    return await work();
+  } catch (error) {
+    try {
+      const refunded = await grantTokens(userId, amount);
+      if (refunded === null) {
+        throw new Error("The token balance row was not found.");
+      }
+    } catch (refundError) {
+      throw new TokenRefundError(error, refundError);
+    }
+    throw error;
+  }
 }

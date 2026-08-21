@@ -4,7 +4,7 @@ import React from "react";
 import { usePathname, useRouter as useNextRouter } from "next/navigation";
 import { resolveClick } from "./resolve-click";
 import { RouterCtx } from "./router-context";
-import { ROUTES, ROUTE_ORDER, WIZARD_PREV, pathForRoute, routeForPath } from "./routes";
+import { ROUTES, ROUTE_ORDER, pathForRoute, routeForPath } from "./routes";
 import { makeToast } from "./toast";
 
 // #175 replaced the prototype's own `#hash` router with the App Router: each
@@ -68,17 +68,6 @@ export function RouterProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener("click", handler, true);
     return () => document.removeEventListener("click", handler, true);
   }, [navigate, nextRouter, route]);
-
-  // Keyboard: ESC steps back through the wizard.
-  React.useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      const prev = (WIZARD_PREV as Record<string, string>)[route];
-      if (prev) navigate(prev);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, route]);
 
   const value = React.useMemo(() => ({ route, navigate, direction }), [route, navigate, direction]);
   return <RouterCtx.Provider value={value}>{children}</RouterCtx.Provider>;

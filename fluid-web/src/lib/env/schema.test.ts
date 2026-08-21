@@ -45,10 +45,6 @@ describe("ServerEnvSchema", () => {
     expect(result.success).toBe(expectValid);
   });
 
-  it("rejects a CRON_SECRET below the minimum-entropy length", () => {
-    expect(ServerEnvSchema.safeParse({ CRON_SECRET: "short" }).success).toBe(false);
-    expect(ServerEnvSchema.safeParse({ CRON_SECRET: "a".repeat(16) }).success).toBe(true);
-  });
 
   it("validates SENTRY_DSN as a URL", () => {
     expect(ServerEnvSchema.safeParse({ SENTRY_DSN: "not-a-url" }).success).toBe(false);

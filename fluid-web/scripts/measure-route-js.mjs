@@ -3,10 +3,8 @@
 //   npm run measure:js            # report + enforce
 //   npm run measure:js -- --write # re-baseline budgets to current + headroom
 //
-// Before the split, /app dynamically imported the whole product: one ~288 KB
-// chunk holding all 18 screens, fetched on every /app route no matter which
-// screen you asked for. Now each route imports only its own screen, so a route
-// pulls its screen plus whatever shared kit modules that screen actually uses.
+// The app keeps route payloads small by loading each screen independently. The
+// archived workflows are outside this measurement and the production source tree.
 //
 // Two checks, both read straight off the build in .next/ — no server and no
 // logged-in session, which matters because every /app route sits behind auth:
@@ -16,10 +14,9 @@
 //      the split: statically importing a screen into the shared layout or
 //      shell drags it into every route's initial payload and blows the budget.
 //
-//   2. No screen's code appears in ANY route's initial payload — the direct
-//      encoding of "the full 18-screen product is no longer in the initial
-//      /app chunk". Screens are loaded with `dynamic(..., { ssr: false })`, so
-//      their code must arrive at runtime, never in the HTML's chunk set.
+//   2. No screen's code appears in ANY route's initial payload. Screens are
+//      loaded with `dynamic(..., { ssr: false })`, so their code must arrive at
+//      runtime, never in the HTML's chunk set.
 //
 // What this deliberately does NOT measure is the per-route runtime fetch (the
 // screen chunk itself), which needs a browser with a real session. Those bytes
@@ -39,11 +36,8 @@ const HEADROOM = 1.2;
 
 const ROUTES = [
   "/", "/login", "/signup",
-  "/app", "/app/home", "/app/brands", "/app/brands-empty", "/app/assets",
+  "/app", "/app/home", "/app/chat", "/app/brands", "/app/brands-empty", "/app/assets",
   "/app/guides", "/app/settings",
-  "/app/step1", "/app/step2", "/app/step3", "/app/step4", "/app/step5",
-  "/app/logo-brief", "/app/logo-direction", "/app/logo-type", "/app/logo-references",
-  "/app/logo-sketches", "/app/logo-refine", "/app/logo-export",
 ];
 
 function htmlFor(route) {

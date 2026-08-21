@@ -5,7 +5,7 @@
 // around it is new.
 
 import { CHAT } from "../_kit/shell";
-import { CRUMB_TO_ROUTE, RAIL_TO_ROUTE, WIZARD_NEXT, WIZARD_PREV } from "./routes";
+import { CRUMB_TO_ROUTE, RAIL_TO_ROUTE } from "./routes";
 
 // ---------------------------------------------------------------------
 // Resolve a click → destination route.
@@ -79,25 +79,14 @@ export function resolveClick(target: any, currentRoute: any, out: any) {
 function matchCtaText(text: any, currentRoute: any, out: any) {
   if (!text) return null;
 
-  // Wizard dock — Back / Continue.
-  if (text === 'Back')                           return (WIZARD_PREV as any)[currentRoute] || null;
-  if (/^Continue to Name$/.test(text))           return 'step2';
-  if (/^Continue to Logo$/.test(text))           return 'step3';
-  if (/^Continue to Style$/.test(text))          return 'step4';
-  if (text === 'Assemble Brand Kit')             return 'step5';
-  if (/^Continue\b/.test(text))                  return (WIZARD_NEXT as any)[currentRoute] || null;
-
   // Top-level CTAs from Home / Brands. Creating a brand is a conversation
-  // now; the step wizard is only reached by resuming one that started there.
+  // now; archived wizard CTAs are no longer part of the product route table.
   if (text.includes('Start a new brand'))        return CHAT;
   if (text === 'Browse templates'
    || text === 'Browse template library')        return 'brands-empty';
-  if (/^Resume [A-Z]/.test(text))                return 'step4';
   if (text === 'All brands' || text === 'All brands →') return 'brands';
   if (text === '+ New brand' || text === 'New brand') return CHAT;
 
-  // Kit screen secondary actions.
-  if (text === 'Iterate')                        return 'step4';
   if (text === 'Export kit' || text === 'Share read-only'
    || text === 'Download all') { out.toast = text + ' — coming soon'; return null; }
 
@@ -108,12 +97,5 @@ function matchCtaText(text: any, currentRoute: any, out: any) {
   // and the text read is a fragment like "Start" rather than the card's. That
   // is why those cards routed nowhere for so long.
 
-  // BrandsActive — brand cards open the kit.
-  if (/^(Apple|Figma|Perplexity|Tesla|Cadence|Linear|Notion|Arc|Vercel|Stripe)\b/.test(text)
-   && currentRoute === 'brands') {
-    return 'step5';
-  }
-
   return null;
 }
-

@@ -1,23 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-// #175 split the client-only /app into 18 real routes. These tests cover the
+// The authenticated product exposes a small set of real routes. These tests cover the
 // half of that which does not need a logged-in user: that every route is
 // actually served by Next (a missing or misnamed segment directory would 404
 // instead of redirecting), that the auth gate covers all of them, and that the
 // pre-#175 /app#<hash> links still land somewhere sensible.
 //
-// NOT covered here: deep-linking to a screen, back/forward between screens,
-// refresh mid-wizard and draft resume. Those need an authenticated session,
-// and this repo has no seeded test user or Supabase test credentials — CI runs
-// with no secrets at all. The pure routing logic underneath them (hash → path,
-// path → route, wizard next/prev) is unit-tested in
-// src/app/app/_state/routes.test.ts instead.
+// NOT covered here: deep-linking into an authenticated conversation or resuming
+// a draft. Those need a seeded Supabase session, which CI does not provide.
 
 const ROUTES = [
-  "home", "brands", "brands-empty", "assets", "guides", "settings",
-  "step1", "step2", "step3", "step4", "step5",
-  "logo-brief", "logo-direction", "logo-type", "logo-references",
-  "logo-sketches", "logo-refine", "logo-export",
+  "home", "chat", "brands", "brands-empty", "assets", "guides", "settings",
 ];
 
 test.describe("App routes", () => {

@@ -18,9 +18,6 @@ const raw = {
   STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO,
   VERCEL_ACCESS_TOKEN: process.env.VERCEL_ACCESS_TOKEN,
   VERCEL_TEAM_ID: process.env.VERCEL_TEAM_ID,
-  CRON_SECRET: process.env.CRON_SECRET,
-  GENERATION_JOBS_CRON_SECRET: process.env.GENERATION_JOBS_CRON_SECRET,
-  LOGO_TAGGING_SECRET: process.env.LOGO_TAGGING_SECRET,
   TEST_ERROR_SECRET: process.env.TEST_ERROR_SECRET,
   SENTRY_DSN: process.env.SENTRY_DSN,
   SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT,
@@ -40,19 +37,11 @@ export const serverEnv = parsed;
 export const capabilities = {
   recraftVectorize: Boolean(parsed.RECRAFT_API_KEY),
   domainAvailability: Boolean(parsed.VERCEL_ACCESS_TOKEN),
-  logoTagging: Boolean(parsed.LOGO_TAGGING_SECRET),
   billing: Boolean(
     parsed.STRIPE_SECRET_KEY && parsed.STRIPE_WEBHOOK_SECRET && parsed.STRIPE_PRICE_STARTER && parsed.STRIPE_PRICE_PRO,
   ),
   errorMonitoring: Boolean(parsed.SENTRY_DSN),
-  generationCron: Boolean(parsed.CRON_SECRET || parsed.GENERATION_JOBS_CRON_SECRET),
 } as const;
-
-// The cron secret, preferring CRON_SECRET when both are set — same
-// precedence the generation-jobs routes used before this module existed.
-export function cronSecret(): string | undefined {
-  return parsed.CRON_SECRET ?? parsed.GENERATION_JOBS_CRON_SECRET;
-}
 
 function required(name: keyof typeof parsed): string {
   const value = parsed[name];
