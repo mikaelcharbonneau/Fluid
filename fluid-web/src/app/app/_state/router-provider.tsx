@@ -4,14 +4,12 @@ import React from "react";
 import { usePathname, useRouter as useNextRouter } from "next/navigation";
 import { resolveClick } from "./resolve-click";
 import { RouterCtx } from "./router-context";
-import { ROUTES, ROUTE_ORDER, pathForRoute, routeForPath } from "./routes";
+import { ROUTE_ORDER, isAppRoute, pathForRoute, routeForPath, type AppRoute } from "./routes";
 import { makeToast } from "./toast";
 
-// #175 replaced the prototype's own `#hash` router with the App Router: each
-// screen is a real route under /app, so deep links, refresh and back/forward
-// are the browser's job now. This provider keeps the exact context shape the
-// 18 screens already consume — `{ route, navigate, direction }` — so none of
-// them had to change; only what sits behind it did.
+// The App Router owns real `/app/*` routes, so deep links, refresh, and
+// back/forward are the browser's job. This provider supplies the shared
+// `{ route, navigate, direction }` context used by dashboard surfaces.
 //
 // `direction` still drives the per-screen entrance animation, and is derived
 // the same way as before: forward when the destination sits later in
@@ -37,17 +35,17 @@ export function RouterProvider({ children }: { children: React.ReactNode }) {
   // smuggled across screens through a `window.__fluidSettingsTab` global,
   // because a single /app#settings URL had nowhere to put it.
   const navigate = React.useCallback(
-    (next: string, query?: Record<string, string>) => {
-      if (!ROUTES.includes(next)) return;
+    (next: AppRoute, query?: Record<string, string>) => {
+      if (!isAppRoute(next)) return;
       const search = query ? `?${new URLSearchParams(query)}` : "";
       nextRouter.push(pathForRoute(next) + search);
     },
     [nextRouter],
   );
 
-  // Global click delegate. The product's CTAs, left rail, breadcrumbs and
-  // wizard dock all navigate by matching button text (see resolve-click.tsx);
-  // that stays as-is, it just pushes a real URL now instead of setting state.
+  // Global click delegate. Dashboard CTAs, the left rail, and breadcrumbs can
+  // navigate by matching button text (see resolve-click.tsx); the chat route
+  // opts out for controls that own their own action.
   React.useEffect(() => {
     function handler(e: MouseEvent) {
       const out: { toast?: string } = {};
@@ -58,7 +56,7 @@ export function RouterProvider({ children }: { children: React.ReactNode }) {
         // A destination starting with "/" is already a real path (e.g. the
         // brand-creation chat at /app/chat); push it directly.
         if (dest.charAt(0) === "/") nextRouter.push(dest);
-        else navigate(dest);
+        else if (isAppRoute(dest)) navigate(dest);
       } else if (out.toast) {
         e.preventDefault();
         e.stopPropagation();

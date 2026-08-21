@@ -18,7 +18,7 @@ function FreeCard() {
       </div>
       <ul className="pc-feats">
         <li>
-          <span className="ck">✓</span> The full guided wizard
+          <span className="ck">✓</span> The full guided brand-kit flow
         </li>
         <li>
           <span className="ck">✓</span> AI names &amp; visual direction

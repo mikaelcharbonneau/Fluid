@@ -6,6 +6,14 @@
 
 import React from "react";
 
+type TweakPrimitive = string | number | boolean;
+type TweakOption<T extends TweakPrimitive> = T | { value: T; label: string };
+
+interface TweakPanelProps {
+  title?: string;
+  children?: React.ReactNode;
+}
+
 // ------------------------------------------------------------------
 // 11-tweaks
 // ------------------------------------------------------------------
@@ -185,9 +193,9 @@ const __TWEAKS_STYLE = `
 // The close button posts __edit_mode_dismissed so the host's toolbar toggle
 // flips off in lockstep; the host echoes __deactivate_edit_mode back which
 // is what actually hides the panel.
-export function TweaksPanel({ title = 'Tweaks', children }: any) {
+export function TweaksPanel({ title = 'Tweaks', children }: TweakPanelProps) {
   const [open, setOpen] = React.useState(false);
-  const dragRef = React.useRef<any>(null);
+  const dragRef = React.useRef<HTMLDivElement>(null);
   const offsetRef = React.useRef({ x: 16, y: 16 });
   const PAD = 16;
 
@@ -218,8 +226,10 @@ export function TweaksPanel({ title = 'Tweaks', children }: any) {
   }, [open, clampToViewport]);
 
   React.useEffect(() => {
-    const onMsg = (e: any) => {
-      const t = e?.data?.type;
+    const onMsg = (e: MessageEvent<unknown>) => {
+      const t = typeof e.data === 'object' && e.data !== null && 'type' in e.data
+        ? e.data.type
+        : undefined;
       if (t === '__activate_edit_mode') setOpen(true);
       else if (t === '__deactivate_edit_mode') setOpen(false);
     };
@@ -233,14 +243,14 @@ export function TweaksPanel({ title = 'Tweaks', children }: any) {
     window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
   };
 
-  const onDragStart = (e: any) => {
+  const onDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
     const panel = dragRef.current;
     if (!panel) return;
     const r = panel.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY;
     const startRight = window.innerWidth - r.right;
     const startBottom = window.innerHeight - r.bottom;
-    const move = (ev: any) => {
+    const move = (ev: MouseEvent) => {
       offsetRef.current = {
         x: startRight - (ev.clientX - sx),
         y: startBottom - (ev.clientY - sy),
@@ -283,7 +293,7 @@ export function TweaksPanel({ title = 'Tweaks', children }: any) {
 
 // ── Layout helpers ──────────────────────────────────────────────────────────
 
-export function TweakSection({ label, children }: any) {
+export function TweakSection({ label, children }: { label: string; children?: React.ReactNode }) {
   return (
     <>
       <div className="twk-sect">{label}</div>
@@ -292,7 +302,7 @@ export function TweakSection({ label, children }: any) {
   );
 }
 
-function TweakRow({ label, value, children, inline = false }: any) {
+function TweakRow({ label, value, children, inline = false }: { label: string; value?: React.ReactNode; children?: React.ReactNode; inline?: boolean }) {
   return (
     <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
       <div className="twk-lbl">
@@ -304,7 +314,7 @@ function TweakRow({ label, value, children, inline = false }: any) {
   );
 }
 
-export function TweakToggle({ label, value, onChange }: any) {
+export function TweakToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
     <div className="twk-row twk-row-h">
       <div className="twk-lbl"><span>{label}</span></div>
@@ -315,8 +325,23 @@ export function TweakToggle({ label, value, onChange }: any) {
   );
 }
 
-export function TweakRadio({ label, value, options, onChange }: any) {
-  const trackRef = React.useRef<any>(null);
+interface TweakRadioProps<T extends TweakPrimitive> {
+  label: string;
+  value: T;
+  options: readonly TweakOption<T>[];
+  onChange: (value: T) => void;
+}
+
+function optionValue<T extends TweakPrimitive>(option: TweakOption<T>): T {
+  return typeof option === 'object' ? option.value : option;
+}
+
+function optionLabel<T extends TweakPrimitive>(option: TweakOption<T>): string {
+  return String(typeof option === 'object' ? option.label : option);
+}
+
+export function TweakRadio<T extends TweakPrimitive>({ label, value, options, onChange }: TweakRadioProps<T>) {
+  const trackRef = React.useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = React.useState(false);
   // The active value is read by pointer-move handlers attached for the lifetime
   // of a drag — ref it so a stale closure doesn't fire onChange for every move.
@@ -328,35 +353,32 @@ export function TweakRadio({ label, value, options, onChange }: any) {
   // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
   // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
   // back to a dropdown rather than wrap.
-  const labelLen = (o: any) => String(typeof o === 'object' ? o.label : o).length;
-  const maxLen = options.reduce((m: any, o: any) => Math.max(m, labelLen(o)), 0);
-  const fitsAsSegments = maxLen <= (({ 2: 16, 3: 10 } as any)[options.length] ?? 0);
+  const maxLen = options.reduce((max, option) => Math.max(max, optionLabel(option).length), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
   if (!fitsAsSegments) {
-    // <select> emits strings — map back to the original option value so the
+    // The select maps its string DOM value back to the original option so the
     // fallback stays type-preserving (numbers, booleans) like the segment path.
-    const resolve = (s: any) => {
-      const m = options.find((o: any) => String(typeof o === 'object' ? o.value : o) === s);
-      return m === undefined ? s : typeof m === 'object' ? m.value : m;
-    };
     return <TweakSelect label={label} value={value} options={options}
-                        onChange={(s: any) => onChange(resolve(s))} />;
+                        onChange={onChange} />;
   }
-  const opts = options.map((o: any) => (typeof o === 'object' ? o : { value: o, label: o }));
-  const idx = Math.max(0, opts.findIndex((o: any) => o.value === value));
+  const opts = options.map((option) => ({ value: optionValue(option), label: optionLabel(option) }));
+  const idx = Math.max(0, opts.findIndex((option) => option.value === value));
   const n = opts.length;
 
-  const segAt = (clientX: any) => {
-    const r = trackRef.current.getBoundingClientRect();
+  const segAt = (clientX: number): T => {
+    const track = trackRef.current;
+    if (!track) return value;
+    const r = track.getBoundingClientRect();
     const inner = r.width - 4;
     const i = Math.floor(((clientX - r.left - 2) / inner) * n);
     return opts[Math.max(0, Math.min(n - 1, i))].value;
   };
 
-  const onPointerDown = (e: any) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     setDragging(true);
     const v0 = segAt(e.clientX);
     if (v0 !== valueRef.current) onChange(v0);
-    const move = (ev: any) => {
+    const move = (ev: PointerEvent) => {
       if (!trackRef.current) return;
       const v = segAt(ev.clientX);
       if (v !== valueRef.current) onChange(v);
@@ -377,8 +399,8 @@ export function TweakRadio({ label, value, options, onChange }: any) {
         <div className="twk-seg-thumb"
              style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
                       width: `calc((100% - 4px) / ${n})` }} />
-        {opts.map((o: any) => (
-          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+        {opts.map((o) => (
+          <button key={String(o.value)} type="button" role="radio" aria-checked={o.value === value}>
             {o.label}
           </button>
         ))}
@@ -387,17 +409,19 @@ export function TweakRadio({ label, value, options, onChange }: any) {
   );
 }
 
-function TweakSelect({ label, value, options, onChange }: any) {
+function TweakSelect<T extends TweakPrimitive>({ label, value, options, onChange }: TweakRadioProps<T>) {
   return (
     <TweakRow label={label}>
-      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o: any) => {
-          const v = typeof o === 'object' ? o.value : o;
-          const l = typeof o === 'object' ? o.label : o;
-          return <option key={v} value={v}>{l}</option>;
+      <select className="twk-field" value={String(value)} onChange={(e) => {
+        const selected = options.find((option) => String(optionValue(option)) === e.target.value);
+        if (selected !== undefined) onChange(optionValue(selected));
+      }}>
+        {options.map((option) => {
+          const v = optionValue(option);
+          const l = optionLabel(option);
+          return <option key={String(v)} value={String(v)}>{l}</option>;
         })}
       </select>
     </TweakRow>
   );
 }
-

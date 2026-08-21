@@ -2,10 +2,9 @@
 
 export type BrandStatus = "draft" | "live";
 
-// Mirrors deriveBrandName() in Prototype.tsx — the placeholder the client
-// writes into `name` from the opening words of the brief. Duplicated here on
-// purpose: it is the only way to tell a real chosen name from a brief
-// fragment, and the two must stay in step.
+// Reconstructs the placeholder historically stored in `name` from the opening
+// words of a brief. This is kept here so old records can be distinguished from
+// a real chosen name while they are resumed by the conversational flow.
 function briefPlaceholderName(brief: string): string {
   const words = brief.trim().split(/\s+/).filter(Boolean).slice(0, 4);
   if (words.length === 0) return "Untitled brand";
@@ -15,12 +14,11 @@ function briefPlaceholderName(brief: string): string {
 
 // The brand's real, chosen name — or null if the user hasn't picked one yet.
 //
-// `brand.name` is NOT a name field in the usual sense: the client's
-// setField('brief', ...) handler derives it from the first few words of the
-// brief (deriveBrandName in Prototype.tsx) as a placeholder so the brands
-// list doesn't read "Untitled brand" everywhere. Every AI generator must use
-// this helper instead of `brand.name_choice || brand.name` — that fallback
-// silently hands the model a brief fragment as if it were the brand name.
+// `brand.name` is NOT always a name field in the usual sense: older clients
+// derived it from the first few words of the brief as a placeholder so the
+// brands list did not read "Untitled brand" everywhere. Callers should use
+// this helper instead of `brand.name_choice || brand.name` — that fallback can
+// hand the model a brief fragment as if it were the brand name.
 //
 // `name_choice` is the field of record, but choosing a name writes it to both
 // fields, so `name` is a valid second source whenever it differs from the

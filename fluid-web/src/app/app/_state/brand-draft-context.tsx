@@ -5,21 +5,26 @@
 // around it is new.
 
 import React from "react";
+import type { AppUser, BillingStatus, DashboardBrand } from "./types";
 
-// Loosely typed on purpose: `draft`/`user`/`billing` carry whatever shape
-// the API returns for a brand/session/subscription record, which this
-// legacy module never validated at the boundary. `any` here documents that
-// honestly rather than asserting a precision the code never had — #175
-// gets a real chance to type this properly once brand state moves out of
-// this file into its own module.
-interface BrandDraftContextValue {
-  brands: any[];
-  user: any;
-  billing: any;
+export interface BrandDraftContextValue {
+  brands: DashboardBrand[];
+  user: AppUser | null;
+  billing: BillingStatus | null;
   refreshBalance: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 export const BrandDraftCtx = React.createContext<BrandDraftContextValue | null>(null);
 
-export const useBrandDraft = () => (React.useContext(BrandDraftCtx) || {}) as BrandDraftContextValue;
+const EMPTY_CONTEXT: BrandDraftContextValue = {
+  brands: [],
+  user: null,
+  billing: null,
+  refreshBalance: async () => undefined,
+  refresh: async () => undefined,
+};
+
+export function useBrandDraft(): BrandDraftContextValue {
+  return React.useContext(BrandDraftCtx) ?? EMPTY_CONTEXT;
+}

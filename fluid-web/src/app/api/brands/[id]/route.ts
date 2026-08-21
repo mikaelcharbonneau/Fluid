@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: Ctx) {
   return NextResponse.json({ brand: data });
 }
 
-// PATCH /api/brands/[id] — update fields (used for autosave through the wizard).
+// PATCH /api/brands/[id] — update fields on a persisted brand record.
 export async function PATCH(request: Request, { params }: Ctx) {
   const { id } = await params;
   const { supabase, user } = await requireUser();
@@ -48,10 +48,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
     return NextResponse.json({ error: "No valid fields." }, { status: 400 });
   }
 
-  // `data` is merged, never assigned. The wizard autosaves by sending its whole
-  // copy of the object, so assigning it would drop every key the client does
-  // not know about — the creative platform, the logo
-  // finalists — each time a field changes. Scalar columns still assign.
+  // `data` is merged, never assigned. A client may send only the fields it
+  // knows about, so assigning the object would drop unrelated generated data.
   const { data: patchData, ...columns } = input;
 
   let brand: unknown = null;

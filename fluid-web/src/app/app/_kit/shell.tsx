@@ -9,16 +9,20 @@ import Image from "next/image";
 import { __assets } from "./assets";
 import { useBrandDraft } from "../_state/brand-draft-context";
 import { useRouter } from "../_state/router-context";
+import type { BillingStatus } from "../_state/types";
 
 // ------------------------------------------------------------------
 // 01-shared
 // ------------------------------------------------------------------
-// Shared bits used across all three direction prototypes.
-// All components are written to `window` at the bottom because each
-// `<script type="text/babel">` gets its own transform scope.
+// Shared bits used across the authenticated app surfaces.
 
 // Uses the same wordmark file as the marketing site so the two never drift.
-export const FluidWordmark = ({ height = 22, color = 'ink' }) => {
+interface FluidWordmarkProps {
+  height?: number;
+  color?: 'ink' | 'mono';
+}
+
+export const FluidWordmark = ({ height = 22, color = 'ink' }: FluidWordmarkProps) => {
   // The two marks have different intrinsic sizes; both render at `height`
   // with width auto, so next/image needs each one's real aspect ratio to
   // reserve the right box.
@@ -36,14 +40,14 @@ export const FluidWordmark = ({ height = 22, color = 'ink' }) => {
   );
 };
 
-const ChevronRight = ({ size = 14 }) => (
+const ChevronRight = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 18 15 12 9 6"/>
   </svg>
 );
 
-export const SearchIcon = ({ size = 14 }) => (
+export const SearchIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -54,15 +58,12 @@ export const SearchIcon = ({ size = 14 }) => (
 // 02-canvas
 // ------------------------------------------------------------------
 // =====================================================================
-// Direction A · Studio Canvas
+// Authenticated app shell
 //
 // Philosophy:
-//   - No wizard rail eating 1/3 of the screen. All five inputs live as
-//     equal cards on one board.
-//   - Fluid threads them together: as one card fills, others light up
-//     with proposals. The bottom dock shows what the agent is doing now.
-//   - Background gradient ribbons are gone. The ribbon mark only appears
-//     where it earns its place — the hero of A4, the AI moment on A3.
+//   - Dashboard sections share one quiet rail, top bar, and billing affordance.
+//   - The brand-kit conversation owns its own live widgets and does not use
+//     this shell's legacy wizard controls.
 // =====================================================================
 
 
@@ -70,7 +71,13 @@ export const SearchIcon = ({ size = 14 }) => (
 // Top dock + slim icon rail + main area. Frame is 1440×900; the dock is
 // 60px, the rail is 60px, leaving a 1380×840 working surface.
 
-const ARailIcon = ({ d, active, label }: any) => (
+interface RailIconProps {
+  d: React.ReactNode;
+  active: boolean;
+  label: string;
+}
+
+const ARailIcon = ({ d, active, label }: RailIconProps) => (
   <div style={{
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
     padding: '14px 0', position: 'relative',
@@ -87,7 +94,7 @@ const ARailIcon = ({ d, active, label }: any) => (
 
 // Token balance pill in the top bar. Colors shift as the balance runs low,
 // and clicking it jumps straight to Settings → Billing to top up.
-const TokenPill = ({ billing }: any) => {
+const TokenPill = ({ billing }: { billing: BillingStatus | null }) => {
   const { navigate } = useRouter();
   if (!billing) return null;
   const balance = typeof billing.balance === 'number' ? billing.balance : 0;
@@ -118,7 +125,15 @@ const TokenPill = ({ billing }: any) => {
   );
 };
 
-export const AShell = ({ children, activeNav = 'brands', breadcrumb }: any) => {
+type ActiveNav = 'home' | 'brands' | 'assets' | 'guides' | 'settings';
+
+interface ShellProps {
+  children: React.ReactNode;
+  activeNav?: ActiveNav;
+  breadcrumb: string[];
+}
+
+export const AShell = ({ children, activeNav = 'brands', breadcrumb }: ShellProps) => {
   const { user, billing } = useBrandDraft();
   return (
   <div className="ab" style={{display:'flex',flexDirection:'column'}}>
@@ -134,7 +149,7 @@ export const AShell = ({ children, activeNav = 'brands', breadcrumb }: any) => {
       <FluidWordmark height={22}/>
       <div className="ash-divider" style={{width:1, height:28, background:'var(--line)'}}/>
       <nav className="ash-breadcrumb" style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--fg-3)', minWidth:0, overflow:'hidden', whiteSpace:'nowrap'}}>
-        {breadcrumb.map((b: any,i: any) => (
+        {breadcrumb.map((b, i) => (
           <React.Fragment key={i}>
             {i>0 && <ChevronRight size={12}/>}
             <span style={{color: i === breadcrumb.length-1 ? 'var(--fg-1)' : 'var(--fg-3)', fontWeight: i === breadcrumb.length-1 ? 600 : 500}}>{b}</span>
@@ -187,4 +202,3 @@ export const AShell = ({ children, activeNav = 'brands', breadcrumb }: any) => {
 // Brand creation is a conversation at its own URL. resolveClick may return
 // this instead of a hash route; the delegate navigates out when it sees one.
 export const CHAT = '/app/chat';
-

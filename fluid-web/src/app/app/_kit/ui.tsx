@@ -4,25 +4,32 @@
 // route split. The code below is unchanged; only the import/export header
 // around it is new.
 
-import React from "react";
+import React, { type CSSProperties, type ReactNode } from "react";
+
+interface SparkleProps {
+  size?: number;
+  color?: string;
+  style?: CSSProperties;
+}
+
+export const Sparkle = ({ size = 14, color = 'currentColor', style }: SparkleProps) => (
 
 // Tiny "✦" sparkle used to flag AI-generated content. Stroke-only,
 // matches the Lucide style mentioned in the design system.
-export const Sparkle = ({ size = 14, color = 'currentColor', style }: any) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>
   </svg>
 );
 
-export const ArrowRight = ({ size = 16 }) => (
+export const ArrowRight = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
   </svg>
 );
 
-export const PlusIcon = ({ size = 14 }) => (
+export const PlusIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -30,16 +37,25 @@ export const PlusIcon = ({ size = 14 }) => (
 );
 
 // A pill-shaped tag with optional dot — used for status chips throughout
-export const Chip = ({ children, tone = 'neutral', style }: any) => {
-  const tones = {
+const tones = {
     neutral: { bg: 'var(--bg-sunken)', fg: 'var(--fg-2)', dot: null },
     live:    { bg: 'rgba(68,217,199,.22)', fg: '#0E6B5E', dot: '#44D9C7' },
     queued:  { bg: 'var(--bg-sunken)', fg: 'var(--fg-3)', dot: 'var(--fg-4)' },
     ai:      { bg: '#000', fg: '#fff', dot: null },
     coral:   { bg: 'rgba(253,121,71,.14)', fg: '#A8421F', dot: '#FD7947' },
     sky:     { bg: 'rgba(154,211,230,.34)', fg: '#2F6B83', dot: null },
-  };
-  const t = (tones as any)[tone] || tones.neutral;
+} as const;
+
+type ChipTone = keyof typeof tones;
+
+interface ChipProps {
+  children?: ReactNode;
+  tone?: ChipTone;
+  style?: CSSProperties;
+}
+
+export const Chip = ({ children, tone = 'neutral', style }: ChipProps) => {
+  const t = tones[tone];
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -66,7 +82,14 @@ export const Thinking = () => (
 
 // ---- Brand showcase card ----------------------------------------------
 // Reusable empty state — shown when a screen has no real content yet.
-export const AEmptyState = ({ title, body, ctaLabel, onCta }: any) => (
+interface EmptyStateProps {
+  title: string;
+  body: string;
+  ctaLabel?: string;
+  onCta?: () => void;
+}
+
+export const AEmptyState = ({ title, body, ctaLabel, onCta }: EmptyStateProps) => (
   <div style={{
     border: '1px dashed var(--line-strong)', borderRadius: 20,
     padding: '56px 40px', display: 'flex', flexDirection: 'column',

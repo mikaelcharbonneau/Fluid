@@ -105,7 +105,7 @@ export interface BrandKitBrief {
   avoid?: string[];
 }
 
-/** One palette swatch, matching what Prototype.tsx's card visual expects: {hex, role}. */
+/** One palette swatch used by the conversational widgets and final board. */
 export interface PaletteSwatch {
   hex: string;
   role: string;

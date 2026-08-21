@@ -6,6 +6,7 @@
 
 import React from "react";
 import Image from "next/image";
+import type { CSSProperties, ReactNode } from "react";
 import { CARD_BUTTON_RESET } from "./a11y";
 import { __assets } from "./assets";
 
@@ -30,7 +31,7 @@ export const PERPLEXITY_DISPLAY = "'New York', 'Times New Roman', 'Tiempos Headl
 const PERPLEXITY_BODY    = "-apple-system, BlinkMacSystemFont, 'Söhne', 'Inter', sans-serif";
 
 // Figma logomark — the canonical 5-shape construction.
-const FigmaLogo = ({ size = 26 }) => (
+const FigmaLogo = ({ size = 26 }: { size?: number }) => (
   <svg width={size * (38/57)} height={size} viewBox="0 0 38 57" aria-label="Figma">
     <path fill="#1ABCFE" d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z"/>
     <path fill="#0ACF83" d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z"/>
@@ -51,11 +52,21 @@ const BRAND_LOGO_SRC = {
 
 // `fill` mode: stretch to fill an overflow-hidden parent tile (parent owns
 // the radius). Otherwise renders a self-contained rounded square at `size`.
-const BrandLogoImg = ({ brand, size = 48, radius, fill = false, style }: any) => (
+type BrandLogoName = keyof typeof BRAND_LOGO_SRC;
+
+interface BrandLogoImgProps {
+  brand: BrandLogoName;
+  size?: number;
+  radius?: number;
+  fill?: boolean;
+  style?: CSSProperties;
+}
+
+const BrandLogoImg = ({ brand, size = 48, radius, fill = false, style }: BrandLogoImgProps) => (
   fill
-    ? <Image src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false} fill sizes="120px"
+    ? <Image src={BRAND_LOGO_SRC[brand]} alt={brand} draggable={false} fill sizes="120px"
         style={{ objectFit: 'cover', display: 'block', ...style }} />
-    : <Image src={(BRAND_LOGO_SRC as any)[brand]} alt={brand} draggable={false} width={size} height={size}
+    : <Image src={BRAND_LOGO_SRC[brand]} alt={brand} draggable={false} width={size} height={size}
         style={{ width: size, height: size, borderRadius: radius != null ? radius : Math.round(size * 0.22), objectFit: 'cover', display: 'block', ...style }} />
 );
 
@@ -390,7 +401,37 @@ export const TeslaHero = () => {
 // The footer carries only the brand-styled style pill + name + category;
 // the palette lives inside the hero so it is shown exactly once and stays
 // consistent with the rest of the brand sheet.
-export const AInspirationCard = ({ name, category, style, hero, sel, onClick }: any) => (
+interface InspirationStyle {
+  label: string;
+  pill: {
+    padding?: string;
+    radius?: number;
+    bg?: string;
+    color?: string;
+    font?: string;
+    weight?: number;
+    italic?: boolean;
+    size?: number;
+    tracking?: string;
+    transform?: CSSProperties['textTransform'];
+    shadow?: string;
+    border?: string;
+    dot?: string;
+    dotSize?: number;
+    dotGlow?: string;
+  };
+}
+
+interface InspirationCardProps {
+  name: string;
+  category: string;
+  style: InspirationStyle;
+  hero: ReactNode;
+  sel?: boolean;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+}
+
+export const AInspirationCard = ({ name, category, style, hero, sel, onClick }: InspirationCardProps) => (
   <button type="button" onClick={onClick} aria-pressed={!!sel} style={{
     ...CARD_BUTTON_RESET,
     background:'var(--bg-elev)', borderRadius: 18,
@@ -461,4 +502,3 @@ export const VISUAL_STYLE_OPTIONS = [
     descriptor: 'Advanced, AI-native and built for the future.',
   },
 ];
-

@@ -2,7 +2,7 @@
 
 import { QuickJump } from "./quick-jump";
 import { TweaksPanel, TweakSection, TweakRadio, TweakToggle } from "../_kit/tweaks";
-import { BRAND_NOTE } from "./tweak-defaults";
+import { BRAND_NOTE, type ProtoTweaks } from "./tweak-defaults";
 
 // The prototype's two review affordances, lifted verbatim out of the original
 // single-file App: the brand-accent tweaks panel and the quick-jump route
@@ -12,7 +12,7 @@ export function DevTools({
   tweaks,
   setTweak,
 }: {
-  tweaks: Record<string, string | boolean>;
+  tweaks: ProtoTweaks;
   setTweak: (key: string, value: unknown) => void;
 }) {
   return (

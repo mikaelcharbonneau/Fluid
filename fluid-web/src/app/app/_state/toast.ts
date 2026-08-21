@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------
 // Tiny toast for non-routing CTAs.
 // ---------------------------------------------------------------------
-export function makeToast(msg: any) {
+export function makeToast(msg: string) {
   let host = document.getElementById('proto-toast-host');
   if (!host) {
     host = document.createElement('div');
@@ -27,4 +27,3 @@ export function makeToast(msg: any) {
     setTimeout(() => el.remove(), 260);
   }, 2200);
 }
-
