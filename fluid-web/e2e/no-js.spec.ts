@@ -31,9 +31,11 @@ test.describe("No JavaScript", () => {
 });
 
 test.describe("Reduced motion", () => {
-  test.use({ reducedMotion: "reduce" });
-
   test("homepage content is fully visible immediately, not mid-reveal-animation", async ({ page }) => {
+    // Emulate the media query on the page because this Playwright setup does
+    // not expose reducedMotion as a typed test fixture, and do it before the
+    // page mounts so components read the intended preference.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     // With reduced motion, marketing.css forces opacity:1/transform:none on
     // every reveal target regardless of the .in class — nothing should be
