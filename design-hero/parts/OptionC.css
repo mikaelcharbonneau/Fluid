@@ -6,11 +6,9 @@
       width: 620px; border-radius: 28px 0 0 28px; overflow: hidden;
       box-shadow: 0 30px 80px rgba(0,0,0,0.16);
     }
-    .specimen i {
+    .specimen canvas {
       position: absolute; inset: 0; display: block;
-      background: url("field.jpg") 60% 45% / cover no-repeat;
-      filter: saturate(1.35) contrast(1.05);
-      transform: scale(1.06);
+      width: 100%; height: 100%; pointer-events: none;
     }
     .specimen-grain {
       position: absolute; inset: 0; opacity: 0.10;

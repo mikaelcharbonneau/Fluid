@@ -1,5 +1,6 @@
 #!/bin/bash
-# Assembles parts/<Name>.body.html + parts/<Name>.css + shared helmet -> <Name>.dc.html
+# Assembles parts/<Name>.body.html + parts/<Name>.css (+ parts/<Name>.mount.js)
+# and the shared helmet into <Name>.dc.html
 set -e
 for name in "$@"; do
   {
@@ -22,7 +23,13 @@ for name in "$@"; do
     cat "parts/${name}.body.html"
     echo '</x-dc>'
     echo '<script data-dc-script data-props='"'"'{"$preview":{"width":1440,"height":900}}'"'"'>'
+    if [ -f "parts/${name}.mount.js" ]; then cat parts/velaris.js; fi
     echo 'class Component extends DCLogic {'
+    if [ -f "parts/${name}.mount.js" ]; then
+      echo '  componentDidMount() {'
+      cat "parts/${name}.mount.js"
+      echo '  }'
+    fi
     echo '  renderVals() { return {}; }'
     echo '}'
     echo '</script>'

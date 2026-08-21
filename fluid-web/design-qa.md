@@ -50,3 +50,56 @@
 - `npm run build` completed successfully after the route and screen changes. `npm run lint` has no errors and retains one unrelated existing warning in `public/scripts/marketing.js`.
 
 final result: passed
+
+---
+
+## 2026-08-20 · Marketing Hero Centered Prompt Layout
+
+**Comparison Target**
+
+- Source visual truth: `/var/folders/fc/ms0rhxpn3xs6s8j125crxjdr0000gp/T/codex-clipboard-7da029d9-4077-46af-974a-ee480aeffd49.png`
+- Implementation screenshot: `/Users/mikael/.codex/visualizations/2026/08/20/01a01fee-5dc6-7e00-aae2-f7152f59303a/fluid-centered-prompt-desktop.png`
+- Side-by-side evidence: `/Users/mikael/.codex/visualizations/2026/08/20/01a01fee-5dc6-7e00-aae2-f7152f59303a/fluid-centered-prompt-comparison.png`
+- Responsive evidence: `/Users/mikael/.codex/visualizations/2026/08/20/01a01fee-5dc6-7e00-aae2-f7152f59303a/fluid-centered-prompt-mobile.png`
+- Viewport: desktop 1440 x 804 CSS pixels at 1x density; mobile 390 x 844 CSS pixels at 1x density.
+- Density normalization: the 3418 x 1910 source was downsampled to 1440 x 804 for the comparison; the implementation capture is natively 1440 x 804.
+- State: marketing home route at the top of the page, prompt empty, no hover or focus state.
+
+**Full-View Comparison**
+
+- The reference's centered vertical hierarchy is present: compact context label, large centered headline, supporting text, and a prominent centered prompt surface.
+- The Fluid implementation intentionally retains its existing copy, animated background, dark visual system, navigation, CTA label, pricing note, and scroll cue. The reference's category carousel and example chips were not added because this change is layout-only.
+- The prompt now behaves as a composer surface, with its placeholder anchored at the upper left and the unchanged submit action anchored at the lower right.
+
+**Focused Comparison**
+
+- A separate crop was not required: the normalized full-view comparison keeps the headline, supporting copy, prompt bounds, button placement, and navigation legible at native scale.
+- Fonts and typography: Fluid's existing display and body families, weights, copy, and color treatment are intentionally preserved; only headline scale and alignment changed.
+- Spacing and layout rhythm: the lockup is centered, the prompt is 720 x 106 CSS pixels on desktop, and the stack uses a tighter headline-to-prompt cadence after the first comparison pass.
+- Colors and visual tokens: unchanged from the existing Fluid hero.
+- Image quality and asset fidelity: the existing Fluid wordmark and live WebGL background remain sharp; no new or substituted assets were introduced.
+- Copy and content: unchanged.
+
+**Comparison History**
+
+- First pass P2: the prompt measured 820 x 118 CSS pixels at y=526.8 and the headline-to-prompt stack was too spread out relative to the source. Fixed by reducing the desktop headline maximum from 120px to 104px, tightening the supporting and CTA margins, and reducing the prompt to 720 x 106px.
+- Post-fix evidence: the final 1440 x 804 capture measures the centered prompt at x=360, y=509.1, width=720, height=106; the lockup measures x=160, y=152.7, width=1120, height=498.5. No horizontal overflow is present.
+- Mobile evidence: at 390 x 844, the prompt remains a two-row composer, the CTA no longer overlaps the placeholder, and `clientWidth` equals `scrollWidth` at 390px.
+
+**Interaction And Console Checks**
+
+- Entered and cleared a sample idea in the hero prompt; the value updated correctly and the unchanged submit button remained enabled.
+- Browser console check returned no errors or warnings.
+
+**Findings**
+
+- No actionable P0, P1, or P2 layout differences remain within the requested layout-only scope.
+
+**Implementation Checklist**
+
+- [x] Center the hero content hierarchy.
+- [x] Convert the existing hero form into a larger prompt-composer layout.
+- [x] Preserve existing copy, colors, background animation, navigation, and behavior.
+- [x] Verify desktop and mobile layout, input interaction, overflow, and console state.
+
+final result: passed

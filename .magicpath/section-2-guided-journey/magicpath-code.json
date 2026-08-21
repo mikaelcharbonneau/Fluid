@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "441250390449750016",
+  "projectId": "441238668703850496",
+  "selectedRevisionId": "441250390449750017",
+  "jobId": "440773436005052416-external-agent-441251059206348800",
+  "generatedName": "warm-pond-7044",
+  "name": "Fluid Section 2 Wireframe — Guided Journey",
+  "dimensions": {
+    "width": 1440,
+    "height": 1000
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "5c0fcaf367bb277b96f47f2e5e1c17349acd12761715cacc2ae2b9146f63ef98"
+    },
+    {
+      "path": "src/components/generated/FluidSection2WireframeGuidedJourney.tsx",
+      "sha256": "763db1bb1b559388af7e5269a8fb7996add163dcce7591e8005007c551d66b38"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "9cb04c4690d1ae576cd8729f6df5ee744b21e4ef5a0409332c6cc02ddd867dff"
+    }
+  ],
+  "baseRevisionId": "441250390449750017"
+}

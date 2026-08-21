@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "441250410712408064",
+  "projectId": "441238668703850496",
+  "selectedRevisionId": "441250410712408065",
+  "jobId": "440773436005052416-external-agent-441251098779607040",
+  "generatedName": "sweetly-town-1359",
+  "name": "Fluid Section 2 Wireframe — Chapter Preview",
+  "dimensions": {
+    "width": 1440,
+    "height": 1000
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "52f894d5d7eb4a8d6b36e516e2589df7de017362221a5de76c63156d834f0426"
+    },
+    {
+      "path": "src/components/generated/FluidSection2WireframeChapterPreview.tsx",
+      "sha256": "828e96ca8433128c31e1fc7ea6ce9d432a58485b36033843a9478407ee772a5a"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "8456dc74b8f6f746c804902b847421c7cf0df6d40d3f1f75db8fab8cacb24987"
+    }
+  ],
+  "baseRevisionId": "441250410712408065"
+}

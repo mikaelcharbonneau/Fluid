@@ -1,11 +1,10 @@
 <div class="stage" style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #0B0B10; color: #fff;">
 
-  <div class="field" aria-hidden="true"><i></i></div>
+  <div class="field" aria-hidden="true"><canvas id="velaris-main"></canvas></div>
   <span class="scrim" aria-hidden="true"></span>
   <span class="scrim-v" aria-hidden="true"></span>
   <span class="grain" aria-hidden="true"></span>
 
-  <!-- nav -->
   <div style="position: absolute; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 18px 48px;">
     <img src="wordmark.png" alt="Fluid" style="height: 22px; width: auto; display: block; filter: brightness(0) invert(1);">
     <div style="display: flex; align-items: center; gap: 34px;">
@@ -16,27 +15,28 @@
     </div>
   </div>
 
-  <!-- lockup -->
-  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 96px;">
+  <!-- .hero-lockup — centered, width min(1120px, 100%) -->
+  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 1120px; margin-inline: auto; padding: 0 96px;">
     <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
       <span class="dot"></span>
       <span class="wf-label" style="color: rgba(255,255,255,0.55);">Brand systems, shaped by AI</span>
     </span>
 
-    <h1 style="font-family: var(--font-display); font-size: 132px; line-height: 0.9; letter-spacing: -0.046em; font-weight: 900; color: #fff; margin: 26px 0 0;">From idea<br>to identity<span class="grad">.</span></h1>
+    <h1 style="font-family: var(--font-display); font-size: 104px; line-height: 0.9; letter-spacing: -0.046em; font-weight: 900; color: #fff; margin: 26px 0 0;">From idea<br>to identity<span class="grad">.</span></h1>
 
-    <p style="font-size: 21px; color: rgba(255,255,255,0.72); max-width: 44ch; margin: 30px 0 0; line-height: 1.55; text-wrap: pretty;">One sentence in. Strategy, name, logo, palette, type and guidelines out &mdash; generated as one system.</p>
+    <p style="font-size: 21px; color: rgba(255,255,255,0.72); max-width: 52ch; margin: 20px auto 0; line-height: 1.55; text-wrap: pretty;">One sentence in. Strategy, name, logo, palette, type and guidelines out &mdash; generated as one system.</p>
 
-    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px; margin-top: 38px;">
-      <form style="display: flex; align-items: center; gap: 10px; width: 600px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 8px 8px 8px 22px;">
-        <span style="flex: 1; color: rgba(255,255,255,0.45); font-size: 16px;">A productivity tool for founders who run on rituals&hellip;</span>
-        <span style="display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 26px; width: 100%;">
+      <!-- .idea-input--hero — 720px, 106px min-height, button parked bottom-right -->
+      <form style="width: 720px; min-height: 106px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 1fr auto; align-items: end; gap: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 28px; padding: 20px 16px 14px 24px; text-align: left;">
+        <span style="grid-column: 1 / -1; grid-row: 1; align-self: start; color: rgba(255,255,255,0.45); font-size: 16px;">A productivity tool for founders who run on rituals&hellip;</span>
+        <span style="grid-column: 2; grid-row: 2; justify-self: end; display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
       </form>
-      <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.5);">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
+      <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: center;">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
     </div>
   </div>
 
-  <div style="position: absolute; z-index: 10; left: 96px; bottom: 44px; display: flex; align-items: center; gap: 12px;">
+  <div style="position: absolute; z-index: 10; left: 50%; transform: translateX(-50%); bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
     <span style="width: 1px; height: 34px; background: linear-gradient(rgba(255,255,255,0.6), transparent);"></span>
     <span class="wf-label" style="color: rgba(255,255,255,0.55);">Scroll</span>
   </div>

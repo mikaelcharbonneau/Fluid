@@ -27,6 +27,7 @@ export default function RootLayout({
     // #173 calls for, not a blanket workaround.
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>{children}</body>
+      <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async />
     </html>
   );
 }

@@ -1,30 +1,30 @@
 {
   "artboards": [
-    { "file": "Main.dc.html",    "title": "Current hero",              "x": 0,    "y": 0,    "w": 1440, "h": 900 },
-    { "file": "OptionA.dc.html", "title": "Option A — Show the output", "x": 1600, "y": 0,    "w": 1440, "h": 900 },
-    { "file": "OptionB.dc.html", "title": "Option B — Sentence first",  "x": 0,    "y": 1140, "w": 1440, "h": 900 },
-    { "file": "OptionC.dc.html", "title": "Option C — Editorial light", "x": 1600, "y": 1140, "w": 1440, "h": 900 }
+    { "file": "Main.dc.html",    "title": "Current hero",               "x": 0,    "y": 0,    "w": 1440, "h": 900 },
+    { "file": "OptionA.dc.html", "title": "Option A — Show the output",  "x": 1600, "y": 0,    "w": 1440, "h": 900 },
+    { "file": "OptionB.dc.html", "title": "Option B — Centre the light", "x": 0,    "y": 1140, "w": 1440, "h": 900 },
+    { "file": "OptionC.dc.html", "title": "Option C — Editorial light",  "x": 1600, "y": 1140, "w": 1440, "h": 900 }
   ],
   "annotations": [
     {
       "id": "note-current",
-      "x": 0, "y": -230, "w": 640,
-      "text": "CURRENT — recreated from src/components/marketing/Hero.tsx and marketing.css at 1440x900, real Metropolis and the real gradient JPG.\n\nWhat is working against it:\n• The 101deg scrim eats most of the field — the signature gradient reads as grey fog on the left two-thirds.\n• The gradient full stop after 'identity' is the only brand colour in the type, and at that size it is a dot.\n• Nothing in the frame shows what Fluid actually produces.\n• Sub, input and fine print are three greys at similar weight — the eye has no second stop after the headline."
+      "x": 0, "y": -270, "w": 640,
+      "text": "CURRENT — rebuilt from Hero.tsx and your working-tree marketing.css at 1440x900: centred lockup, 104px headline, 52ch sub, the 720x106 input with the button parked bottom-right, and the real Velaris shader (same GLSL, same four colours, speed 1.15, grain 0.18).\n\nWhat is still working against it:\n• The .hero-scrim is still the 101deg rake cut for the OLD left-aligned hero. Against a centred lockup it darkens the left and lets the right blow out — the headline sits half in fog, half in glare.\n• The gradient full stop after 'identity' is the only brand colour in the type, and at 104px it is a dot.\n• Nothing in the frame shows what Fluid actually produces.\n• Sub, input placeholder and fine print are three greys at similar weight."
     },
     {
       "id": "note-a",
-      "x": 1600, "y": -230, "w": 640,
-      "text": "OPTION A — SHOW THE OUTPUT\nKeeps the dark field and the lockup you already have; spends the empty right two-thirds on the thing the sentence produced — mark, wordmark, palette, typeface. The scrim is rebalanced so colour runs as a diagonal band through the middle instead of dying on the left.\n\nWhy: a product that generates brand systems currently shows none. This is the cheapest large gain in belief.\n\nTradeoff: busier, and the gradient stops being the sole subject. The example brand shown ('Ritualist') is a placeholder — swap in a real generated output before shipping."
+      "x": 1600, "y": -270, "w": 640,
+      "text": "OPTION A — SHOW THE OUTPUT\nGoes back to a two-column split and spends the right half on the identity that sentence produced: mark, wordmark, palette, typeface. Scrim rebalanced so colour runs as a diagonal band through the middle.\n\nWhy: a product that generates brand systems currently shows none of one. This is the biggest gain in belief available here.\n\nTradeoff: busier, gives up the centred composition you just moved to, and the shader stops being the sole subject. The example brand ('Ritualist') is a placeholder — swap in a real generated output before shipping."
     },
     {
       "id": "note-b",
-      "x": 0, "y": 910, "w": 640,
-      "text": "OPTION B — SENTENCE FIRST\nNear-black stage; the gradient is demoted from wallpaper to a bloom that exists only around the input, so colour appears to come out of the sentence. The control is the biggest element on the page (860px, 19px type), with the six deliverables named directly under it.\n\nWhy: the input is the one thing the page exists to get used, and right now it is the fourth element in the hierarchy.\n\nTradeoff: much less visual drama on first paint, and it leans on a centred composition, which is a bigger departure from the rest of your page."
+      "x": 0, "y": 880, "w": 640,
+      "text": "OPTION B — CENTRE THE LIGHT\nNote: the centring and the bigger input that this option originally argued for have already landed in your working tree. What is left is the part that did not: the scrim.\n\nHere it is radial and centred on the lockup instead of raking in at 101deg, so the type sits in an even pool of dark and the colour falls off symmetrically. Plus colour gathered behind the input, and the six deliverables named as chips so the sub's prose list becomes scannable.\n\nWhy: smallest diff on the board — a scrim swap and one row of chips.\n\nTradeoff: it is a correction, not a direction; it does not answer the missing-proof problem at all."
     },
     {
       "id": "note-c",
-      "x": 1600, "y": 910, "w": 640,
-      "text": "OPTION C — EDITORIAL LIGHT\nInverts the tone: --bg white, black display type, and the gradient contained as a full-saturation specimen bleeding off the right edge with nothing scrimming it. Unlocks the black --accent CTA, which the dark hero cannot use.\n\nWhy: the gradient finally looks like the asset it is, and the hero stops fighting the mostly-white page below it.\n\nTradeoff: loses the immersive full-bleed moment, and the nav's data-dark inversion and the hero's dark-glass input would both come out."
+      "x": 1600, "y": 880, "w": 640,
+      "text": "OPTION C — EDITORIAL LIGHT\nInverts the tone: --bg white, black display type, left-aligned, and the shader contained as a full-saturation specimen bleeding off the right edge with nothing scrimming it. Unlocks the black --accent CTA, which the dark hero cannot use.\n\nWhy: the shader finally reads at full strength instead of being 80% covered, and the hero stops fighting the mostly-white page below it.\n\nTradeoff: loses the immersive full-bleed moment, and the nav's data-dark inversion and the hero's dark-glass input would both come out."
     }
   ],
   "launch": { "view": "canvas" }

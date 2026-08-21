@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+:root { font-family: Inter, Arial, sans-serif; background: #101010; color: #f7f7f2; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #101010; }
+button { font: inherit; color: inherit; }
+.chapter-wireframe { min-height: 100vh; padding: 66px 74px; background: #101010; }
+.heading { display: grid; grid-template-columns: 1fr .9fr .8fr; align-items: end; gap: 50px; padding-bottom: 38px; border-bottom: 1px solid #4b4b48; }
+.heading > p { margin: 0; font: 600 11px monospace; text-transform: uppercase; letter-spacing: .09em; color: #8f8f88; }
+.heading h1 { margin: 0; font-size: 53px; line-height: .98; letter-spacing: -.05em; font-weight: 550; }
+.heading > span { font-size: 16px; line-height: 1.5; color: #a6a69e; }
+.chapter-layout { display: grid; grid-template-columns: 410px 1fr; gap: 26px; margin-top: 30px; min-height: 690px; }
+aside { border: 1px solid #4a4a46; }
+.aside-label { height: 54px; padding: 20px 22px; border-bottom: 1px solid #4a4a46; font: 600 10px monospace; text-transform: uppercase; color: #909089; }
+aside button { width: 100%; min-height: 118px; padding: 22px; border: 0; border-bottom: 1px solid #383835; background: transparent; display: grid; grid-template-columns: 42px 1fr 24px; gap: 12px; text-align: left; cursor: pointer; transition: .18s ease; }
+aside button:hover, aside button:focus-visible { background: #1d1d1b; outline: none; }
+aside button.active { background: #efefe9; color: #111; }
+aside button > span { font: 600 11px monospace; opacity: .55; }
+aside button div { display: flex; flex-direction: column; gap: 8px; }
+aside strong { font-size: 16px; font-weight: 600; }
+aside small { font-size: 12px; line-height: 1.35; opacity: .55; }
+aside button > i { font-style: normal; align-self: center; opacity: .4; }
+.preview { border: 1px solid #4a4a46; background: #171716; display: grid; grid-template-rows: 54px 1fr 52px; }
+.preview > header, .preview > footer { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: #94948d; font: 600 10px monospace; text-transform: uppercase; }
+.preview > header { border-bottom: 1px solid #4a4a46; }
+.preview > header div { display: flex; gap: 7px; }
+.preview > header i { width: 8px; height: 8px; border: 1px solid #85857e; border-radius: 50%; }
+.preview-body { padding: 34px; display: grid; grid-template-columns: 245px 1fr; gap: 30px; }
+.preview-title { padding-top: 34px; }
+.preview-title > span { font: 600 10px monospace; color: #8d8d86; text-transform: uppercase; }
+.preview-title h2 { margin: 18px 0 14px; font-size: 37px; line-height: 1; letter-spacing: -.04em; font-weight: 550; }
+.preview-title p { margin: 0; font-size: 15px; line-height: 1.5; color: #9b9b94; }
+.ui-shell { border: 1px solid #777770; background: #efefe9; color: #111; min-height: 500px; }
+.ui-top { height: 58px; border-bottom: 1px solid #aaa9a2; padding: 0 17px; display: flex; align-items: center; gap: 8px; }
+.ui-top span { width: 72px; height: 11px; background: #c5c5be; }
+.ui-top span:nth-child(2) { width: 44px; }
+.ui-top button { margin-left: auto; padding: 9px 18px; border: 1px solid #777; background: transparent; color: #111; }
+.ui-grid { display: grid; grid-template-columns: .85fr 1.15fr; min-height: 440px; }
+.ui-panel,.ui-result { padding: 30px; }
+.ui-panel { border-right: 1px solid #aaa9a2; display: flex; flex-direction: column; }
+.ui-grid small { font: 600 10px monospace; text-transform: uppercase; color: #666; }
+.ui-panel > i { height: 16px; margin-top: 16px; background: #c6c6bf; }
+.ui-panel > i:nth-of-type(2) { width: 72%; }
+.ui-panel > i:nth-of-type(3) { width: 54%; }
+.ui-panel button { margin-top: auto; min-height: 46px; border: 0; background: #161616; color: white; }
+.ui-result > div { display: grid; grid-template-rows: 190px 110px; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
+.ui-result i { border: 1px dashed #8d8d85; background: repeating-linear-gradient(45deg,#deded8,#deded8 7px,#d3d3cd 7px,#d3d3cd 14px); }
+.ui-result i:first-child { grid-column: span 2; }
+.preview > footer { border-top: 1px solid #4a4a46; }
+.preview > footer div { display: flex; gap: 6px; }
+.preview > footer i { width: 18px; height: 3px; background: #54544f; }
+.preview > footer i.active { background: #efefe9; }
+@media (max-width: 900px) { .chapter-wireframe { padding: 40px 24px; } .heading { grid-template-columns: 1fr; } .chapter-layout { grid-template-columns: 1fr; } .preview-body { grid-template-columns: 1fr; } }

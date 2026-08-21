@@ -49,27 +49,36 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: url("field.jpg") center / 200% 200% no-repeat;
     }
-    /* The field is demoted to a bloom behind the control — the gradient stops
-       being wallpaper and becomes the thing the sentence emits. */
-    .bloom {
-      position: absolute; left: 50%; top: 62%; width: 1500px; height: 720px;
-      transform: translate(-50%, -50%);
-      background: url("field.jpg") center 40% / cover no-repeat;
-      filter: saturate(1.7) blur(38px);
-      opacity: 0.62; z-index: 0; pointer-events: none;
-      -webkit-mask-image: radial-gradient(58% 46% at 50% 50%, #000 0%, rgba(0,0,0,0.55) 46%, transparent 78%);
-      mask-image: radial-gradient(58% 46% at 50% 50%, #000 0%, rgba(0,0,0,0.55) 46%, transparent 78%);
+    .field { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+    .field canvas {
+      position: absolute; inset: 0; display: block;
+      width: 100%; height: 100%; pointer-events: none;
     }
+    /* The one change that matters here: the scrim is radial and centred on the
+       lockup instead of raking in at 101deg. The shipped scrim was cut for a
+       LEFT-aligned hero — against the centred lockup it darkens the left and
+       lets the right blow out, so the headline sits half in fog, half in glare. */
+    .scrim {
+      position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background:
+        radial-gradient(78% 62% at 50% 52%,
+          rgba(9,9,13,0.90) 0%, rgba(9,9,13,0.80) 34%,
+          rgba(9,9,13,0.42) 62%, rgba(9,9,13,0.10) 88%),
+        linear-gradient(180deg, rgba(9,9,13,0.55) 0%, rgba(9,9,13,0) 22%,
+          rgba(9,9,13,0) 74%, rgba(9,9,13,0.50) 100%);
+    }
+    /* colour gathers where the sentence goes */
     .input-glow {
-      position: absolute; inset: -26px -34px; z-index: 0; border-radius: 999px;
+      position: absolute; inset: -30px -40px; z-index: 0; border-radius: 48px;
       background: url("field.jpg") center 45% / cover no-repeat;
-      filter: saturate(1.8) blur(26px); opacity: 0.85;
+      filter: saturate(1.7) blur(30px); opacity: 0.55;
     }
   </style>
 </helmet>
 <div class="stage" style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #08080B; color: #fff;">
 
-  <span class="bloom" aria-hidden="true"></span>
+  <div class="field" aria-hidden="true"><canvas id="velaris-b"></canvas></div>
+  <span class="scrim" aria-hidden="true"></span>
   <span class="grain" aria-hidden="true"></span>
 
   <div style="position: absolute; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 18px 48px;">
@@ -82,43 +91,212 @@
     </div>
   </div>
 
-  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 96px;">
+  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 1120px; margin-inline: auto; padding: 0 96px;">
 
-    <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);">
+    <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
       <span class="dot"></span>
-      <span class="wf-label" style="color: rgba(255,255,255,0.58);">Brand systems, shaped by AI</span>
+      <span class="wf-label" style="color: rgba(255,255,255,0.6);">Brand systems, shaped by AI</span>
     </span>
 
-    <h1 style="font-family: var(--font-display); font-size: 112px; line-height: 0.88; letter-spacing: -0.05em; font-weight: 900; color: #fff; margin: 30px 0 0; text-align: center;">From idea to <span class="grad">identity</span>.</h1>
+    <h1 style="font-family: var(--font-display); font-size: 104px; line-height: 0.9; letter-spacing: -0.046em; font-weight: 900; color: #fff; margin: 26px 0 0;">From idea<br>to identity<span class="grad">.</span></h1>
 
-    <p style="font-size: 20px; color: rgba(255,255,255,0.6); max-width: 52ch; margin: 26px 0 0; line-height: 1.5; text-align: center; text-wrap: pretty;">Describe what you are building. Fluid returns strategy, a name, a logo, a palette, type and guidelines &mdash; as one system.</p>
+    <p style="font-size: 21px; color: rgba(255,255,255,0.74); max-width: 52ch; margin: 20px auto 0; line-height: 1.55; text-wrap: pretty;">One sentence in. Strategy, name, logo, palette, type and guidelines out &mdash; generated as one system.</p>
 
-    <!-- the control is the subject: colour only exists where the sentence goes -->
-    <div style="position: relative; margin-top: 46px; width: 860px;">
-      <span class="input-glow" aria-hidden="true"></span>
-      <form style="position: relative; z-index: 2; display: flex; align-items: center; gap: 12px; background: rgba(14,14,19,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 10px 10px 10px 28px; box-shadow: 0 24px 70px rgba(0,0,0,0.55);">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M10 3.5v13"></path><path d="M3.5 10h13"></path><path d="M6 6l8 8"></path><path d="M14 6l-8 8"></path></svg>
-        <span style="flex: 1; color: rgba(255,255,255,0.5); font-size: 19px; letter-spacing: -0.01em;">A productivity tool for founders who run on rituals&hellip;</span>
-        <span style="display: inline-flex; align-items: center; gap: 9px; padding: 16px 28px; border-radius: 999px; background: #fff; color: #000; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
-      </form>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 26px; width: 100%;">
+      <!-- colour is allowed to gather around the control instead of the corner -->
+      <div style="position: relative; width: 720px;">
+        <span class="input-glow" aria-hidden="true"></span>
+        <form style="position: relative; z-index: 2; width: 100%; min-height: 106px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 1fr auto; align-items: end; gap: 10px; background: rgba(12,12,17,0.62); border: 1px solid rgba(255,255,255,0.22); border-radius: 28px; padding: 20px 16px 14px 24px; text-align: left; box-shadow: 0 24px 70px rgba(0,0,0,0.5);">
+          <span style="grid-column: 1 / -1; grid-row: 1; align-self: start; color: rgba(255,255,255,0.5); font-size: 16px;">A productivity tool for founders who run on rituals&hellip;</span>
+          <span style="grid-column: 2; grid-row: 2; justify-self: end; display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
+        </form>
+      </div>
+
+      <!-- what comes back, named — the sub says it in prose, this makes it scannable -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Strategy</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Name</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Logo</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Palette</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Type</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Guidelines</span>
+      </div>
+
+      <p style="margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: center;">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
     </div>
+  </div>
 
-    <!-- what comes back, named -->
-    <div style="display: flex; align-items: center; gap: 10px; margin-top: 26px;">
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Strategy</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Name</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Logo</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Palette</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Type</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Guidelines</span>
-    </div>
-
-    <p style="margin: 30px 0 0; font-size: 13px; color: rgba(255,255,255,0.45);">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: rgba(255,255,255,0.8); text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: rgba(255,255,255,0.8); text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
+  <div style="position: absolute; z-index: 10; left: 50%; transform: translateX(-50%); bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+    <span style="width: 1px; height: 34px; background: linear-gradient(rgba(255,255,255,0.6), transparent);"></span>
+    <span class="wf-label" style="color: rgba(255,255,255,0.55);">Scroll</span>
   </div>
 </div>
 </x-dc>
 <script data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+// Ported verbatim from src/components/ui/velaris.tsx so the artboards show the
+// real hero field, not an approximation. Only difference: preserveDrawingBuffer,
+// so PNG/PDF export captures the shader instead of a blank frame.
+var VELARIS_VERT = `
+attribute vec2 position;
+varying vec2 vUv;
+void main() {
+  vUv = position * 0.5 + 0.5;
+  gl_Position = vec4(position, 0.0, 1.0);
+}
+`;
+var VELARIS_FRAG = `
+precision highp float;
+varying vec2 vUv;
+
+uniform vec2  u_resolution;
+uniform float u_time;
+uniform float u_grain;
+uniform vec3  u_colors[4];
+uniform vec3  u_bg;
+
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+float snoise(vec2 v){
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+           -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy) );
+  vec2 x0 = v -   i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+  + i.x + vec3(0.0, i1.x, 1.0 ));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+    dot(x12.zw,x12.zw)), 0.0);
+  m = m*m ;
+  m = m*m ;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+void main() {
+  vec2 uv = vUv;
+  float ratio = u_resolution.x / u_resolution.y;
+  vec2 p = uv - 0.5;
+  p.x *= ratio;
+
+  float t = u_time * 0.1;
+
+  float n1 = snoise(p * 0.4 + vec2(t * 0.2, -t * 0.3));
+  float n2 = snoise(p * 0.55 + vec2(-t * 0.15, t * 0.25) + n1 * 0.25);
+  float n3 = snoise(p * 0.75 + vec2(t * 0.1, -t * 0.2) + n2 * 0.2);
+
+  vec3 col = u_bg;
+
+  float dist = length(p) * 1.5;
+  float vignette = 1.0 - smoothstep(0.3, 1.2, dist);
+
+  col = mix(col, u_colors[0], smoothstep(-0.2, 0.5, n1) * 0.85);
+  col = mix(col, u_colors[1], smoothstep(-0.1, 0.6, n2) * 0.7);
+  col = mix(col, u_colors[2], smoothstep(-0.3, 0.4, n3) * 0.6);
+  col = mix(col, u_colors[3], smoothstep(0.0, 0.7, n1 * n2) * 0.5);
+
+  float glow = smoothstep(0.8, 0.0, dist) * 0.3;
+  col += u_colors[1] * glow;
+
+  col = mix(col * 0.2, col, vignette);
+
+  float grain = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453 + u_time);
+  col += (grain - 0.5) * u_grain * 0.1;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function hexToRgb(hex) {
+  var v = hex.replace("#", "");
+  return [parseInt(v.slice(0,2),16)/255, parseInt(v.slice(2,4),16)/255, parseInt(v.slice(4,6),16)/255];
+}
+
+function mountVelaris(canvas, opts) {
+  if (!canvas) return;
+  var bg = opts.bg || "#09090D";
+  var colors = opts.colors || [];
+  var speed = opts.speed == null ? 1.15 : opts.speed;
+  var grain = opts.grain == null ? 0.18 : opts.grain;
+  var gl = canvas.getContext("webgl", { alpha: false, antialias: false, preserveDrawingBuffer: true });
+  if (!gl) return;
+
+  function shader(type, source) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+
+  var program = gl.createProgram();
+  gl.attachShader(program, shader(gl.VERTEX_SHADER, VELARIS_VERT));
+  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, VELARIS_FRAG));
+  gl.linkProgram(program);
+  gl.useProgram(program);
+
+  var buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  var position = gl.getAttribLocation(program, "position");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+  var loc = {
+    resolution: gl.getUniformLocation(program, "u_resolution"),
+    time: gl.getUniformLocation(program, "u_time"),
+    grain: gl.getUniformLocation(program, "u_grain"),
+    colors: gl.getUniformLocation(program, "u_colors"),
+    background: gl.getUniformLocation(program, "u_bg")
+  };
+
+  var palette = colors.slice(0, 4);
+  while (palette.length < 4) palette.push(palette[palette.length - 1] || bg);
+  var flat = new Float32Array(palette.reduce(function (acc, c) { return acc.concat(hexToRgb(c)); }, []));
+  var background = hexToRgb(bg);
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function render(t) {
+    gl.uniform2f(loc.resolution, canvas.width, canvas.height);
+    gl.uniform1f(loc.time, (t + 9000) * 0.001 * speed);
+    gl.uniform1f(loc.grain, grain);
+    gl.uniform3f(loc.background, background[0], background[1], background[2]);
+    gl.uniform3fv(loc.colors, flat);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (!still) requestAnimationFrame(render);
+  }
+  // The +9000ms offset above starts the field mid-drift rather than on the
+  // flat opening frame — the live hero has usually been running a while by
+  // the time anyone looks at it.
+  requestAnimationFrame(render);
+}
 class Component extends DCLogic {
+  componentDidMount() {
+    mountVelaris(document.getElementById("velaris-b"), {
+      bg: "#08080B",
+      colors: ["#5FD7D3", "#D9D2EE", "#FF7A4F", "#FFC95A"],
+      speed: 1.15,
+      grain: 0.18
+    });
+  }
   renderVals() { return {}; }
 }
 </script>

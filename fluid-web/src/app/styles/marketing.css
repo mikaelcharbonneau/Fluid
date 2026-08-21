@@ -172,8 +172,7 @@ body.custom-cursor .btn { cursor: none; }
    HERO — "Liquid Field"
    ---------------------------------------------------------
    A dark, full-bleed hero: the brand gradient is the subject,
-   scaled up and drifting, with a raking scrim that keeps the
-   type side dark and lets the colour run on the other.
+   scaled up and drifting behind a centered prompt-led lockup.
 
    This replaced the old light hero along with ~80 lines of
    `.canvas` / `.frag` rules for an "assembling identity"
@@ -218,9 +217,10 @@ body.custom-cursor .btn { cursor: none; }
 /* ---- lockup ---- */
 .hero-lockup {
   position: relative; z-index: 10;
-  display: flex; flex-direction: column; align-items: flex-start;
+  display: flex; flex-direction: column; align-items: center;
   padding: 0 clamp(20px, 6.7vw, 96px);
-  width: 100%;
+  width: min(1120px, 100%); margin-inline: auto;
+  text-align: center;
 }
 .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 9px;
@@ -238,7 +238,7 @@ body.custom-cursor .btn { cursor: none; }
 .hero-eyebrow .wf-label { color: rgba(255,255,255,0.55); }
 
 .hero h1 {
-  font-size: clamp(52px, 9.2vw, 132px);
+  font-size: clamp(52px, 7.2vw, 104px);
   line-height: 0.9; letter-spacing: -0.046em; font-weight: 900;
   color: #fff; margin: 26px 0 0;
 }
@@ -249,17 +249,17 @@ body.custom-cursor .btn { cursor: none; }
 }
 .hero-sub {
   font-size: clamp(17px, 1.45vw, 21px);
-  color: rgba(255,255,255,0.72);
-  max-width: 44ch; margin: 30px 0 0; line-height: 1.55; text-wrap: pretty;
+  color: rgba(255,255,255,0.72); text-align: center;
+  max-width: 52ch; margin: 20px auto 0; line-height: 1.55; text-wrap: pretty;
 }
-.hero-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; margin-top: 38px; width: 100%; }
-.hero-fine { margin: 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: left; }
+.hero-cta { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 26px; width: 100%; }
+.hero-fine { margin: 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: center; }
 .hero-fine a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
 
 .scroll-cue {
   position: absolute; z-index: 10;
-  left: clamp(20px, 6.7vw, 96px); bottom: 44px;
-  display: flex; align-items: center; gap: 12px;
+  left: 50%; bottom: 30px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .scroll-cue .bar {
   width: 1px; height: 34px; transform-origin: top;
@@ -270,7 +270,7 @@ body.custom-cursor .btn { cursor: none; }
 .scroll-cue .wf-label { color: rgba(255,255,255,0.55); }
 
 @media (max-width: 680px) {
-  .hero { min-height: 620px; padding: 92px 0 52px; align-items: flex-start; }
+  .hero { min-height: 680px; padding: 92px 0 52px; align-items: center; }
   .hero h1 { font-size: clamp(44px, 13vw, 64px); letter-spacing: -0.04em; margin-top: 20px; }
   .hero-sub { font-size: 16px; margin-top: 20px; }
   .hero-cta { margin-top: 26px; }
@@ -913,7 +913,20 @@ body.custom-cursor .btn { cursor: none; }
    only its box changes. (It previously carried a light override here, for the
    light hero that #178 introduced.) */
 .idea-input--hero {
-  margin: 0; width: min(600px, 100%);
+  margin: 0; width: min(720px, 100%); max-width: 720px; min-height: 106px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto; align-items: end;
+  padding: 20px 16px 14px 24px; border-radius: 28px;
+}
+.idea-input--hero input {
+  grid-column: 1 / -1; grid-row: 1;
+  width: 100%; align-self: start;
+}
+.idea-input--hero .metal-cta {
+  grid-column: 2; grid-row: 2; justify-self: end;
+}
+@media (max-width: 680px) {
+  .idea-input--hero { min-height: 108px; padding: 17px 12px 12px 18px; border-radius: 24px; }
 }
 .final .sub { color: rgba(255,255,255,0.6); margin-top: 22px; font-size: 15px; }
 

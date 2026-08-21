@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "441239182652895232",
+  "projectId": "441238668703850496",
+  "selectedRevisionId": "441248114544881664",
+  "baseRevisionId": "441248114544881664",
+  "jobId": "440773436005052416-external-agent-441248281062952960",
+  "generatedName": "fierce-week-5451",
+  "name": "Fluid Homepage — Current",
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "05b51a2393f6cf4fc7a21abea50ee33b77f28d982ad1696cd74822b26e7fbc00"
+    },
+    {
+      "path": "src/components/generated/FluidHomepageCurrent.tsx",
+      "sha256": "cde434dfdb0502815f7ea01f24792825139cef235a59fceceab493f25aba8db2"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "98fdd9586b6a53275ab9f7a53287fcc99d61a0b375322cdbab39e47c47bd9785"
+    }
+  ],
+  "dimensions": {
+    "width": 1440,
+    "height": 900
+  }
+}

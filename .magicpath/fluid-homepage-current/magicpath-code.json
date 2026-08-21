@@ -1,0 +1,77 @@
+{
+  "mode": "edit",
+  "componentId": "441239182652895232",
+  "projectId": "441238668703850496",
+  "selectedRevisionId": "441239182652895233",
+  "jobId": "440773436005052416-external-agent-441240688206684160",
+  "generatedName": "fierce-week-5451",
+  "name": "Fluid Homepage — Current",
+  "dimensions": {
+    "width": 1440,
+    "height": 5600
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "assets/fluid-app-icon.png",
+      "sha256": "862c893ec06c7cac00459aa4d35f085a8db352f36d021960baba1af999352a0a"
+    },
+    {
+      "path": "assets/fluid-gradient.jpg",
+      "sha256": "5effe95eb112e26e7b603317d8621d5ad0dea44581a6b2b6f7ef93a5cc9a6414"
+    },
+    {
+      "path": "assets/fluid-mark.png",
+      "sha256": "d197e8e12cefd1f1044df7f00650f656684b797ef163d0b7c46092705f7cab1c"
+    },
+    {
+      "path": "assets/fluid-nav.png",
+      "sha256": "bf401e1001fe030492df4cc80094fe9892de4a7e75e9957dcca1f419b7a0c7ea"
+    },
+    {
+      "path": "assets/fluid-wordmark.png",
+      "sha256": "86b6b6abcfebcdf97bc839208aa59ddde5dc91b80c0a1b6a8c2182b631614c81"
+    },
+    {
+      "path": "assets/mosaic-1.jpg",
+      "sha256": "deccfb69d1d6d516a3da4b5b6f83350b0413cb231eaa5f94b13d0d13c52b47b5"
+    },
+    {
+      "path": "assets/mosaic-2.jpg",
+      "sha256": "d6d7b9a2947a16fe741a71173416706785aa60b126bc1b94255301a509e0a105"
+    },
+    {
+      "path": "assets/mosaic-3.jpg",
+      "sha256": "580a726c0eb354be7b21ccaa288afa2765b8bd59b924b0bccd01ee37471cf85b"
+    },
+    {
+      "path": "assets/service-graphics.jpg",
+      "sha256": "fd2d5fa0d9e912ada51046496be409edffb363719a02ac3f7366a33cbfd1f77e"
+    },
+    {
+      "path": "assets/service-guidelines.jpg",
+      "sha256": "6accab6947a83f92bbddc74f4d56e8f7425103ff10bcbbdc9e9b0079e0067243"
+    },
+    {
+      "path": "assets/service-logo.jpg",
+      "sha256": "22f100144da3783543b248b281034f0f94a0a2d595938c732e85946b591d6873"
+    },
+    {
+      "path": "assets/service-name.jpg",
+      "sha256": "bca803011251b39e90647ffd3095a6465881c9b274fe7b8c18d15c856555b1f0"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "05b51a2393f6cf4fc7a21abea50ee33b77f28d982ad1696cd74822b26e7fbc00"
+    },
+    {
+      "path": "src/components/generated/FluidHomepageCurrent.tsx",
+      "sha256": "a53153c62f8b8bab99718d240dd65f8c25f1f95f911905e67647b5fc8db6aab4"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "4643143cadf1d2590e060ba7d5eec118ebb5bebb3f49c6157e72f35d9548336b"
+    }
+  ],
+  "baseRevisionId": "441239182652895233"
+}

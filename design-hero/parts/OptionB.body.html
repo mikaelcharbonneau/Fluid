@@ -1,6 +1,7 @@
 <div class="stage" style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #08080B; color: #fff;">
 
-  <span class="bloom" aria-hidden="true"></span>
+  <div class="field" aria-hidden="true"><canvas id="velaris-b"></canvas></div>
+  <span class="scrim" aria-hidden="true"></span>
   <span class="grain" aria-hidden="true"></span>
 
   <div style="position: absolute; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 18px 48px;">
@@ -13,37 +14,43 @@
     </div>
   </div>
 
-  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 96px;">
+  <div style="position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 1120px; margin-inline: auto; padding: 0 96px;">
 
-    <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);">
+    <span style="display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
       <span class="dot"></span>
-      <span class="wf-label" style="color: rgba(255,255,255,0.58);">Brand systems, shaped by AI</span>
+      <span class="wf-label" style="color: rgba(255,255,255,0.6);">Brand systems, shaped by AI</span>
     </span>
 
-    <h1 style="font-family: var(--font-display); font-size: 112px; line-height: 0.88; letter-spacing: -0.05em; font-weight: 900; color: #fff; margin: 30px 0 0; text-align: center;">From idea to <span class="grad">identity</span>.</h1>
+    <h1 style="font-family: var(--font-display); font-size: 104px; line-height: 0.9; letter-spacing: -0.046em; font-weight: 900; color: #fff; margin: 26px 0 0;">From idea<br>to identity<span class="grad">.</span></h1>
 
-    <p style="font-size: 20px; color: rgba(255,255,255,0.6); max-width: 52ch; margin: 26px 0 0; line-height: 1.5; text-align: center; text-wrap: pretty;">Describe what you are building. Fluid returns strategy, a name, a logo, a palette, type and guidelines &mdash; as one system.</p>
+    <p style="font-size: 21px; color: rgba(255,255,255,0.74); max-width: 52ch; margin: 20px auto 0; line-height: 1.55; text-wrap: pretty;">One sentence in. Strategy, name, logo, palette, type and guidelines out &mdash; generated as one system.</p>
 
-    <!-- the control is the subject: colour only exists where the sentence goes -->
-    <div style="position: relative; margin-top: 46px; width: 860px;">
-      <span class="input-glow" aria-hidden="true"></span>
-      <form style="position: relative; z-index: 2; display: flex; align-items: center; gap: 12px; background: rgba(14,14,19,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 10px 10px 10px 28px; box-shadow: 0 24px 70px rgba(0,0,0,0.55);">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M10 3.5v13"></path><path d="M3.5 10h13"></path><path d="M6 6l8 8"></path><path d="M14 6l-8 8"></path></svg>
-        <span style="flex: 1; color: rgba(255,255,255,0.5); font-size: 19px; letter-spacing: -0.01em;">A productivity tool for founders who run on rituals&hellip;</span>
-        <span style="display: inline-flex; align-items: center; gap: 9px; padding: 16px 28px; border-radius: 999px; background: #fff; color: #000; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
-      </form>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 26px; width: 100%;">
+      <!-- colour is allowed to gather around the control instead of the corner -->
+      <div style="position: relative; width: 720px;">
+        <span class="input-glow" aria-hidden="true"></span>
+        <form style="position: relative; z-index: 2; width: 100%; min-height: 106px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 1fr auto; align-items: end; gap: 10px; background: rgba(12,12,17,0.62); border: 1px solid rgba(255,255,255,0.22); border-radius: 28px; padding: 20px 16px 14px 24px; text-align: left; box-shadow: 0 24px 70px rgba(0,0,0,0.5);">
+          <span style="grid-column: 1 / -1; grid-row: 1; align-self: start; color: rgba(255,255,255,0.5); font-size: 16px;">A productivity tool for founders who run on rituals&hellip;</span>
+          <span style="grid-column: 2; grid-row: 2; justify-self: end; display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Start free <span>&#8594;</span></span>
+        </form>
+      </div>
+
+      <!-- what comes back, named — the sub says it in prose, this makes it scannable -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Strategy</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Name</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Logo</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Palette</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Type</span>
+        <span style="padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Guidelines</span>
+      </div>
+
+      <p style="margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,0.5); text-align: center;">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: #fff; text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
     </div>
+  </div>
 
-    <!-- what comes back, named -->
-    <div style="display: flex; align-items: center; gap: 10px; margin-top: 26px;">
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Strategy</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Name</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Logo</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Palette</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Type</span>
-      <span style="padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); font-size: 14px; color: rgba(255,255,255,0.78);">Guidelines</span>
-    </div>
-
-    <p style="margin: 30px 0 0; font-size: 13px; color: rgba(255,255,255,0.45);">Free to start &mdash; 20 tokens, no card. <a href="#" style="color: rgba(255,255,255,0.8); text-decoration: underline; text-underline-offset: 2px;">See pricing</a> or <a href="#" style="color: rgba(255,255,255,0.8); text-decoration: underline; text-underline-offset: 2px;">watch how it works</a>.</p>
+  <div style="position: absolute; z-index: 10; left: 50%; transform: translateX(-50%); bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+    <span style="width: 1px; height: 34px; background: linear-gradient(rgba(255,255,255,0.6), transparent);"></span>
+    <span class="wf-label" style="color: rgba(255,255,255,0.55);">Scroll</span>
   </div>
 </div>
