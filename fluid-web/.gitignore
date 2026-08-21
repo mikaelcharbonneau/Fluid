@@ -25,6 +25,10 @@
 # production
 /build
 
+# local-only archive of retired workflows; restore from the annotated Git tag
+/archive/*
+!/archive/README.md
+
 # misc
 .DS_Store
 *.pem

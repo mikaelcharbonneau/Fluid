@@ -14,18 +14,12 @@ import React from "react";
 // this file into its own module.
 interface BrandDraftContextValue {
   brands: any[];
-  draft: any;
   user: any;
   billing: any;
   refreshBalance: () => Promise<void>;
-  setField: (key: any, value: any) => void;
-  setData: (patch: any) => void;
-  startNew: (input?: any) => Promise<any>;
-  loadBrand: (id: any) => any;
   refresh: () => Promise<void>;
 }
 
 export const BrandDraftCtx = React.createContext<BrandDraftContextValue | null>(null);
 
 export const useBrandDraft = () => (React.useContext(BrandDraftCtx) || {}) as BrandDraftContextValue;
-

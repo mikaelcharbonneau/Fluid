@@ -19,10 +19,6 @@ export function checkRequiredEnv(): { missing: string[]; warnings: string[] } {
   if (serverEnv.VERCEL_TEAM_ID && !serverEnv.VERCEL_ACCESS_TOKEN) {
     warnings.push("VERCEL_TEAM_ID is set but VERCEL_ACCESS_TOKEN is not — domain availability stays disabled.");
   }
-  if (serverEnv.CRON_SECRET && serverEnv.GENERATION_JOBS_CRON_SECRET) {
-    warnings.push("Both CRON_SECRET and GENERATION_JOBS_CRON_SECRET are set — CRON_SECRET takes precedence.");
-  }
-
   return { missing, warnings };
 }
 

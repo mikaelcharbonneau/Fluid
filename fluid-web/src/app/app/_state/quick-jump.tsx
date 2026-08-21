@@ -17,23 +17,12 @@ export function QuickJump() {
   const [open, setOpen] = useState(false);
   const routes = [
     { id: 'home',         label: 'Home' },
+    { id: 'chat',         label: 'Brand kit' },
     { id: 'brands',       label: 'Brands' },
     { id: 'brands-empty', label: 'Empty library' },
     { id: 'assets',       label: 'Assets' },
     { id: 'guides',       label: 'Guides' },
     { id: 'settings',     label: 'Settings' },
-    { id: 'logo-brief',   label: 'Logo · 1 Brief' },
-    { id: 'logo-direction', label: 'Logo · 2 Direction' },
-    { id: 'logo-type',    label: 'Logo · 3 Type' },
-    { id: 'logo-references', label: 'Logo · 4 References' },
-    { id: 'logo-sketches', label: 'Logo · 5 Concepts' },
-    { id: 'logo-refine',  label: 'Logo · 6 Refine' },
-    { id: 'logo-export',  label: 'Logo · 7 Export' },
-    { id: 'step1',        label: 'Wizard · 1 Brief' },
-    { id: 'step2',        label: 'Wizard · 2 Name' },
-    { id: 'step3',        label: 'Wizard · 3 Logo' },
-    { id: 'step4',        label: 'Wizard · 4 Style' },
-    { id: 'step5',        label: 'Brand kit' },
   ];
   return (
     <>
@@ -92,4 +81,3 @@ export function QuickJump() {
     </>
   );
 }
-

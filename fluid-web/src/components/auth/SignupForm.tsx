@@ -46,7 +46,7 @@ export function SignupForm() {
         return;
       }
       if (res.ok) {
-        window.location.assign("/app/step1");
+        window.location.assign("/app/chat");
         return;
       }
       setError(data?.error || "Something went wrong. Try again.");
